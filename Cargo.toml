@@ -1,0 +1,11 @@
+[package]
+name = "verco"
+version = "0.1.0"
+authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
+
+[dependencies]
+termion = { git = "https://github.com/mcgoo/termion", branch = "windows" }
+
+[[bin]]
+name = "verco"
+path = "src/main.rs"
