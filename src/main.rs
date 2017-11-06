@@ -9,5 +9,5 @@ fn main() {
 	let _guard = termion::init();
 
 	let vc = VersionControl {};
-	tui::show();
+	tui::show(&vc);
 }

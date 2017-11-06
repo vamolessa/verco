@@ -5,7 +5,9 @@ use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use std::io::{stdin, stdout, Write};
 
-pub fn show() {
+use version_control::{Action, VersionControl};
+
+pub fn show(version_control: &VersionControl) {
 	let stdin = stdin();
 	let mut stdout = stdout().into_raw_mode().unwrap();
 
@@ -30,21 +32,20 @@ pub fn show() {
 		).unwrap();
 
 		match c.unwrap() {
-			Key::Char('q') => break,
-			Key::Char(c) => println!("{}", c),
-			Key::Alt(c) => println!("^{}", c),
-			Key::Ctrl(c) => println!("*{}", c),
-			Key::Esc => println!("ESC"),
-			Key::Left => println!("←"),
-			Key::Right => println!("→"),
-			Key::Up => println!("↑"),
-			Key::Down => println!("↓"),
-			Key::Backspace => println!("×"),
-			_ => {}
+			Key::Ctrl('c') => break,
+			Key::Ctrl('s') => show_action(version_control, Action::Status, &mut stdout),
+			_ => (),
 		}
 
 		stdout.flush().unwrap();
 	}
 
 	write!(stdout, "{}", termion::cursor::Show).unwrap();
+}
+
+fn show_action<T: Write>(version_control: &VersionControl, action: Action, stdout: &mut T) {
+	match version_control.on_action(action) {
+		Ok(result) => write!(stdout, "{}", result),
+		Err(error) => write!(stdout, "{}", error),
+	}.unwrap();
 }
