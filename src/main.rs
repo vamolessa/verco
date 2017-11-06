@@ -2,31 +2,31 @@ extern crate termion;
 
 use termion::event::Key;
 use termion::input::TermRead;
-use std::io::{Write};
+use std::io::Write;
 
-mod console;
-use console::Console;
+mod tui;
+use tui::Tui;
 
 fn main() {
 	let _guard = termion::init();
 
-	let mut console = Console::new();
+	let mut tui = Tui::new();
 
-	console.clear();
+	tui.clear();
 
 	write!(
-		console.stdout,
+		tui.stdout,
 		"{}{}q to exit. Type stuff, use alt, and so on.{}",
 		termion::clear::All,
 		termion::cursor::Goto(1, 1),
 		termion::cursor::Hide
 	).unwrap();
 
-	console.stdout.flush().unwrap();
+	tui.stdout.flush().unwrap();
 
-	for c in console.stdin.keys() {
+	for c in tui.stdin.keys() {
 		write!(
-			console.stdout,
+			tui.stdout,
 			"{}{}",
 			termion::cursor::Goto(1, 1),
 			termion::clear::CurrentLine
@@ -46,8 +46,8 @@ fn main() {
 			_ => {}
 		}
 
-		console.stdout.flush().unwrap();
+		tui.stdout.flush().unwrap();
 	}
 
-	write!(console.stdout, "{}", termion::cursor::Show).unwrap();
+	write!(tui.stdout, "{}", termion::cursor::Show).unwrap();
 }

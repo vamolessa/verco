@@ -3,14 +3,14 @@ extern crate termion;
 use termion::raw::{IntoRawMode, RawTerminal};
 use std::io::{stdin, stdout, Stdin, Stdout, Write};
 
-pub struct Console {
+pub struct Tui {
 	pub stdin: Stdin,
 	pub stdout: RawTerminal<Stdout>,
 }
 
-impl Console {
-	pub fn new() -> Console {
-		Console {
+impl Tui {
+	pub fn new() -> Tui {
+		Tui {
 			stdin: stdin(),
 			stdout: stdout().into_raw_mode().unwrap(),
 		}
