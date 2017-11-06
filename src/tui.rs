@@ -2,74 +2,57 @@ extern crate termion;
 
 use termion::event::Key;
 use termion::input::TermRead;
-use termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{stdin, stdout, Error, Stdin, Stdout, Write};
+use termion::raw::IntoRawMode;
+use std::io::{stdin, stdout, Write};
 
 use version_control::{Action, VersionControl};
 
-pub struct Tui {
-	reader: Stdin,
-	writer: RawTerminal<Stdout>,
-}
+pub fn show(version_control: &VersionControl) {
+	let stdin = stdin();
+	let mut stdout = stdout().into_raw_mode().unwrap();
 
-impl Tui {
-	pub fn init() -> Tui {
-		Tui {
-			reader: stdin(),
-			writer: stdout().into_raw_mode().unwrap(),
-		}
-	}
+	write!(
+		stdout,
+		"{}{}q to exit. Type stuff, use alt, and so on.{}",
+		termion::clear::All,
+		termion::cursor::Goto(1, 1),
+		termion::cursor::Hide
+	).unwrap();
 
-	pub fn show(&mut self, version_control: &VersionControl) {
+	flush(&mut stdout);
+
+	for c in stdin.keys() {
 		write!(
-			self.writer,
-			"{}{}q to exit. Type stuff, use alt, and so on.{}",
-			termion::clear::All,
+			stdout,
+			"{}{}",
 			termion::cursor::Goto(1, 1),
-			termion::cursor::Hide
+			termion::clear::CurrentLine
 		).unwrap();
 
-		self.flush();
+		match c.unwrap() {
+			Key::Ctrl('c') => break,
 
-		let keys: Vec<Result<Key, Error>> = (&mut self.reader).keys().collect();
+			Key::Ctrl('s') => show_action(version_control, Action::Status, &mut stdout),
 
-		for c in keys {
-			write!(
-				self.writer,
-				"{}{}",
-				termion::cursor::Goto(1, 1),
-				termion::clear::CurrentLine
-			).unwrap();
+			Key::Char(c) => println!("{}", c),
+			Key::Ctrl(c) => println!("ctrl+{}", c),
 
-			match c.unwrap() {
-				Key::Ctrl('c') => break,
-
-				Key::Ctrl('s') => self.show_action(version_control, Action::Status),
-
-				Key::Char(c) => println!("{}", c),
-				Key::Ctrl(c) => println!("ctrl+{}", c),
-
-				_ => (),
-			}
-
-			self.flush();
+			_ => (),
 		}
 
-		write!(self.writer, "{}", termion::cursor::Show).unwrap();
+		flush(&mut stdout);
 	}
 
-	fn show_action(&mut self, version_control: &VersionControl, action: Action) {
-		match version_control.on_action(action) {
-			Ok(result) => write!(self.writer, "{}", result),
-			Err(error) => write!(self.writer, "{}", error),
-		}.unwrap();
-	}
+	write!(stdout, "{}", termion::cursor::Show).unwrap();
+}
 
-	fn clear(&mut self) {
-		write!(self.writer, "{}", termion::clear::All).unwrap();
-	}
+fn show_action<T: Write>(version_control: &VersionControl, action: Action, stdout: &mut T) {
+	match version_control.on_action(action) {
+		Ok(result) => write!(stdout, "{}", result),
+		Err(error) => write!(stdout, "{}", error),
+	}.unwrap();
+}
 
-	fn flush(&mut self) {
-		self.writer.flush().unwrap();
-	}
+fn flush<T: Write>(stdout: &mut T) {
+	stdout.flush().unwrap();
 }
