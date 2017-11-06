@@ -1,3 +1,5 @@
+use std::process::Command;
+
 pub struct VersionControl {}
 
 pub enum Action {
@@ -12,6 +14,11 @@ impl VersionControl {
 	}
 
 	fn status(&self) -> Result<String, String> {
-		Ok(String::from("aaaeeeeee"))
+		let output = Command::new("git")
+			.arg("-c color.status=always status")
+			.output()
+			.expect("Could not run 'status'");
+
+		return Ok(String::from_utf8_lossy(&output.stdout[..]).into_owned());
 	}
 }
