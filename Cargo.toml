@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
 
 [dependencies]
+serde = "*"
+serde_json = "*"
+serde_derive = "*"
 termion = { git = "https://github.com/mcgoo/termion", branch = "windows" }
 
 [[bin]]

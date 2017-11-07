@@ -5,7 +5,7 @@ use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use std::io::{stdin, stdout, Write};
 
-use version_control::{Action, VersionControl};
+use version_control::VersionControl;
 
 pub fn show(version_control: &VersionControl) {
 	let stdin = stdin();
@@ -13,10 +13,9 @@ pub fn show(version_control: &VersionControl) {
 
 	write!(
 		stdout,
-		"{}{}q to exit. Type stuff, use alt, and so on.{}",
+		"{}{}q to exit. Type stuff, use alt, and so on.",
 		termion::clear::All,
-		termion::cursor::Goto(1, 1),
-		termion::cursor::Hide
+		termion::cursor::Goto(1, 1)
 	).unwrap();
 
 	flush(&mut stdout);
@@ -25,14 +24,14 @@ pub fn show(version_control: &VersionControl) {
 		write!(
 			stdout,
 			"{}{}",
-			termion::cursor::Goto(1, 1),
-			termion::clear::CurrentLine
+			termion::clear::All,
+			termion::cursor::Goto(1, 1)
 		).unwrap();
 
 		match c.unwrap() {
 			Key::Ctrl('c') => break,
 
-			Key::Ctrl('s') => show_action(version_control, Action::Status, &mut stdout),
+			Key::Ctrl('s') => show_action(version_control, "status", &mut stdout),
 
 			Key::Char(c) => println!("{}", c),
 			Key::Ctrl(c) => println!("ctrl+{}", c),
@@ -42,14 +41,12 @@ pub fn show(version_control: &VersionControl) {
 
 		flush(&mut stdout);
 	}
-
-	write!(stdout, "{}", termion::cursor::Show).unwrap();
 }
 
-fn show_action<T: Write>(version_control: &VersionControl, action: Action, stdout: &mut T) {
+fn show_action<T: Write>(version_control: &VersionControl, action: &str, stdout: &mut T) {
 	match version_control.on_action(action) {
-		Ok(result) => write!(stdout, "{}", result),
-		Err(error) => write!(stdout, "{}", error),
+		Ok(result) => write!(stdout, "{}{}", termion::clear::All, result),
+		Err(error) => write!(stdout, "{}{}", termion::clear::All, error),
 	}.unwrap();
 }
 

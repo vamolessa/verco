@@ -1,0 +1,13 @@
+{
+	"git": [
+		{
+			"name": "status",
+			"key": "s",
+			"commands": [
+				{
+					"exec": "git status"
+				}
+			]
+		}
+	]
+}
