@@ -6,6 +6,7 @@ use termion::raw::IntoRawMode;
 use std::io::{stdin, stdout, Write};
 
 use version_control::VersionControl;
+use actions::Action;
 
 pub fn show(version_control: &VersionControl) {
 	let stdin = stdin();
@@ -18,7 +19,7 @@ pub fn show(version_control: &VersionControl) {
 		termion::cursor::Goto(1, 1)
 	).unwrap();
 
-	flush(&mut stdout);
+	stdout.flush().unwrap();
 
 	for c in stdin.keys() {
 		write!(
@@ -31,25 +32,37 @@ pub fn show(version_control: &VersionControl) {
 		match c.unwrap() {
 			Key::Ctrl('c') => break,
 
-			Key::Ctrl('s') => show_action(version_control, "status", &mut stdout),
-
-			Key::Char(c) => println!("{}", c),
+			Key::Char(key) => handle_key(version_control, key, &mut stdout),
 			Key::Ctrl(c) => println!("ctrl+{}", c),
 
 			_ => (),
 		}
 
-		flush(&mut stdout);
+		stdout.flush().unwrap();
 	}
 }
 
-fn show_action<T: Write>(version_control: &VersionControl, action: &str, stdout: &mut T) {
-	match version_control.on_action(action) {
-		Ok(result) => write!(stdout, "{}{}", termion::clear::All, result),
-		Err(error) => write!(stdout, "{}{}", termion::clear::All, error),
-	}.unwrap();
+fn handle_key<T: Write>(version_control: &VersionControl, key: char, stdout: &mut T) {
+	match version_control
+		.actions
+		.iter()
+		.find(|a| a.key.starts_with(key))
+	{
+		Some(action) => handle_action(version_control, action, stdout),
+		None => (),
+	};
 }
 
-fn flush<T: Write>(stdout: &mut T) {
-	stdout.flush().unwrap();
+fn handle_action<T: Write>(version_control: &VersionControl, action: &Action, stdout: &mut T) {
+	write!(
+		stdout,
+		"{}executing {}\n\n",
+		termion::clear::All,
+		action.name
+	).unwrap();
+
+	match version_control.run_action(&action.name[..]) {
+		Ok(output) => write!(stdout, "{}\n\ndone\n\n", output),
+		Err(error) => write!(stdout, "{}\n\nerror\n\n", error),
+	}.unwrap();
 }

@@ -3,8 +3,8 @@ use std::process::Command;
 use actions::{Action, Actions};
 
 pub struct VersionControl<'a> {
+	pub actions: &'a Vec<Action>,
 	current_dir: &'a str,
-	actions: &'a Vec<Action>,
 }
 
 impl<'a> VersionControl<'a> {
@@ -21,7 +21,7 @@ impl<'a> VersionControl<'a> {
 		};
 	}
 
-	pub fn on_action(&self, action: &str) -> Result<String, String> {
+	pub fn run_action(&self, action: &str) -> Result<String, String> {
 		match self.actions.iter().find(|&a| a.name == action) {
 			Some(act) => run(self.current_dir, &act.commands[0].exec[..]),
 			None => Err(format!("Could not find action '{}'.", action)),
