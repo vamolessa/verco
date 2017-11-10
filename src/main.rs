@@ -9,6 +9,7 @@ extern crate serde_derive;
 use std::env;
 
 mod tui;
+use tui::Tui;
 
 mod version_control;
 use version_control::VersionControl;
@@ -26,7 +27,7 @@ fn main() {
 	let current_dir = current_dir_path.to_str().unwrap();
 
 	match VersionControl::find_current(current_dir, &actions) {
-		Ok(version_control) => tui::show(&version_control),
+		Ok(version_control) => Tui::new(&version_control).show(),
 		Err(_) => println!("Not on a valid repository"),
 	}
 }

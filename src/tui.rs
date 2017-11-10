@@ -8,61 +8,70 @@ use std::io::{stdin, stdout, Write};
 use version_control::VersionControl;
 use actions::Action;
 
-pub fn show(version_control: &VersionControl) {
-	let stdin = stdin();
-	let mut stdout = stdout().into_raw_mode().unwrap();
+pub struct Tui<'a> {
+	version_control: &'a VersionControl<'a>,
+}
 
-	write!(
-		stdout,
-		"{}{}q to exit. Type stuff, use alt, and so on.",
-		termion::clear::All,
-		termion::cursor::Goto(1, 1)
-	).unwrap();
+impl<'a> Tui<'a> {
+	pub fn new(version_control: &'a VersionControl) -> Tui<'a> {
+		Tui {
+			version_control: version_control,
+		}
+	}
 
-	stdout.flush().unwrap();
+	pub fn show(&self) {
+		let stdin = stdin();
+		let mut stdout = stdout().into_raw_mode().unwrap();
 
-	for c in stdin.keys() {
 		write!(
 			stdout,
-			"{}{}",
+			"{}{}q to exit. Type stuff, use alt, and so on.",
 			termion::clear::All,
 			termion::cursor::Goto(1, 1)
 		).unwrap();
 
-		match c.unwrap() {
-			Key::Ctrl('c') => break,
-
-			Key::Char(key) => handle_key(version_control, key, &mut stdout),
-			Key::Ctrl(c) => println!("ctrl+{}", c),
-
-			_ => (),
-		}
-
 		stdout.flush().unwrap();
+
+		for c in stdin.keys() {
+			match c.unwrap() {
+				Key::Ctrl('c') => break,
+				Key::Char(key) => self.handle_key(key, &mut stdout),
+				_ => (),
+			}
+
+			stdout.flush().unwrap();
+		}
 	}
-}
 
-fn handle_key<T: Write>(version_control: &VersionControl, key: char, stdout: &mut T) {
-	match version_control
-		.actions
-		.iter()
-		.find(|a| a.key.starts_with(key))
-	{
-		Some(action) => handle_action(version_control, action, stdout),
-		None => (),
-	};
-}
+	fn handle_key<T: Write>(&self, key: char, stdout: &mut T) {
+		match self.version_control
+			.actions
+			.iter()
+			.find(|a| a.key.starts_with(key))
+		{
+			Some(action) => self.handle_action(action, stdout),
+			None => (),
+		};
+	}
 
-fn handle_action<T: Write>(version_control: &VersionControl, action: &Action, stdout: &mut T) {
-	write!(
-		stdout,
-		"{}executing {}\n\n",
-		termion::clear::All,
-		action.name
-	).unwrap();
+	fn handle_action<T: Write>(&self, action: &Action, stdout: &mut T) {
+		write!(
+			stdout,
+			"{}{}action {}\n\n",
+			termion::clear::All,
+			termion::cursor::Goto(1, 1),
+			action.name
+		).unwrap();
 
-	match version_control.run_action(&action.name[..]) {
-		Ok(output) => write!(stdout, "{}\n\ndone\n\n", output),
-		Err(error) => write!(stdout, "{}\n\nerror\n\n", error),
-	}.unwrap();
+		match self.version_control.run_action(&action.name[..]) {
+			Ok(output) => {
+				write!(stdout, "{}\n\n", output).unwrap();
+				write!(stdout, "done\n\n").unwrap();
+			}
+			Err(error) => {
+				write!(stdout, "{}\n\n", error).unwrap();
+				write!(stdout, "error\n\n").unwrap();
+			}
+		};
+	}
 }
