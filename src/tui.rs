@@ -34,6 +34,7 @@ impl<'a> Tui<'a> {
 
 		for c in stdin.keys() {
 			match c.unwrap() {
+				Key::Char('q') => break,
 				Key::Ctrl('c') => break,
 				Key::Char(key) => self.handle_key(key, &mut stdout),
 				_ => (),
@@ -63,13 +64,24 @@ impl<'a> Tui<'a> {
 			action.name
 		).unwrap();
 
-		match self.version_control.run_action(&action.name[..]) {
-			Ok(output) => {
-				write!(stdout, "{}\n\n", output).unwrap();
+		match self.version_control.run_action(
+			&action.name[..],
+			|| String::from(""),
+			|output| match output {
+				Ok(output) => {
+					write!(stdout, "{}\n\n", output).unwrap();
+					write!(stdout, "done\n\n").unwrap();
+				}
+				Err(error) => {
+					write!(stdout, "{}\n\n", error).unwrap();
+					write!(stdout, "error\n\n").unwrap();
+				}
+			},
+		) {
+			Ok(_) => {
 				write!(stdout, "done\n\n").unwrap();
 			}
-			Err(error) => {
-				write!(stdout, "{}\n\n", error).unwrap();
+			Err(_) => {
 				write!(stdout, "error\n\n").unwrap();
 			}
 		};

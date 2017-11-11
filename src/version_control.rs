@@ -1,4 +1,6 @@
 use std::process::Command;
+use std::iter::once;
+use std::ops::Add;
 
 use actions::{Action, Actions};
 
@@ -21,9 +23,40 @@ impl<'a> VersionControl<'a> {
 		};
 	}
 
-	pub fn run_action(&self, action: &str) -> Result<String, String> {
+	pub fn run_action<FI, FO>(
+		&self,
+		action: &str,
+		on_input: FI,
+		on_output: FO,
+	) -> Result<(), String>
+	where
+		FI: Fn() -> String,
+		FO: FnMut(Result<&str, &str>),
+	{
+		let on_in = on_input;
+		let mut on_out = on_output;
+
 		match self.actions.iter().find(|&a| a.name == action) {
-			Some(act) => run(self.current_dir, &act.commands[0].exec[..]),
+			Some(act) => {
+				for command in &act.commands {
+					let result = match command.prompt {
+						Some(ref prompt) => {
+							on_out(Ok(&prompt[..]));
+							let input = on_in();
+							let exec = simple_format(&command.exec[..], &input[..]);
+							run(self.current_dir, &exec[..])
+						}
+						None => run(self.current_dir, &command.exec[..]),
+					};
+
+					match result {
+						Ok(output) => on_out(Ok(&output[..])),
+						Err(error) => on_out(Err(&error[..])),
+					}
+				}
+
+				return Ok(());
+			}
 			None => Err(format!("Could not find action '{}'.", action)),
 		}
 	}
@@ -47,4 +80,13 @@ fn run(current_dir: &str, command: &str) -> Result<String, String> {
 		},
 		Err(error) => Err(error.to_string()),
 	};
+}
+
+fn simple_format(format: &str, arg: &str) -> String {
+	format
+		.splitn(2, '$')
+		.take(1)
+		.chain(once(arg))
+		.chain(format.splitn(2, '$').skip(1))
+		.fold(String::from(""), |xs, x| xs.add(x))
 }
