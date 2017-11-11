@@ -1,5 +1,4 @@
 extern crate termion;
-
 extern crate serde;
 extern crate serde_json;
 
@@ -9,17 +8,13 @@ extern crate serde_derive;
 use std::env;
 
 mod tui;
-use tui::Tui;
-
 mod version_control;
-use version_control::VersionControl;
-
 mod actions;
+
+use version_control::VersionControl;
 use actions::Actions;
 
 fn main() {
-	let _guard = termion::init();
-
 	let default_actions_json = include_str!("default_actions.json");
 	let actions = Actions::from_json(default_actions_json).unwrap();
 
@@ -27,7 +22,7 @@ fn main() {
 	let current_dir = current_dir_path.to_str().unwrap();
 
 	match VersionControl::find_current(current_dir, &actions) {
-		Ok(version_control) => Tui::new(&version_control).show(),
+		Ok(version_control) => tui::show_tui(&version_control),
 		Err(_) => println!("Not on a valid repository"),
 	}
 }

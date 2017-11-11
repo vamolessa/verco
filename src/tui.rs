@@ -1,63 +1,84 @@
-extern crate termion;
-
+use termion;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-use std::io::{stdin, stdout, Write};
+
+use std::io::{stdin, stdout, Read, Write};
 
 use version_control::VersionControl;
 use actions::Action;
 
-pub struct Tui<'a> {
+pub fn show_tui<'a>(version_control: &'a VersionControl) {
+	let _guard = termion::init();
+
+	let stdin = stdin();
+	let stdin = stdin.lock();
+	let stdout = stdout().into_raw_mode().unwrap();
+
+	Tui::new(stdin, stdout, version_control).show();
+}
+
+pub struct Tui<'a, R: Read, W: Write> {
+	stdin: R,
+	stdout: W,
 	version_control: &'a VersionControl<'a>,
 }
 
-impl<'a> Tui<'a> {
-	pub fn new(version_control: &'a VersionControl) -> Tui<'a> {
+impl<'a, R: Read, W: Write> Tui<'a, R, W> {
+	pub fn new(stdin: R, stdout: W, version_control: &'a VersionControl) -> Tui<'a, R, W> {
 		Tui {
+			stdin: stdin,
+			stdout: stdout,
 			version_control: version_control,
 		}
 	}
 
-	pub fn show(&self) {
-		let stdin = stdin();
-		let mut stdout = stdout().into_raw_mode().unwrap();
-
+	pub fn show(&mut self) {
 		write!(
-			stdout,
+			self.stdout,
 			"{}{}q to exit. Type stuff, use alt, and so on.",
 			termion::clear::All,
 			termion::cursor::Goto(1, 1)
 		).unwrap();
 
-		stdout.flush().unwrap();
+		let pass = self.stdin.read_line();
+		if let Ok(Some(pass)) = pass {
+			self.stdout.write_all(pass.as_bytes()).unwrap();
+			self.stdout.write_all(b"\n").unwrap();
+		} else {
+			self.stdout.write_all(b"Error\n").unwrap();
+		}
 
-		for c in stdin.keys() {
-			match c.unwrap() {
+		self.stdout.flush().unwrap();
+
+		loop {
+			let key = (&mut self.stdin).keys().next().unwrap().unwrap();
+
+			match key {
 				Key::Char('q') => break,
 				Key::Ctrl('c') => break,
-				Key::Char(key) => self.handle_key(key, &mut stdout),
+				Key::Char(key) => self.handle_key(key),
 				_ => (),
 			}
 
-			stdout.flush().unwrap();
+			self.stdout.flush().unwrap();
 		}
 	}
 
-	fn handle_key<T: Write>(&self, key: char, stdout: &mut T) {
+	fn handle_key(&mut self, key: char) {
 		match self.version_control
 			.actions
 			.iter()
 			.find(|a| a.key.starts_with(key))
 		{
-			Some(action) => self.handle_action(action, stdout),
+			Some(action) => self.handle_action(action),
 			None => (),
 		};
 	}
 
-	fn handle_action<T: Write>(&self, action: &Action, stdout: &mut T) {
+	fn handle_action(&mut self, action: &Action) {
 		write!(
-			stdout,
+			self.stdout,
 			"{}{}action {}\n\n",
 			termion::clear::All,
 			termion::cursor::Goto(1, 1),
@@ -69,20 +90,18 @@ impl<'a> Tui<'a> {
 			|| String::from(""),
 			|output| match output {
 				Ok(output) => {
-					write!(stdout, "{}\n\n", output).unwrap();
-					write!(stdout, "done\n\n").unwrap();
+					write!(self.stdout, "{}\n\n", output).unwrap();
+					write!(self.stdout, "done\n\n").unwrap();
 				}
 				Err(error) => {
-					write!(stdout, "{}\n\n", error).unwrap();
-					write!(stdout, "error\n\n").unwrap();
+					write!(self.stdout, "{}\n\n", error).unwrap();
+					write!(self.stdout, "error\n\n").unwrap();
 				}
 			},
 		) {
-			Ok(_) => {
-				write!(stdout, "done\n\n").unwrap();
-			}
-			Err(_) => {
-				write!(stdout, "error\n\n").unwrap();
+			Ok(_) => (),
+			Err(error) => {
+				write!(self.stdout, "{}\n\nerror\n\n", error).unwrap();
 			}
 		};
 	}
