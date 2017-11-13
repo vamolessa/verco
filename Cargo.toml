@@ -8,6 +8,7 @@ serde = "*"
 serde_json = "*"
 serde_derive = "*"
 termion = { git = "https://github.com/mcgoo/termion", branch = "windows" }
+liner = { git = "https://github.com/joeyAcc/liner", branch = "windows" }
 
 [[bin]]
 name = "verco"

@@ -1,6 +1,7 @@
-extern crate termion;
 extern crate serde;
 extern crate serde_json;
+extern crate termion;
+extern crate liner;
 
 #[macro_use]
 extern crate serde_derive;

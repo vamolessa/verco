@@ -3,9 +3,11 @@ use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
-use std::io::{stdin, stdout, Read, Write};
+use liner::Context;
 
-use version_control::VersionControl;
+use std::io::{stdin, stdout, BufRead, Write};
+
+use version_control::{VersionControl, VersionControlIO};
 use actions::Action;
 
 pub fn show_tui<'a>(version_control: &'a VersionControl) {
@@ -18,18 +20,52 @@ pub fn show_tui<'a>(version_control: &'a VersionControl) {
 	Tui::new(stdin, stdout, version_control).show();
 }
 
-pub struct Tui<'a, R: Read, W: Write> {
+pub struct Tui<'a, R: BufRead, W: Write> {
 	stdin: R,
 	stdout: W,
 	version_control: &'a VersionControl<'a>,
+	liner_context: Context,
 }
 
-impl<'a, R: Read, W: Write> Tui<'a, R, W> {
+impl<'a, R: BufRead, W: Write> VersionControlIO for Tui<'a, R, W> {
+	fn on_in(&mut self) -> Option<String> {
+		let line = self.liner_context.read_line("", &mut |_| {}).unwrap();
+
+		if line.is_empty() {
+			return None;
+		}
+
+		//self.liner_context.history.push(line.into()).unwrap();
+		Some(line)
+
+	}
+
+	fn on_out(&mut self, result: Result<Option<&str>, &str>) {
+		match result {
+			Ok(output) => match output {
+				Some(output) => {
+					write!(self.stdout, "\n\n{}\n\n", output).unwrap();
+					write!(self.stdout, "done\n\n").unwrap();
+				}
+				None => {
+					write!(self.stdout, "\n\ncancelled\n\n").unwrap();
+				}
+			},
+			Err(error) => {
+				write!(self.stdout, "{}\n\n", error).unwrap();
+				write!(self.stdout, "error\n\n").unwrap();
+			}
+		}
+	}
+}
+
+impl<'a, R: BufRead, W: Write> Tui<'a, R, W> {
 	pub fn new(stdin: R, stdout: W, version_control: &'a VersionControl) -> Tui<'a, R, W> {
 		Tui {
 			stdin: stdin,
 			stdout: stdout,
 			version_control: version_control,
+			liner_context: Context::new(),
 		}
 	}
 
@@ -40,14 +76,6 @@ impl<'a, R: Read, W: Write> Tui<'a, R, W> {
 			termion::clear::All,
 			termion::cursor::Goto(1, 1)
 		).unwrap();
-
-		let pass = self.stdin.read_line();
-		if let Ok(Some(pass)) = pass {
-			self.stdout.write_all(pass.as_bytes()).unwrap();
-			self.stdout.write_all(b"\n").unwrap();
-		} else {
-			self.stdout.write_all(b"Error\n").unwrap();
-		}
 
 		self.stdout.flush().unwrap();
 
@@ -85,20 +113,7 @@ impl<'a, R: Read, W: Write> Tui<'a, R, W> {
 			action.name
 		).unwrap();
 
-		match self.version_control.run_action(
-			&action.name[..],
-			|| String::from(""),
-			|output| match output {
-				Ok(output) => {
-					write!(self.stdout, "{}\n\n", output).unwrap();
-					write!(self.stdout, "done\n\n").unwrap();
-				}
-				Err(error) => {
-					write!(self.stdout, "{}\n\n", error).unwrap();
-					write!(self.stdout, "error\n\n").unwrap();
-				}
-			},
-		) {
+		match self.version_control.run_action(&action.name[..], self) {
 			Ok(_) => (),
 			Err(error) => {
 				write!(self.stdout, "{}\n\nerror\n\n", error).unwrap();

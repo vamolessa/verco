@@ -4,6 +4,11 @@ use std::ops::Add;
 
 use actions::{Action, Actions};
 
+pub trait VersionControlIO {
+	fn on_in(&mut self) -> Option<String>;
+	fn on_out(&mut self, Result<Option<&str>, &str>);
+}
+
 pub struct VersionControl<'a> {
 	pub actions: &'a Vec<Action>,
 	current_dir: &'a str,
@@ -23,39 +28,34 @@ impl<'a> VersionControl<'a> {
 		};
 	}
 
-	pub fn run_action<FI, FO>(
-		&self,
-		action: &str,
-		on_input: FI,
-		on_output: FO,
-	) -> Result<(), String>
-	where
-		FI: Fn() -> String,
-		FO: FnMut(Result<&str, &str>),
-	{
-		let on_in = on_input;
-		let mut on_out = on_output;
-
+	pub fn run_action<T: VersionControlIO>(&self, action: &str, io: &mut T) -> Result<(), String> {
 		match self.actions.iter().find(|&a| a.name == action) {
 			Some(act) => {
 				for command in &act.commands {
 					let result = match command.prompt {
 						Some(ref prompt) => {
-							on_out(Ok(&prompt[..]));
-							let input = on_in();
-							let exec = simple_format(&command.exec[..], &input[..]);
-							run(self.current_dir, &exec[..])
+							io.on_out(Ok(Some(&prompt[..])));
+							match io.on_in() {
+								Some(input) => {
+									let exec = simple_format(&command.exec[..], &input[..]);
+									run(self.current_dir, &exec[..]).map(|o| Some(o))
+								}
+								None => Ok(None),
+							}
 						}
-						None => run(self.current_dir, &command.exec[..]),
+						None => run(self.current_dir, &command.exec[..]).map(|o| Some(o)),
 					};
 
 					match result {
-						Ok(output) => on_out(Ok(&output[..])),
-						Err(error) => on_out(Err(&error[..])),
+						Ok(result) => match result {
+							Some(output) => io.on_out(Ok(Some(&output[..]))),
+							None => io.on_out(Ok(None)),
+						},
+						Err(error) => io.on_out(Err(&error[..])),
 					}
 				}
 
-				return Ok(());
+				Ok(())
 			}
 			None => Err(format!("Could not find action '{}'.", action)),
 		}
@@ -68,7 +68,7 @@ fn run(current_dir: &str, command: &str) -> Result<String, String> {
 		.next()
 		.ok_or(format!("Invalid command '{}'", command))?;
 
-	return match Command::new(exec)
+	match Command::new(exec)
 		.current_dir(current_dir)
 		.args(command_iter.collect::<Vec<&str>>())
 		.output()
@@ -79,7 +79,7 @@ fn run(current_dir: &str, command: &str) -> Result<String, String> {
 			Err(String::from_utf8_lossy(&output.stderr[..]).into_owned())
 		},
 		Err(error) => Err(error.to_string()),
-	};
+	}
 }
 
 fn simple_format(format: &str, arg: &str) -> String {
