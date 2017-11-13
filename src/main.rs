@@ -1,7 +1,7 @@
+extern crate liner;
 extern crate serde;
 extern crate serde_json;
 extern crate termion;
-extern crate liner;
 
 #[macro_use]
 extern crate serde_derive;
@@ -16,6 +16,20 @@ use version_control::VersionControl;
 use actions::Actions;
 
 fn main() {
+	{
+		let mut con = liner::Context::new();
+
+		loop {
+			let res = con.read_line("[prompt]$ ", &mut |_| {}).unwrap();
+
+			if res.is_empty() {
+				break;
+			}
+
+			con.history.push(res.into()).unwrap();
+		}
+	}
+
 	let default_actions_json = include_str!("default_actions.json");
 	let actions = Actions::from_json(default_actions_json).unwrap();
 

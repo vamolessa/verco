@@ -8,6 +8,19 @@
 					"exec": "git status"
 				}
 			]
+		},
+		{
+			"name": "commit",
+			"key": "c",
+			"commands": [
+				{
+					"exec": "git add --all ."
+				},
+				{
+					"exec": "git commit -m \"%s\"",
+					"prompt": "commit message: "
+				}
+			]
 		}
 	]
 }
