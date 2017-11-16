@@ -3,13 +3,28 @@ name = "verco"
 version = "0.1.0"
 authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
 
+[[bin]]
+name = "verco"
+path = "src/main2.rs"
+
 [dependencies]
 serde = "*"
 serde_json = "*"
 serde_derive = "*"
+
 termion = { git = "https://github.com/mcgoo/termion", branch = "windows" }
 liner = { git = "https://github.com/joeyAcc/liner", branch = "windows" }
 
-[[bin]]
-name = "verco"
-path = "src/main.rs"
+conrod = { version  = "*", features = ["glium", "winit"] }
+find_folder = "0.3.0"
+rand = "0.3.13"
+image = "0.17.0"
+
+gfx_window_glutin = "0.18.0"
+glutin = "0.10.0"
+
+glium = { version = "0.18.0", optional = true }
+winit = { version = "0.8.3", optional = true }
+
+[features]
+default = ["glium", "winit"]
