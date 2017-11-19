@@ -74,22 +74,29 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 	fn handle_key(&mut self, key: char) {
 		match key {
-			's' => self.handle_result("status", self.version_control.status()),
-			'c' => if let Some(input) = self.handle_input("commit message: ") {
-				self.handle_result("commit", self.version_control.commit(&input[..]))
-			},
+			's' => {
+				self.show_action("status");
+				self.handle_result(self.version_control.status());
+			}
+			'c' => {
+				self.show_action("commit");
+				if let Some(input) = self.handle_input("commit message: ") {
+					self.handle_result(self.version_control.commit(&input[..]));
+				}
+			}
 			_ => (),
 		}
+	}
+
+	fn show_action(&mut self, action_name: &str) {
+		self.show_header();
+		write!(self.stdout, "\n\naction {}\n\n", action_name).unwrap();
 	}
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
 		let readline = self.readline.readline(prompt);
 		match readline {
-			Ok(line) => {
-				//self.readline.add_history_entry(&line);
-				println!("Line: {}", line);
-				Some(line)
-			}
+			Ok(line) => Some(line),
 			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
 				write!(self.stdout, "\n\ncanceled\n\n").unwrap();
 				None
@@ -101,11 +108,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		}
 	}
 
-	fn handle_result(&mut self, action_name: &str, result: Result<String, String>) {
-		self.show_header();
-
-		write!(self.stdout, "\n\naction {}\n\n", action_name).unwrap();
-
+	fn handle_result(&mut self, result: Result<String, String>) {
 		match result {
 			Ok(output) => {
 				write!(self.stdout, "{}\n\n", output).unwrap();
