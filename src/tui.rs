@@ -3,14 +3,14 @@ use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
-use liner::Context;
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 use std::io::{stdin, stdout, BufRead, Write};
 
-use version_control::{VersionControl, VersionControlIO};
-use actions::Action;
+use version_control_actions::VersionControlActions;
 
-pub fn show_tui<'a>(version_control: &'a VersionControl) {
+pub fn show_tui<'a, T: VersionControlActions>(version_control: &'a T) {
 	let _guard = termion::init();
 
 	let stdin = stdin();
@@ -20,64 +20,25 @@ pub fn show_tui<'a>(version_control: &'a VersionControl) {
 	Tui::new(stdin, stdout, version_control).show();
 }
 
-pub struct Tui<'a, R: BufRead, W: Write> {
+pub struct Tui<'a, R: BufRead, W: Write, T: VersionControlActions + 'a> {
 	stdin: R,
 	stdout: W,
-	version_control: &'a VersionControl<'a>,
-	liner_context: Context,
+	version_control: &'a T,
+	readline: Editor<()>,
 }
 
-impl<'a, R: BufRead, W: Write> VersionControlIO for Tui<'a, R, W> {
-	fn on_in(&mut self) -> Option<String> {
-		let line = self.liner_context.read_line("", &mut |_| {}).unwrap();
-
-		if line.is_empty() {
-			return None;
-		}
-
-		//self.liner_context.history.push(line.into()).unwrap();
-		Some(line)
-
-	}
-
-	fn on_out(&mut self, result: Result<Option<&str>, &str>) {
-		match result {
-			Ok(output) => match output {
-				Some(output) => {
-					write!(self.stdout, "\n\n{}\n\n", output).unwrap();
-					write!(self.stdout, "done\n\n").unwrap();
-				}
-				None => {
-					write!(self.stdout, "\n\ncancelled\n\n").unwrap();
-				}
-			},
-			Err(error) => {
-				write!(self.stdout, "{}\n\n", error).unwrap();
-				write!(self.stdout, "error\n\n").unwrap();
-			}
-		}
-	}
-}
-
-impl<'a, R: BufRead, W: Write> Tui<'a, R, W> {
-	pub fn new(stdin: R, stdout: W, version_control: &'a VersionControl) -> Tui<'a, R, W> {
+impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
+	pub fn new(stdin: R, stdout: W, version_control: &'a T) -> Self {
 		Tui {
 			stdin: stdin,
 			stdout: stdout,
 			version_control: version_control,
-			liner_context: Context::new(),
+			readline: Editor::<()>::new(),
 		}
 	}
 
 	pub fn show(&mut self) {
-		write!(
-			self.stdout,
-			"{}{}q to exit. Type stuff, use alt, and so on.",
-			termion::clear::All,
-			termion::cursor::Goto(1, 1)
-		).unwrap();
-
-		self.stdout.flush().unwrap();
+		self.show_header();
 
 		loop {
 			let key = (&mut self.stdin).keys().next().unwrap().unwrap();
@@ -91,33 +52,69 @@ impl<'a, R: BufRead, W: Write> Tui<'a, R, W> {
 
 			self.stdout.flush().unwrap();
 		}
+
+		write!(
+			self.stdout,
+			"{}{}",
+			termion::clear::All,
+			termion::cursor::Goto(1, 1),
+		).unwrap();
+	}
+
+	fn show_header(&mut self) {
+		write!(
+			self.stdout,
+			"{}{}Verco - Git/Hg client\n",
+			termion::clear::All,
+			termion::cursor::Goto(1, 1)
+		).unwrap();
+
+		self.stdout.flush().unwrap();
 	}
 
 	fn handle_key(&mut self, key: char) {
-		match self.version_control
-			.actions
-			.iter()
-			.find(|a| a.key.starts_with(key))
-		{
-			Some(action) => self.handle_action(action),
-			None => (),
-		};
+		match key {
+			's' => self.handle_result("status", self.version_control.status()),
+			'c' => if let Some(input) = self.handle_input("commit message: ") {
+				self.handle_result("commit", self.version_control.commit(&input[..]))
+			},
+			_ => (),
+		}
 	}
 
-	fn handle_action(&mut self, action: &Action) {
-		write!(
-			self.stdout,
-			"{}{}action {}\n\n",
-			termion::clear::All,
-			termion::cursor::Goto(1, 1),
-			action.name
-		).unwrap();
-
-		match self.version_control.run_action(&action.name[..], self) {
-			Ok(_) => (),
-			Err(error) => {
-				write!(self.stdout, "{}\n\nerror\n\n", error).unwrap();
+	fn handle_input(&mut self, prompt: &str) -> Option<String> {
+		let readline = self.readline.readline(prompt);
+		match readline {
+			Ok(line) => {
+				//self.readline.add_history_entry(&line);
+				println!("Line: {}", line);
+				Some(line)
 			}
-		};
+			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+				write!(self.stdout, "\n\ncanceled\n\n").unwrap();
+				None
+			}
+			Err(err) => {
+				println!("error {:?}\n\n", err);
+				None
+			}
+		}
+	}
+
+	fn handle_result(&mut self, action_name: &str, result: Result<String, String>) {
+		self.show_header();
+
+		write!(self.stdout, "\n\naction {}\n\n", action_name).unwrap();
+
+		match result {
+			Ok(output) => {
+				write!(self.stdout, "{}\n\n", output).unwrap();
+				write!(self.stdout, "done\n\n").unwrap();
+			}
+			Err(error) => {
+				write!(self.stdout, "{}\n\n", error).unwrap();
+				write!(self.stdout, "error\n\n").unwrap();
+			}
+		}
 	}
 }
