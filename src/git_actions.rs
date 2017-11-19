@@ -15,7 +15,10 @@ impl<'a> GitActions<'a> {
 
 impl<'a> VersionControlActions for GitActions<'a> {
 	fn status(&self) -> Result<String, String> {
-		handle_command(self.command().args(&["status"]))
+		handle_command(
+			self.command()
+				.args(&["-c", "color.status=always", "status"]),
+		)
 	}
 
 	fn commit(&self, message: &str) -> Result<String, String> {

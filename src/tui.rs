@@ -80,7 +80,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			}
 			'c' => {
 				self.show_action("commit");
-				if let Some(input) = self.handle_input("commit message: ") {
+				if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
 					self.handle_result(self.version_control.commit(&input[..]));
 				}
 			}
@@ -90,7 +90,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 	fn show_action(&mut self, action_name: &str) {
 		self.show_header();
-		write!(self.stdout, "\n\naction {}\n\n", action_name).unwrap();
+		write!(self.stdout, "\n{}\n\n", action_name).unwrap();
 	}
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
