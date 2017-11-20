@@ -78,10 +78,58 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				self.show_action("status");
 				self.handle_result(self.version_control.status());
 			}
+			'l' => {
+				self.show_action("log");
+				self.handle_result(self.version_control.log());
+			}
 			'c' => {
 				self.show_action("commit");
 				if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
 					self.handle_result(self.version_control.commit(&input[..]));
+				}
+			}
+			'r' => {
+				self.show_action("revert");
+				self.handle_result(self.version_control.revert());
+			}
+			'u' => {
+				self.show_action("update");
+				if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
+					self.handle_result(self.version_control.update(&input[..]));
+				}
+			}
+			'm' => {
+				self.show_action("merge");
+				if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
+					self.handle_result(self.version_control.merge(&input[..]));
+				}
+			}
+			'f' => {
+				self.show_action("fetch");
+				self.handle_result(self.version_control.fetch());
+			}
+			'p' => {
+				self.show_action("pull");
+				self.handle_result(self.version_control.pull());
+			}
+			'P' => {
+				self.show_action("push");
+				self.handle_result(self.version_control.push());
+			}
+			't' => {
+				self.show_action("tag");
+				if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
+					self.handle_result(self.version_control.tag(&input[..]));
+				}
+			}
+			'b' => {
+				self.show_action("branch");
+				self.handle_result(self.version_control.branches());
+			}
+			'B' => {
+				self.show_action("branch");
+				if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
+					self.handle_result(self.version_control.branch(&input[..]));
 				}
 			}
 			_ => (),
