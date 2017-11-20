@@ -71,6 +71,6 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn branches(&self) -> Result<String, String> {
-		handle_command(self.command().args(&["branch", "-a"]))
+		handle_command(self.command().args(&["branch", "--all", "--color"]))
 	}
 }
