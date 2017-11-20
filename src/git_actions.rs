@@ -66,11 +66,11 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		handle_command(self.command().arg("tag").arg(name).arg("-f"))
 	}
 
-	fn branch(&self, name: &str) -> Result<String, String> {
-		handle_command(self.command().arg("branch").arg(name))
-	}
-
 	fn branches(&self) -> Result<String, String> {
 		handle_command(self.command().args(&["branch", "--all", "--color"]))
+	}
+
+	fn branch(&self, name: &str) -> Result<String, String> {
+		handle_command(self.command().arg("branch").arg(name))
 	}
 }

@@ -39,6 +39,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 	pub fn show(&mut self) {
 		self.show_header();
+		self.show_help();
 
 		loop {
 			let key = (&mut self.stdin).keys().next().unwrap().unwrap();
@@ -74,6 +75,10 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 	fn handle_key(&mut self, key: char) {
 		match key {
+			'h' => {
+				self.show_action("help");
+				self.show_help();
+			}
 			's' => {
 				self.show_action("status");
 				self.handle_result(self.version_control.status());
@@ -167,5 +172,25 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				write!(self.stdout, "error\n\n").unwrap();
 			}
 		}
+	}
+
+	fn show_help(&mut self) {
+		write!(self.stdout, "\npress a key and peform an action\n\n").unwrap();
+
+		write!(self.stdout, "\ts\tstatus\n").unwrap();
+		write!(self.stdout, "\tl\tlog\n\n").unwrap();
+
+		write!(self.stdout, "\tc\tcommit\n").unwrap();
+		write!(self.stdout, "\tr\trevert\n").unwrap();
+		write!(self.stdout, "\tu\tupdate\n").unwrap();
+		write!(self.stdout, "\tm\tmerge\n\n").unwrap();
+
+		write!(self.stdout, "\tf\tfetch\n").unwrap();
+		write!(self.stdout, "\tp\tpull\n").unwrap();
+		write!(self.stdout, "\tshift+p\tpush\n\n").unwrap();
+
+		write!(self.stdout, "\tt\ttag\n").unwrap();
+		write!(self.stdout, "\tb\tbranches\n").unwrap();
+		write!(self.stdout, "\tshift+b\tbranch\n\n").unwrap();
 	}
 }
