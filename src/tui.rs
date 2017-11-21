@@ -1,4 +1,5 @@
 use termion;
+use termion::color;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
@@ -62,17 +63,6 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		).unwrap();
 	}
 
-	fn show_header(&mut self) {
-		write!(
-			self.stdout,
-			"{}{}Verco - Git/Hg client\n",
-			termion::clear::All,
-			termion::cursor::Goto(1, 1)
-		).unwrap();
-
-		self.stdout.flush().unwrap();
-	}
-
 	fn handle_key(&mut self, key: char) {
 		match key {
 			'h' => {
@@ -93,7 +83,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					self.handle_result(self.version_control.commit(&input[..]));
 				}
 			}
-			'r' => {
+			'R' => {
 				self.show_action("revert");
 				self.handle_result(self.version_control.revert());
 			}
@@ -121,7 +111,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				self.show_action("push");
 				self.handle_result(self.version_control.push());
 			}
-			't' => {
+			'T' => {
 				self.show_action("tag");
 				if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
 					self.handle_result(self.version_control.tag(&input[..]));
@@ -139,11 +129,6 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			}
 			_ => (),
 		}
-	}
-
-	fn show_action(&mut self, action_name: &str) {
-		self.show_header();
-		write!(self.stdout, "\n{}\n\n", action_name).unwrap();
 	}
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
@@ -165,32 +150,79 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		match result {
 			Ok(output) => {
 				write!(self.stdout, "{}\n\n", output).unwrap();
-				write!(self.stdout, "done\n\n").unwrap();
+				write!(
+					self.stdout,
+					"{}done{}\n\n",
+					color::Fg(color::LightGreen),
+					color::Fg(color::Reset)
+				).unwrap();
 			}
 			Err(error) => {
 				write!(self.stdout, "{}\n\n", error).unwrap();
-				write!(self.stdout, "error\n\n").unwrap();
+				write!(
+					self.stdout,
+					"{}error{}\n\n",
+					color::Fg(color::Red),
+					color::Fg(color::Reset)
+				).unwrap();
 			}
 		}
 	}
 
+	fn show_header(&mut self) {
+		write!(
+			self.stdout,
+			"{}{}{}Verco - Git/Hg client{}\n\n",
+			termion::clear::All,
+			termion::cursor::Goto(1, 1),
+			color::Fg(color::Rgb(255, 0, 255)),
+			color::Fg(color::Reset)
+		).unwrap();
+
+		self.stdout.flush().unwrap();
+	}
+
+	fn show_action(&mut self, action_name: &str) {
+		self.show_header();
+		write!(
+			self.stdout,
+			"{}{}{}\n\n",
+			color::Fg(color::Rgb(255, 100, 180)),
+			action_name,
+			color::Fg(color::Reset)
+		).unwrap();
+	}
+
 	fn show_help(&mut self) {
-		write!(self.stdout, "\npress a key and peform an action\n\n").unwrap();
+		write!(self.stdout, "press a key and peform an action\n\n").unwrap();
 
-		write!(self.stdout, "\ts\tstatus\n").unwrap();
-		write!(self.stdout, "\tl\tlog\n\n").unwrap();
+		self.show_help_action("h", "help\n");
 
-		write!(self.stdout, "\tc\tcommit\n").unwrap();
-		write!(self.stdout, "\tr\trevert\n").unwrap();
-		write!(self.stdout, "\tu\tupdate\n").unwrap();
-		write!(self.stdout, "\tm\tmerge\n\n").unwrap();
+		self.show_help_action("s", "status");
+		self.show_help_action("l", "log\n");
 
-		write!(self.stdout, "\tf\tfetch\n").unwrap();
-		write!(self.stdout, "\tp\tpull\n").unwrap();
-		write!(self.stdout, "\tshift+p\tpush\n\n").unwrap();
+		self.show_help_action("c", "commit");
+		self.show_help_action("shift+r", "revert");
+		self.show_help_action("u", "update");
+		self.show_help_action("m", "merge\n");
 
-		write!(self.stdout, "\tt\ttag\n").unwrap();
-		write!(self.stdout, "\tb\tbranches\n").unwrap();
-		write!(self.stdout, "\tshift+b\tbranch\n\n").unwrap();
+		self.show_help_action("f", "fetch");
+		self.show_help_action("p", "pull");
+		self.show_help_action("shift+p", "push\n");
+
+		self.show_help_action("shift+t", "tag");
+		self.show_help_action("b", "branches");
+		self.show_help_action("shift+b", "branch\n");
+	}
+
+	fn show_help_action(&mut self, shortcut: &str, action: &str) {
+		write!(
+			self.stdout,
+			"\t{}{}{}\t\t{}\n",
+			color::Fg(color::Rgb(255, 180, 100)),
+			shortcut,
+			color::Fg(color::Reset),
+			action
+		).unwrap();
 	}
 }
