@@ -44,7 +44,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			stdin: stdin,
 			stdout: stdout,
 			version_control: version_control,
-			readline: Editor::<()>::new(),
+			readline: Editor::new(),
 		}
 	}
 
