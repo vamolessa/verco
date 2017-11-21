@@ -7,7 +7,7 @@ pub struct HgActions<'a> {
 
 impl<'a> HgActions<'a> {
 	fn command(&self) -> Command {
-		let mut command = Command::new("git");
+		let mut command = Command::new("hg");
 		command.current_dir(self.current_dir);
 		command
 	}
@@ -36,10 +36,10 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		handle_command(self.command().args(&[
 			"log",
 			"--graph",
-			"--style",
-			"compact",
+			"--template",
+			"{label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}",
 			"-l",
-			"-20",
+			"20",
 			"--color",
 			"always",
 		]))
