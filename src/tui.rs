@@ -128,7 +128,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				}
 			}
 			'b' => {
-				self.show_action("branch");
+				self.show_action("branches");
 				self.handle_result(self.version_control.branches());
 			}
 			'B' => {
