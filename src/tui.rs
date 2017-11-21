@@ -11,6 +11,16 @@ use std::io::{stdin, stdout, BufRead, Write};
 
 use version_control_actions::VersionControlActions;
 
+const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
+
+const HEADER_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 0, 255));
+const ACTION_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 100, 180));
+const ENTRY_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 180, 100));
+
+const DONE_COLOR: color::Fg<color::LightGreen> = color::Fg(color::LightGreen);
+const CANCEL_COLOR: color::Fg<color::LightYellow> = color::Fg(color::LightYellow);
+const ERROR_COLOR: color::Fg<color::Red> = color::Fg(color::Red);
+
 pub fn show_tui<'a, T: VersionControlActions>(version_control: &'a T) {
 	let _guard = termion::init();
 
@@ -132,11 +142,18 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
-		let readline = self.readline.readline(prompt);
+		let readline = self.readline
+			.readline(&format!("{}{}{}", ENTRY_COLOR, prompt, RESET_COLOR)[..]);
+
 		match readline {
 			Ok(line) => Some(line),
 			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-				write!(self.stdout, "\n\ncanceled\n\n").unwrap();
+				write!(
+					self.stdout,
+					"\n\n{}canceled{}\n\n",
+					CANCEL_COLOR,
+					RESET_COLOR
+				).unwrap();
 				None
 			}
 			Err(err) => {
@@ -153,8 +170,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				write!(
 					self.stdout,
 					"{}done{}\n\n",
-					color::Fg(color::LightGreen),
-					color::Fg(color::Reset)
+					DONE_COLOR,
+					RESET_COLOR
 				).unwrap();
 			}
 			Err(error) => {
@@ -162,8 +179,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				write!(
 					self.stdout,
 					"{}error{}\n\n",
-					color::Fg(color::Red),
-					color::Fg(color::Reset)
+					ERROR_COLOR,
+					RESET_COLOR
 				).unwrap();
 			}
 		}
@@ -175,8 +192,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			"{}{}{}Verco - Git/Hg client{}\n\n",
 			termion::clear::All,
 			termion::cursor::Goto(1, 1),
-			color::Fg(color::Rgb(255, 0, 255)),
-			color::Fg(color::Reset)
+			HEADER_COLOR,
+			RESET_COLOR
 		).unwrap();
 
 		self.stdout.flush().unwrap();
@@ -187,9 +204,9 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		write!(
 			self.stdout,
 			"{}{}{}\n\n",
-			color::Fg(color::Rgb(255, 100, 180)),
+			ACTION_COLOR,
 			action_name,
-			color::Fg(color::Reset)
+			RESET_COLOR
 		).unwrap();
 	}
 
@@ -219,9 +236,9 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		write!(
 			self.stdout,
 			"\t{}{}{}\t\t{}\n",
-			color::Fg(color::Rgb(255, 180, 100)),
+			ENTRY_COLOR,
 			shortcut,
-			color::Fg(color::Reset),
+			RESET_COLOR,
 			action
 		).unwrap();
 	}
