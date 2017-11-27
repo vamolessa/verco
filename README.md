@@ -58,7 +58,7 @@ shift+b         new branch
 
 ## Screenshots
 
-![verco example](images/example.mp4)
+![verco video example](https://raw.githubusercontent.com/matheuslessarodrigues/verco/master/images/example.mp4)
 
 ![help screen in verco](images/help.png)
 
