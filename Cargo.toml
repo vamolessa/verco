@@ -2,6 +2,9 @@
 name = "verco"
 version = "0.1.0"
 authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
+exclude = [
+    "images/*",
+]
 
 [[bin]]
 name = "verco"
