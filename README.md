@@ -58,6 +58,8 @@ shift+b         new branch
 
 ## Screenshots
 
+![verco example](images/example.mp4)
+
 ![help screen in verco](images/help.png)
 
 ![commit screen in verco](images/commit.png)
