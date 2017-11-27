@@ -57,3 +57,9 @@ shift+t         new tag
 b               list branches
 shift+b         new branch
 ```
+
+## Screenshots
+
+![help screen in verco](images/help.png)
+
+![commit screen in verco](images/commit.png)
