@@ -14,11 +14,9 @@ It depends on:
 ## Install
 
 First of all, install rust into your system using [rustup](https://www.rustup.rs/).
-Now you can install verco using Cargo (Rust's package manager).
 
-Now we can clone this repo and install verco.
-
-Open a terminal and run:
+Once it's installed, you can proceed to install verco using Cargo (Rust's package manager).
+Open a terminal and run these commands to clone and install verco:
 
 ```
 git clone https://github.com/matheuslessarodrigues/verco.git
