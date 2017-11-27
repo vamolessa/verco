@@ -63,3 +63,5 @@ shift+b         new branch
 ![help screen in verco](images/help.png)
 
 ![commit screen in verco](images/commit.png)
+
+![log screen in verco](images/log.png)
