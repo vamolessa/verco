@@ -29,21 +29,21 @@ Use your keyboard to perform git/hg actions (also, press `h` for help).
 ## Keymap
 
 ```
-**h**               help
+h               help
 
-**s**               status
-**l**               log
+s               status
+l               log
 
-**c**               commit
-**shift+r**         revert
-**u**               update/checkout
-**m**               merge
+c               commit
+shift+r         revert
+u               update/checkout
+m               merge
 
-**f**               fetch
-**p**               pull
-**shift+p**         push
+f               fetch
+p               pull
+shift+p         push
 
-**shift+t**         new tag
-**b**               list branches
-**shift+b**         new branch
+shift+t         new tag
+b               list branches
+shift+b         new branch
 ```
