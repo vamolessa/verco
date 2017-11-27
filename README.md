@@ -1,6 +1,16 @@
 # verco
 A simple Git/Hg version control client based on keyboard shortcuts
 
+## Platforms
+
+This project uses Cargo and pure Rust stable so Windows, Mac and Linux should work.
+
+It depends on:
+- [rustyline](https://github.com/kkawakam/rustyline)
+- [termion windows fork](https://github.com/mcgoo/termion)
+  - `windows` branch
+  - watch the windows port [issue](https://github.com/ticki/termion/issues/103)
+
 ## Install
 
 First of all, install rust into your system using [rustup](https://www.rustup.rs/).
