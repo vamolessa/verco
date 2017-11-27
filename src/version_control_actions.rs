@@ -23,7 +23,11 @@ pub fn handle_command(command: &mut Command) -> Result<String, String> {
 		Ok(output) => if output.status.success() {
 			Ok(String::from_utf8_lossy(&output.stdout[..]).into_owned())
 		} else {
-			Err(String::from_utf8_lossy(&output.stderr[..]).into_owned())
+			let mut out = String::new();
+			out.push_str(&String::from_utf8_lossy(&output.stdout[..]).into_owned()[..]);
+			out.push_str("\n\n");
+			out.push_str(&String::from_utf8_lossy(&output.stderr[..]).into_owned()[..]);
+			Err(out)
 		},
 		Err(error) => Err(error.to_string()),
 	}
