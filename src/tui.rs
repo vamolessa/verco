@@ -220,16 +220,16 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 		self.show_help_action("c", "commit");
 		self.show_help_action("shift+r", "revert");
-		self.show_help_action("u", "update");
+		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
 
 		self.show_help_action("f", "fetch");
 		self.show_help_action("p", "pull");
 		self.show_help_action("shift+p", "push\n");
 
-		self.show_help_action("shift+t", "tag");
-		self.show_help_action("b", "branches");
-		self.show_help_action("shift+b", "branch\n");
+		self.show_help_action("shift+t", "new tag");
+		self.show_help_action("b", "new branches");
+		self.show_help_action("shift+b", "new branch\n");
 	}
 
 	fn show_help_action(&mut self, shortcut: &str, action: &str) {
