@@ -58,6 +58,8 @@ shift+b         new branch
 
 ## Screenshots
 
+![verco video example](https://raw.githubusercontent.com/matheuslessarodrigues/verco/master/images/example.mp4)
+
 ![help screen in verco](images/help.png)
 
 ![commit screen in verco](images/commit.png)
