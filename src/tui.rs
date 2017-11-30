@@ -204,7 +204,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			).unwrap();
 
 			for _ in 0..w {
-				write!(self.stdout, " ",).unwrap();
+				write!(self.stdout, " ").unwrap();
 			}
 		}
 
