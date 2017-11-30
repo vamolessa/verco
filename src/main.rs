@@ -20,12 +20,12 @@ fn main() {
 		let actions = GitActions {
 			current_dir: &current_dir,
 		};
-		tui::show_tui(&actions);
+		tui::show_tui(&current_dir, &actions);
 	} else if subdir_exists(&current_dir_path, ".hg") {
 		let actions = HgActions {
 			current_dir: &current_dir,
 		};
-		tui::show_tui(&actions);
+		tui::show_tui(&current_dir, &actions);
 	} else {
 		println!("no repository found");
 	}

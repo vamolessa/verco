@@ -62,15 +62,19 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		handle_command(self.command().arg("push"))
 	}
 
-	fn tag(&self, name: &str) -> Result<String, String> {
+	fn create_tag(&self, name: &str) -> Result<String, String> {
 		handle_command(self.command().arg("tag").arg(name).arg("-f"))
 	}
 
-	fn branches(&self) -> Result<String, String> {
+	fn list_branches(&self) -> Result<String, String> {
 		handle_command(self.command().args(&["branch", "--all", "--color"]))
 	}
 
-	fn branch(&self, name: &str) -> Result<String, String> {
+	fn create_branch(&self, name: &str) -> Result<String, String> {
 		handle_command(self.command().arg("branch").arg(name))
+	}
+
+	fn close_branch(&self) -> Result<String, String> {
+		Err(String::from("Not implemented yet"))
 	}
 }

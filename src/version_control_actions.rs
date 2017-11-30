@@ -13,9 +13,10 @@ pub trait VersionControlActions {
 	fn pull(&self) -> Result<String, String>;
 	fn push(&self) -> Result<String, String>;
 
-	fn tag(&self, name: &str) -> Result<String, String>;
-	fn branches(&self) -> Result<String, String>;
-	fn branch(&self, nam: &str) -> Result<String, String>;
+	fn create_tag(&self, name: &str) -> Result<String, String>;
+	fn list_branches(&self) -> Result<String, String>;
+	fn create_branch(&self, nam: &str) -> Result<String, String>;
+	fn close_branch(&self) -> Result<String, String>;
 }
 
 pub fn handle_command(command: &mut Command) -> Result<String, String> {

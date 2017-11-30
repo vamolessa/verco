@@ -12,8 +12,10 @@ use std::io::{stdin, stdout, BufRead, Write};
 use version_control_actions::VersionControlActions;
 
 const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
+const RESET_BG_COLOR: color::Bg<color::Reset> = color::Bg(color::Reset);
 
-const HEADER_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 0, 255));
+const HEADER_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(0, 0, 0));
+const HEADER_BG_COLOR: color::Bg<color::Rgb> = color::Bg(color::Rgb(255, 0, 255));
 const ACTION_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 100, 180));
 const ENTRY_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 180, 100));
 
@@ -21,34 +23,36 @@ const DONE_COLOR: color::Fg<color::LightGreen> = color::Fg(color::LightGreen);
 const CANCEL_COLOR: color::Fg<color::LightYellow> = color::Fg(color::LightYellow);
 const ERROR_COLOR: color::Fg<color::Red> = color::Fg(color::Red);
 
-pub fn show_tui<'a, T: VersionControlActions>(version_control: &'a T) {
+pub fn show_tui<'a, T: VersionControlActions>(repository_name: &str, version_control: &'a T) {
 	let _guard = termion::init();
 
 	let stdin = stdin();
 	let stdin = stdin.lock();
 	let stdout = stdout().into_raw_mode().unwrap();
 
-	Tui::new(stdin, stdout, version_control).show();
+	Tui::new(stdin, stdout, repository_name, version_control).show();
 }
 
-pub struct Tui<'a, R: BufRead, W: Write, T: VersionControlActions + 'a> {
+struct Tui<'a, R: BufRead, W: Write, T: VersionControlActions + 'a> {
 	stdin: R,
 	stdout: W,
+	repository_name: &'a str,
 	version_control: &'a T,
 	readline: Editor<()>,
 }
 
 impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
-	pub fn new(stdin: R, stdout: W, version_control: &'a T) -> Self {
+	fn new(stdin: R, stdout: W, repository_name: &'a str, version_control: &'a T) -> Self {
 		Tui {
 			stdin: stdin,
 			stdout: stdout,
+			repository_name: repository_name,
 			version_control: version_control,
 			readline: Editor::new(),
 		}
 	}
 
-	pub fn show(&mut self) {
+	fn show(&mut self) {
 		self.show_header();
 		self.show_help();
 
@@ -58,7 +62,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			match key {
 				Key::Char('q') => break,
 				Key::Ctrl('c') => break,
-				Key::Char(key) => self.handle_key(key),
+				Key::Ctrl(key) => self.handle_key(key, true),
+				Key::Char(key) => self.handle_key(key, false),
 				_ => (),
 			}
 
@@ -73,71 +78,81 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		).unwrap();
 	}
 
-	fn handle_key(&mut self, key: char) {
-		match key {
-			'h' => {
-				self.show_action("help");
-				self.show_help();
-			}
-			's' => {
-				self.show_action("status");
-				self.handle_result(self.version_control.status());
-			}
-			'l' => {
-				self.show_action("log");
-				self.handle_result(self.version_control.log());
-			}
-			'c' => {
-				self.show_action("commit");
-				if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
-					self.handle_result(self.version_control.commit(&input[..]));
+	fn handle_key(&mut self, key: char, is_control_held: bool) {
+		if is_control_held {
+			match key {
+				'b' => {
+					self.show_action("close branch");
+					self.handle_result(self.version_control.close_branch());
 				}
+				_ => (),
 			}
-			'R' => {
-				self.show_action("revert");
-				self.handle_result(self.version_control.revert());
-			}
-			'u' => {
-				self.show_action("update");
-				if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
-					self.handle_result(self.version_control.update(&input[..]));
+		} else {
+			match key {
+				'h' => {
+					self.show_action("help");
+					self.show_help();
 				}
-			}
-			'm' => {
-				self.show_action("merge");
-				if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
-					self.handle_result(self.version_control.merge(&input[..]));
+				's' => {
+					self.show_action("status");
+					self.handle_result(self.version_control.status());
 				}
-			}
-			'f' => {
-				self.show_action("fetch");
-				self.handle_result(self.version_control.fetch());
-			}
-			'p' => {
-				self.show_action("pull");
-				self.handle_result(self.version_control.pull());
-			}
-			'P' => {
-				self.show_action("push");
-				self.handle_result(self.version_control.push());
-			}
-			'T' => {
-				self.show_action("tag");
-				if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
-					self.handle_result(self.version_control.tag(&input[..]));
+				'l' => {
+					self.show_action("log");
+					self.handle_result(self.version_control.log());
 				}
-			}
-			'b' => {
-				self.show_action("branches");
-				self.handle_result(self.version_control.branches());
-			}
-			'B' => {
-				self.show_action("branch");
-				if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
-					self.handle_result(self.version_control.branch(&input[..]));
+				'c' => {
+					self.show_action("commit");
+					if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
+						self.handle_result(self.version_control.commit(&input[..]));
+					}
 				}
+				'R' => {
+					self.show_action("revert");
+					self.handle_result(self.version_control.revert());
+				}
+				'u' => {
+					self.show_action("update");
+					if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
+						self.handle_result(self.version_control.update(&input[..]));
+					}
+				}
+				'm' => {
+					self.show_action("merge");
+					if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
+						self.handle_result(self.version_control.merge(&input[..]));
+					}
+				}
+				'f' => {
+					self.show_action("fetch");
+					self.handle_result(self.version_control.fetch());
+				}
+				'p' => {
+					self.show_action("pull");
+					self.handle_result(self.version_control.pull());
+				}
+				'P' => {
+					self.show_action("push");
+					self.handle_result(self.version_control.push());
+				}
+				'T' => {
+					self.show_action("tag");
+					if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
+						self.handle_result(self.version_control.create_tag(&input[..]));
+					}
+				}
+				'b' => {
+					self.show_action("branches");
+					self.handle_result(self.version_control.list_branches());
+				}
+				'B' => {
+					self.show_action("branch");
+					if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
+						self.handle_result(self.version_control.create_branch(&input[..]));
+					}
+				}
+				_ => (),
 			}
-			_ => (),
 		}
 	}
 
@@ -167,33 +182,40 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		match result {
 			Ok(output) => {
 				write!(self.stdout, "{}\n\n", output).unwrap();
-				write!(
-					self.stdout,
-					"{}done{}\n\n",
-					DONE_COLOR,
-					RESET_COLOR
-				).unwrap();
+				write!(self.stdout, "{}done{}\n\n", DONE_COLOR, RESET_COLOR).unwrap();
 			}
 			Err(error) => {
 				write!(self.stdout, "{}\n\n", error).unwrap();
-				write!(
-					self.stdout,
-					"{}error{}\n\n",
-					ERROR_COLOR,
-					RESET_COLOR
-				).unwrap();
+				write!(self.stdout, "{}error{}\n\n", ERROR_COLOR, RESET_COLOR).unwrap();
 			}
 		}
 	}
 
 	fn show_header(&mut self) {
+		write!(self.stdout, "{}", termion::clear::All).unwrap();
+
+		if let Ok((w, _)) = termion::terminal_size() {
+			write!(
+				self.stdout,
+				"{}{}{}",
+				termion::cursor::Goto(1, 1),
+				HEADER_COLOR,
+				HEADER_BG_COLOR,
+			).unwrap();
+
+			for _ in 0..w {
+				write!(self.stdout, " ",).unwrap();
+			}
+		}
+
 		write!(
 			self.stdout,
-			"{}{}{}Verco - Git/Hg client{}\n\n",
-			termion::clear::All,
-			termion::cursor::Goto(1, 1),
+			"{}{}Verco @ {}{}{}\n\n",
 			HEADER_COLOR,
-			RESET_COLOR
+			termion::cursor::Goto(1, 1),
+			self.repository_name,
+			RESET_COLOR,
+			RESET_BG_COLOR,
 		).unwrap();
 
 		self.stdout.flush().unwrap();
@@ -227,9 +249,11 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		self.show_help_action("p", "pull");
 		self.show_help_action("shift+p", "push\n");
 
-		self.show_help_action("shift+t", "new tag");
-		self.show_help_action("b", "new branches");
-		self.show_help_action("shift+b", "new branch\n");
+		self.show_help_action("shift+t", "create tag\n");
+
+		self.show_help_action("b", "list branches");
+		self.show_help_action("shift+b", "create branch");
+		self.show_help_action("ctrl+b", "close branch\n");
 	}
 
 	fn show_help_action(&mut self, shortcut: &str, action: &str) {
