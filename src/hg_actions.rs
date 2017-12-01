@@ -18,15 +18,15 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		let mut output = String::new();
 
 		output.push_str(
-			&try!(handle_command(
+			&handle_command(
 				self.command().args(&["summary", "--color", "always"])
-			))[..],
+			)?[..],
 		);
 		output.push_str("\n");
 		output.push_str(
-			&try!(handle_command(
+			&handle_command(
 				self.command().args(&["status", "--color", "always"])
-			))[..],
+			)?[..],
 		);
 
 		Ok(output)

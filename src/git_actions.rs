@@ -34,7 +34,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn commit(&self, message: &str) -> Result<String, String> {
-		try!(handle_command(self.command().args(&["add", "--all"])));
+		handle_command(self.command().args(&["add", "--all"]))?;
 		handle_command(self.command().arg("commit").arg("-m").arg(message))
 	}
 
@@ -75,6 +75,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn close_branch(&self) -> Result<String, String> {
-		Err(String::from("Not implemented yet"))
+		let branch_name = handle_command(self.command().args(&["branch"]))?;
+		handle_command(self.command().arg("branch").arg("-d").arg(&branch_name[..]))
 	}
 }
