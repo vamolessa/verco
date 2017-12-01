@@ -76,7 +76,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn push(&self) -> Result<String, String> {
-		handle_command(self.command().arg("push"))
+		handle_command(self.command().args(&["push", "--new-branch"]))
 	}
 
 	fn create_tag(&self, name: &str) -> Result<String, String> {
