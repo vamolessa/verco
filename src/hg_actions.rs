@@ -91,7 +91,15 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		handle_command(self.command().arg("branch").arg(name))
 	}
 
-	fn close_branch(&self) -> Result<String, String> {
-		handle_command(self.command().args(&["commit", "-m", "\"close branch\"", "--close-branch"]))
+	fn close_branch(&self, name: &str) -> Result<String, String> {
+		let changeset = handle_command(self.command().args(&["identify", "--num"]))?;
+		self.update(name)?;
+
+		let mut output = String::new();
+		output.push_str(&handle_command(self.command().args(&["commit", "-m", "\"close branch\"", "--close-branch"]))?[..]);
+		output.push_str("\n");
+		output.push_str(&self.update(changeset.trim())?[..]);
+
+		Ok(output)
 	}
 }

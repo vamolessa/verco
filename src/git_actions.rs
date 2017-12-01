@@ -80,9 +80,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		Ok(output)
 	}
 
-	fn close_branch(&self) -> Result<String, String> {
-		let branch_name =
-			handle_command(self.command().args(&["rev-parse", "--abbrev-ref", "HEAD"]))?;
-		handle_command(self.command().arg("branch").arg("-d").arg(branch_name.trim()))
+	fn close_branch(&self, name: &str) -> Result<String, String> {
+		handle_command(self.command().arg("branch").arg("-d").arg(name))
 	}
 }

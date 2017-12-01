@@ -83,7 +83,9 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			match key {
 				'b' => {
 					self.show_action("close branch");
-					self.handle_result(self.version_control.close_branch());
+					if let Some(input) = self.handle_input("branch to close (ctrl+c to cancel): ") {
+						self.handle_result(self.version_control.close_branch(&input[..]));
+					}
 				}
 				_ => (),
 			}
