@@ -71,7 +71,13 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn create_branch(&self, name: &str) -> Result<String, String> {
-		handle_command(self.command().arg("branch").arg(name))
+		let mut output = String::new();
+
+		output.push_str(&handle_command(self.command().arg("branch").arg(name))?[..]);
+		output.push_str("\n");
+		output.push_str(&self.update(name)?[..]);
+
+		Ok(output)
 	}
 
 	fn close_branch(&self) -> Result<String, String> {
