@@ -83,6 +83,6 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	fn close_branch(&self) -> Result<String, String> {
 		let branch_name =
 			handle_command(self.command().args(&["rev-parse", "--abbrev-ref", "HEAD"]))?;
-		handle_command(self.command().arg("branch").arg("-d").arg(&branch_name[..]))
+		handle_command(self.command().arg("branch").arg("-d").arg(branch_name.trim()))
 	}
 }
