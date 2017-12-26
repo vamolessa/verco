@@ -205,9 +205,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				HEADER_BG_COLOR,
 			).unwrap();
 
-			for _ in 0..w {
-				write!(self.stdout, " ").unwrap();
-			}
+			write!(self.stdout, "{}", " ".repeat(w as usize)).unwrap();
 		}
 
 		write!(
