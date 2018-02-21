@@ -168,8 +168,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				write!(
 					self.stdout,
 					"\n\n{}canceled{}\n\n",
-					CANCEL_COLOR,
-					RESET_COLOR
+					CANCEL_COLOR, RESET_COLOR
 				).unwrap();
 				None
 			}
@@ -226,13 +225,13 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		write!(
 			self.stdout,
 			"{}{}{}\n\n",
-			ACTION_COLOR,
-			action_name,
-			RESET_COLOR
+			ACTION_COLOR, action_name, RESET_COLOR
 		).unwrap();
 	}
 
 	fn show_help(&mut self) {
+		write!(self.stdout, "Verco 0.2.0\n\n").unwrap();
+
 		write!(self.stdout, "press a key and peform an action\n\n").unwrap();
 
 		self.show_help_action("h", "help\n");
@@ -260,10 +259,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		write!(
 			self.stdout,
 			"\t{}{}{}\t\t{}\n",
-			ENTRY_COLOR,
-			shortcut,
-			RESET_COLOR,
-			action
+			ENTRY_COLOR, shortcut, RESET_COLOR, action
 		).unwrap();
 	}
 }
