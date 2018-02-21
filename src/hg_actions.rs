@@ -17,17 +17,11 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	fn status(&self) -> Result<String, String> {
 		let mut output = String::new();
 
-		output.push_str(
-			&handle_command(
-				self.command().args(&["summary", "--color", "always"])
-			)?[..],
-		);
+		output
+			.push_str(&handle_command(self.command().args(&["summary", "--color", "always"]))?[..]);
 		output.push_str("\n");
-		output.push_str(
-			&handle_command(
-				self.command().args(&["status", "--color", "always"])
-			)?[..],
-		);
+		output
+			.push_str(&handle_command(self.command().args(&["status", "--color", "always"]))?[..]);
 
 		Ok(output)
 	}
@@ -56,7 +50,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn revert(&self) -> Result<String, String> {
-		handle_command(self.command().args(&["revert", "--all"]))
+		handle_command(self.command().args(&["revert", "-C", "--all"]))
 	}
 
 	fn update(&self, target: &str) -> Result<String, String> {
@@ -96,7 +90,14 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		self.update(name)?;
 
 		let mut output = String::new();
-		output.push_str(&handle_command(self.command().args(&["commit", "-m", "\"close branch\"", "--close-branch"]))?[..]);
+		output.push_str(
+			&handle_command(self.command().args(&[
+				"commit",
+				"-m",
+				"\"close branch\"",
+				"--close-branch",
+			]))?[..],
+		);
 		output.push_str("\n");
 		output.push_str(&self.update(changeset.trim())?[..]);
 
