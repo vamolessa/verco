@@ -39,7 +39,13 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn revert(&self) -> Result<String, String> {
-		handle_command(self.command().args(&["reset", "--hard"]))
+		let mut output = String::new();
+
+		output.push_str(&handle_command(self.command().args(&["reset", "--hard"]))?[..]);
+		output.push_str("\n");
+		output.push_str(&handle_command(self.command().args(&["clean", "-df"]))?[..]);
+
+		Ok(output)
 	}
 
 	fn update(&self, target: &str) -> Result<String, String> {
