@@ -33,6 +33,25 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		]))
 	}
 
+	fn changes(&self, target: &str) -> Result<String, String> {
+		handle_command(
+			self.command()
+				.arg("diff-tree")
+				.arg("--no-commit-id")
+				.arg("--name-status")
+				.arg("-r")
+				.arg(target)
+				.arg("--color"),
+		)
+	}
+
+	fn diff(&self, target: &str) -> Result<String, String> {
+		let mut arg = String::from(target);
+		arg.push_str("^!");
+
+		handle_command(self.command().arg("diff").arg(arg).arg("--color"))
+	}
+
 	fn commit(&self, message: &str) -> Result<String, String> {
 		handle_command(self.command().args(&["add", "--all"]))?;
 		handle_command(self.command().arg("commit").arg("-m").arg(message))

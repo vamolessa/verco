@@ -103,6 +103,19 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					self.show_action("log");
 					self.handle_result(self.version_control.log());
 				}
+				'd' => {
+					self.show_action("rev changes");
+					if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
+					{
+						self.handle_result(self.version_control.changes(&input[..]));
+					}
+				}
+				'D' => {
+					self.show_action("rev diff");
+					if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ") {
+						self.handle_result(self.version_control.diff(&input[..]));
+					}
+				}
 				'c' => {
 					self.show_action("commit");
 					if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
@@ -230,7 +243,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn show_help(&mut self) {
-		write!(self.stdout, "Verco 0.2.0\n\n").unwrap();
+		write!(self.stdout, "Verco 0.3.0\n\n").unwrap();
 
 		write!(self.stdout, "press a key and peform an action\n\n").unwrap();
 
@@ -238,6 +251,9 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 		self.show_help_action("s", "status");
 		self.show_help_action("l", "log\n");
+
+		self.show_help_action("d", "rev changes");
+		self.show_help_action("shift+d", "rev diff");
 
 		self.show_help_action("c", "commit");
 		self.show_help_action("shift+r", "revert");

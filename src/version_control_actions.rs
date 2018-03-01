@@ -4,6 +4,9 @@ pub trait VersionControlActions {
 	fn status(&self) -> Result<String, String>;
 	fn log(&self) -> Result<String, String>;
 
+	fn changes(&self, target: &str) -> Result<String, String>;
+	fn diff(&self, target: &str) -> Result<String, String>;
+
 	fn commit(&self, message: &str) -> Result<String, String>;
 	fn revert(&self) -> Result<String, String>;
 	fn update(&self, target: &str) -> Result<String, String>;
