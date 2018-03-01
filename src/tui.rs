@@ -243,7 +243,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn show_help(&mut self) {
-		write!(self.stdout, "Verco 0.3.0\n\n").unwrap();
+		write!(self.stdout, "Verco 0.3.1\n\n").unwrap();
 
 		write!(self.stdout, "press a key and peform an action\n\n").unwrap();
 
