@@ -253,7 +253,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		self.show_help_action("l", "log\n");
 
 		self.show_help_action("d", "rev changes");
-		self.show_help_action("shift+d", "rev diff");
+		self.show_help_action("shift+d", "rev diff\n");
 
 		self.show_help_action("c", "commit");
 		self.show_help_action("shift+r", "revert");
