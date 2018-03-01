@@ -40,7 +40,14 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn changes(&self, target: &str) -> Result<String, String> {
-		handle_command(self.command().arg("status").arg("--change").arg(target))
+		handle_command(
+			self.command()
+				.arg("status")
+				.arg("--change")
+				.arg(target)
+				.arg("--color")
+				.arg("always"),
+		)
 	}
 
 	fn diff(&self, target: &str) -> Result<String, String> {
@@ -53,7 +60,9 @@ impl<'a> VersionControlActions for HgActions<'a> {
 				.arg("commit")
 				.arg("--addremove")
 				.arg("-m")
-				.arg(message),
+				.arg(message)
+				.arg("--color")
+				.arg("always"),
 		)
 	}
 
