@@ -4,8 +4,8 @@ use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
-use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use rustyline::error::ReadlineError;
 
 use std::io::{stdin, stdout, BufRead, Write};
 
@@ -243,7 +243,18 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn show_help(&mut self) {
-		write!(self.stdout, "Verco 0.3.1\n\n").unwrap();
+		write!(self.stdout, "Verco 0.4.0\n\n").unwrap();
+
+		match self.version_control.version() {
+			Ok(version) => {
+				write!(self.stdout, "{}", version).unwrap();
+				write!(self.stdout, "\n\n").unwrap();
+			}
+			Err(error) => {
+				write!(self.stdout, "{}{}", ERROR_COLOR, error).unwrap();
+				panic!("Could not find version control in system");
+			}
+		}
 
 		write!(self.stdout, "press a key and peform an action\n\n").unwrap();
 

@@ -13,4 +13,3 @@ path = "src/main.rs"
 [dependencies]
 termion = { git = "https://github.com/mcgoo/termion", branch = "windows" }
 rustyline = "1.0.0"
-

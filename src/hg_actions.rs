@@ -14,6 +14,10 @@ impl<'a> HgActions<'a> {
 }
 
 impl<'a> VersionControlActions for HgActions<'a> {
+	fn version(&self) -> Result<String, String> {
+		handle_command(self.command().arg("--version"))
+	}
+
 	fn status(&self) -> Result<String, String> {
 		let mut output = String::new();
 

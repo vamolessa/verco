@@ -1,6 +1,8 @@
 use std::process::Command;
 
 pub trait VersionControlActions {
+	fn version(&self) -> Result<String, String>;
+
 	fn status(&self) -> Result<String, String>;
 	fn log(&self) -> Result<String, String>;
 
