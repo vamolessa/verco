@@ -87,6 +87,10 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 						self.handle_result(self.version_control.close_branch(&input[..]));
 					}
 				}
+				'm' => {
+					self.show_action("merge taking local");
+					self.handle_result(self.version_control.take_local());
+				}
 				_ => (),
 			}
 		} else {
@@ -104,14 +108,14 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					self.handle_result(self.version_control.log());
 				}
 				'd' => {
-					self.show_action("rev changes");
+					self.show_action("revision changes");
 					if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
 					{
 						self.handle_result(self.version_control.changes(&input[..]));
 					}
 				}
 				'D' => {
-					self.show_action("rev diff");
+					self.show_action("revision diff");
 					if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ") {
 						self.handle_result(self.version_control.diff(&input[..]));
 					}
@@ -137,6 +141,14 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
 						self.handle_result(self.version_control.merge(&input[..]));
 					}
+				}
+				'r' => {
+					self.show_action("unresolved conflicts");
+					self.handle_result(self.version_control.conflicts());
+				}
+				'M' => {
+					self.show_action("merge taking other");
+					self.handle_result(self.version_control.take_other());
 				}
 				'f' => {
 					self.show_action("fetch");
@@ -263,17 +275,17 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		self.show_help_action("s", "status");
 		self.show_help_action("l", "log\n");
 
-		self.show_help_action("d", "rev changes");
-		self.show_help_action("shift+d", "rev diff\n");
+		self.show_help_action("d", "revision changes");
+		self.show_help_action("shift+d", "revision diff\n");
 
 		self.show_help_action("c", "commit");
 		self.show_help_action("shift+r", "revert");
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
 
-		self.show_help_action("t", "list conflicts");
-		self.show_help_action("shift+t", "resolve all by taking other");
-		self.show_help_action("ctrl+t", "resolve all by taking local");
+		self.show_help_action("r", "unresolved conflicts");
+		self.show_help_action("shift+m", "merge taking other");
+		self.show_help_action("ctrl+m", "merge taking local\n");
 
 		self.show_help_action("f", "fetch");
 		self.show_help_action("p", "pull");
