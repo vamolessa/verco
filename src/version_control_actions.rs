@@ -14,6 +14,10 @@ pub trait VersionControlActions {
 	fn update(&self, target: &str) -> Result<String, String>;
 	fn merge(&self, target: &str) -> Result<String, String>;
 
+	fn conflicts(&self) -> Result<String, String>;
+	fn take_other(&self) -> Result<String, String>;
+	fn take_local(&self) -> Result<String, String>;
+
 	fn fetch(&self) -> Result<String, String>;
 	fn pull(&self) -> Result<String, String>;
 	fn push(&self) -> Result<String, String>;

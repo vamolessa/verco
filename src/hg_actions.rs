@@ -82,6 +82,24 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		handle_command(self.command().arg("merge").arg(target))
 	}
 
+	fn conflicts(&self) -> Result<String, String> {
+		handle_command(self.command().args(&["resolve", "-l"]))
+	}
+
+	fn take_other(&self) -> Result<String, String> {
+		handle_command(
+			self.command()
+				.args(&["resolve", "-a", "-t", "internal:other"]),
+		)
+	}
+
+	fn take_local(&self) -> Result<String, String> {
+		handle_command(
+			self.command()
+				.args(&["resolve", "-a", "-t", "internal:local"]),
+		)
+	}
+
 	fn fetch(&self) -> Result<String, String> {
 		self.pull()
 	}

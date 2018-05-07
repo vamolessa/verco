@@ -79,6 +79,21 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		handle_command(self.command().arg("merge").arg(target))
 	}
 
+	fn conflicts(&self) -> Result<String, String> {
+		handle_command(
+			self.command()
+				.args(&["diff", "--name-only", "--diff-filter=U"]),
+		)
+	}
+
+	fn take_other(&self) -> Result<String, String> {
+		handle_command(self.command().args(&["checkout", ".", "--theirs"]))
+	}
+
+	fn take_local(&self) -> Result<String, String> {
+		handle_command(self.command().args(&["checkout", ".", "--ours"]))
+	}
+
 	fn fetch(&self) -> Result<String, String> {
 		handle_command(self.command().args(&["fetch", "--all"]))
 	}

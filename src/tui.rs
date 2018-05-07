@@ -271,6 +271,10 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
 
+		self.show_help_action("t", "list conflicts");
+		self.show_help_action("shift+t", "resolve all by taking other");
+		self.show_help_action("ctrl+t", "resolve all by taking local");
+
 		self.show_help_action("f", "fetch");
 		self.show_help_action("p", "pull");
 		self.show_help_action("shift+p", "push\n");
