@@ -4,8 +4,8 @@ use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
-use rustyline::Editor;
 use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 use std::io::{stdin, stdout, BufRead, Write};
 
@@ -87,7 +87,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 						self.handle_result(self.version_control.close_branch(&input[..]));
 					}
 				}
-				'm' => {
+				'R' => {
 					self.show_action("merge taking local");
 					self.handle_result(self.version_control.take_local());
 				}
@@ -126,7 +126,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 						self.handle_result(self.version_control.commit(&input[..]));
 					}
 				}
-				'R' => {
+				'U' => {
 					self.show_action("revert");
 					self.handle_result(self.version_control.revert());
 				}
@@ -146,7 +146,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					self.show_action("unresolved conflicts");
 					self.handle_result(self.version_control.conflicts());
 				}
-				'M' => {
+				'R' => {
 					self.show_action("merge taking other");
 					self.handle_result(self.version_control.take_other());
 				}
@@ -184,7 +184,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
-		let readline = self.readline
+		let readline = self
+			.readline
 			.readline(&format!("{}{}{}", ENTRY_COLOR, prompt, RESET_COLOR)[..]);
 
 		match readline {
@@ -255,7 +256,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn show_help(&mut self) {
-		write!(self.stdout, "Verco 0.4.0\n\n").unwrap();
+		write!(self.stdout, "Verco 0.5.0\n\n").unwrap();
 
 		match self.version_control.version() {
 			Ok(version) => {
@@ -279,13 +280,13 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		self.show_help_action("shift+d", "revision diff\n");
 
 		self.show_help_action("c", "commit");
-		self.show_help_action("shift+r", "revert");
+		self.show_help_action("shift+u", "revert");
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
 
 		self.show_help_action("r", "unresolved conflicts");
-		self.show_help_action("shift+m", "merge taking other");
-		self.show_help_action("ctrl+m", "merge taking local\n");
+		self.show_help_action("shift+r", "resolve taking other");
+		self.show_help_action("ctrl+r", "resolve taking local\n");
 
 		self.show_help_action("f", "fetch");
 		self.show_help_action("p", "pull");
