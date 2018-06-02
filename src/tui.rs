@@ -87,7 +87,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 						self.handle_result(self.version_control.close_branch(&input[..]));
 					}
 				}
-				'R' => {
+				'r' => {
 					self.show_action("merge taking local");
 					self.handle_result(self.version_control.take_local());
 				}
