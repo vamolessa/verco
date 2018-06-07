@@ -314,9 +314,11 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
         ).unwrap();
     }
 
-    fn open_explorer(&self) {
+    fn open_explorer(&mut self) {
         let mut command = Command::new("explorer");
-        command.current_dir(self.repository_name);
+        command.arg(self.repository_name);
         command.spawn().expect("failed to open explorer");
+
+        write!(self.stdout, "{}done{}\n\n", DONE_COLOR, RESET_COLOR).unwrap();
     }
 }
