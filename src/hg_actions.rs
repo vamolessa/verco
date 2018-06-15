@@ -83,7 +83,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn conflicts(&self) -> Result<String, String> {
-		handle_command(self.command().args(&["resolve", "-l"]))
+		handle_command(self.command().args(&["resolve", "-l", "--color", "always"]))
 	}
 
 	fn take_other(&self) -> Result<String, String> {
