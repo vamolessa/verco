@@ -61,7 +61,6 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			let key = (&mut self.stdin).keys().next().unwrap().unwrap();
 
 			match key {
-				Key::Char('q') => break,
 				Key::Ctrl('c') => break,
 				Key::Ctrl(key) => self.handle_key(key, true),
 				Key::Char(key) => self.handle_key(key, false),
@@ -70,13 +69,6 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 			self.stdout.flush().unwrap();
 		}
-
-		write!(
-			self.stdout,
-			"{}{}",
-			termion::clear::All,
-			termion::cursor::Goto(1, 1),
-		).unwrap();
 	}
 
 	fn handle_key(&mut self, key: char, is_control_held: bool) {
