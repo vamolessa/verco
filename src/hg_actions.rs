@@ -1,3 +1,4 @@
+use add_remove::Entry;
 use std::process::Command;
 use version_control_actions::{handle_command, VersionControlActions};
 
@@ -14,6 +15,10 @@ impl<'a> HgActions<'a> {
 }
 
 impl<'a> VersionControlActions for HgActions<'a> {
+	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String> {
+		Ok(Vec::new())
+	}
+
 	fn version(&self) -> Result<String, String> {
 		handle_command(self.command().arg("--version"))
 	}
@@ -58,11 +63,22 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		handle_command(self.command().arg("diff").arg("--change").arg(target))
 	}
 
-	fn commit(&self, message: &str) -> Result<String, String> {
+	fn commit_all(&self, message: &str) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.arg("commit")
 				.arg("--addremove")
+				.arg("-m")
+				.arg(message)
+				.arg("--color")
+				.arg("always"),
+		)
+	}
+
+	fn commit_selected(&self, message: &str, _entries: &Vec<Entry>) -> Result<String, String> {
+		handle_command(
+			self.command()
+				.arg("commit")
 				.arg("-m")
 				.arg(message)
 				.arg("--color")

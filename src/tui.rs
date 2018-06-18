@@ -10,7 +10,7 @@ use rustyline::Editor;
 use std::io::{stdin, stdout, BufRead, Write};
 use std::process::Command;
 
-use add_remove_ui::{draw_add_remove_selection, Entry};
+use add_remove::{draw_add_remove_selection, Entry};
 use version_control_actions::VersionControlActions;
 
 const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
@@ -119,13 +119,28 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					}
 				}
 				'c' => {
-					self.show_action("commit");
-
-					let mut entries = Vec::new();
-					self.show_add_remove_ui(&mut entries);
+					self.show_action("commit all");
 
 					if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.commit(&input[..]));
+						self.handle_result(self.version_control.commit_all(&input[..]));
+					}
+				}
+				'C' => {
+					self.show_action("commit selected");
+
+					match self.version_control.get_files_to_commit() {
+						Ok(mut entries) => {
+							self.show_add_remove_ui(&mut entries);
+
+							if let Some(input) =
+								self.handle_input("commit message (ctrl+c to cancel): ")
+							{
+								self.handle_result(
+									self.version_control.commit_selected(&input[..], &entries),
+								);
+							}
+						}
+						Err(error) => self.handle_result(Err(error)),
 					}
 				}
 				'U' => {
@@ -283,7 +298,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		self.show_help_action("d", "revision changes");
 		self.show_help_action("shift+d", "revision diff\n");
 
-		self.show_help_action("c", "commit");
+		self.show_help_action("c", "commit all");
+		self.show_help_action("shift+c", "commit selected");
 		self.show_help_action("shift+u", "revert");
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");

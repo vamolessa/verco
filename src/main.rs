@@ -4,7 +4,7 @@ extern crate termion;
 use std::env;
 use std::path::PathBuf;
 
-mod add_remove_ui;
+mod add_remove;
 mod git_actions;
 mod hg_actions;
 mod tui;

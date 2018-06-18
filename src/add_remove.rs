@@ -39,20 +39,6 @@ impl State {
 	}
 }
 
-impl From<char> for State {
-	fn from(c: char) -> Self {
-		match c {
-			'M' => State::Modified,
-			'A' => State::Added,
-			'D' => State::Deleted,
-			'R' => State::Renamed,
-			'C' => State::Copied,
-			'U' => State::Unmerged,
-			_ => State::Unmodified,
-		}
-	}
-}
-
 #[derive(Clone)]
 pub struct Entry {
 	pub filename: String,

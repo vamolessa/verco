@@ -1,6 +1,9 @@
+use add_remove::Entry;
 use std::process::Command;
 
 pub trait VersionControlActions {
+	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String>;
+
 	fn version(&self) -> Result<String, String>;
 
 	fn status(&self) -> Result<String, String>;
@@ -9,7 +12,8 @@ pub trait VersionControlActions {
 	fn changes(&self, target: &str) -> Result<String, String>;
 	fn diff(&self, target: &str) -> Result<String, String>;
 
-	fn commit(&self, message: &str) -> Result<String, String>;
+	fn commit_all(&self, message: &str) -> Result<String, String>;
+	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String>;
 	fn revert(&self) -> Result<String, String>;
 	fn update(&self, target: &str) -> Result<String, String>;
 	fn merge(&self, target: &str) -> Result<String, String>;

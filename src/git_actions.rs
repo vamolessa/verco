@@ -1,5 +1,18 @@
+use add_remove::{Entry, State};
 use std::process::Command;
 use version_control_actions::{handle_command, VersionControlActions};
+
+fn str_to_state(s: &str) -> State {
+	match s {
+		"M" => State::Modified,
+		"A" => State::Added,
+		"D" => State::Deleted,
+		"R" => State::Renamed,
+		"C" => State::Copied,
+		"U" => State::Unmerged,
+		_ => State::Unmodified,
+	}
+}
 
 pub struct GitActions<'a> {
 	pub current_dir: &'a str,
@@ -14,6 +27,24 @@ impl<'a> GitActions<'a> {
 }
 
 impl<'a> VersionControlActions for GitActions<'a> {
+	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String> {
+		let output = handle_command(self.command().args(&["status", "--porcelain"]))?;
+
+		let files: Vec<_> = output
+			.trim()
+			.split('\n')
+			.map(|e| {
+				let (state, filename) = e.trim().split_at(1);
+				Entry {
+					filename: String::from(filename.trim()),
+					selected: false,
+					state: str_to_state(state.trim()),
+				}
+			})
+			.collect();
+		Ok(files)
+	}
+
 	fn version(&self) -> Result<String, String> {
 		handle_command(self.command().arg("--version"))
 	}
@@ -56,8 +87,16 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		handle_command(self.command().arg("diff").arg(arg).arg("--color"))
 	}
 
-	fn commit(&self, message: &str) -> Result<String, String> {
+	fn commit_all(&self, message: &str) -> Result<String, String> {
 		handle_command(self.command().args(&["add", "--all"]))?;
+		handle_command(self.command().arg("commit").arg("-m").arg(message))
+	}
+
+	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
+		for e in entries.iter() {
+			handle_command(self.command().arg("add").arg(&e.filename))?;
+		}
+
 		handle_command(self.command().arg("commit").arg("-m").arg(message))
 	}
 
