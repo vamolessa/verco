@@ -41,7 +41,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 				Entry {
 					filename: String::from(filename.trim()),
 					selected: false,
-					state: str_to_state(&state[..1]),
+					state: str_to_state(state),
 				}
 			})
 			.collect();
