@@ -10,6 +10,7 @@ use rustyline::Editor;
 use std::io::{stdin, stdout, BufRead, Write};
 use std::process::Command;
 
+use add_remove_ui::{draw_add_remove_selection, Entry};
 use version_control_actions::VersionControlActions;
 
 const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
@@ -119,6 +120,10 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				}
 				'c' => {
 					self.show_action("commit");
+
+					let mut entries = Vec::new();
+					self.show_add_remove_ui(&mut entries);
+
 					if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
 						self.handle_result(self.version_control.commit(&input[..]));
 					}
@@ -312,5 +317,17 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		command.spawn().expect("failed to open explorer");
 
 		write!(self.stdout, "{}done{}\n\n", DONE_COLOR, RESET_COLOR).unwrap();
+	}
+
+	pub fn show_add_remove_ui(&mut self, entries: &mut Vec<Entry>) {
+		let mut index = 0;
+
+		loop {
+			write!(self.stdout, "{}", termion::clear::All).unwrap();
+
+			if !draw_add_remove_selection(&mut self.stdin, &mut self.stdout, entries, &mut index) {
+				break;
+			}
+		}
 	}
 }
