@@ -4,6 +4,7 @@ use version_control_actions::{handle_command, VersionControlActions};
 
 fn str_to_state(s: &str) -> State {
 	match s {
+		"?" => State::Untracked,
 		"M" => State::Modified,
 		"A" => State::Added,
 		"D" => State::Deleted,
@@ -34,11 +35,11 @@ impl<'a> VersionControlActions for GitActions<'a> {
 			.trim()
 			.split('\n')
 			.map(|e| {
-				let (state, filename) = e.trim().split_at(1);
+				let (state, filename) = e.trim().split_at(2);
 				Entry {
 					filename: String::from(filename.trim()),
 					selected: false,
-					state: str_to_state(state.trim()),
+					state: str_to_state(&state[..1]),
 				}
 			})
 			.collect();
@@ -94,7 +95,9 @@ impl<'a> VersionControlActions for GitActions<'a> {
 
 	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
 		for e in entries.iter() {
-			handle_command(self.command().arg("add").arg(&e.filename))?;
+			if e.selected {
+				handle_command(self.command().arg("add").arg(&e.filename))?;
+			}
 		}
 
 		handle_command(self.command().arg("commit").arg("-m").arg(message))

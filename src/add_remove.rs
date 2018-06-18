@@ -5,6 +5,7 @@ use termion::input::TermRead;
 
 #[derive(Clone, Debug)]
 pub enum State {
+	Untracked,
 	Unmodified,
 	Modified,
 	Added,
@@ -17,6 +18,7 @@ pub enum State {
 const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
 const RESET_BG_COLOR: color::Bg<color::Reset> = color::Bg(color::Reset);
 
+const UNTRACKED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(100, 180, 255));
 const UNMODIFIED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 255, 255));
 const MODIFIED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 200, 0));
 const ADDED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(0, 255, 0));
@@ -28,6 +30,7 @@ const UNMERGED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 180, 100
 impl State {
 	fn color(&self) -> color::Fg<color::Rgb> {
 		match self {
+			State::Untracked => UNTRACKED_COLOR,
 			State::Unmodified => UNMODIFIED_COLOR,
 			State::Modified => MODIFIED_COLOR,
 			State::Added => ADDED_COLOR,
@@ -52,7 +55,11 @@ pub fn draw_add_remove_selection<R: BufRead, W: Write>(
 	entries: &mut Vec<Entry>,
 	cursor_index: &mut usize,
 ) -> bool {
-	write!(stdout, "{}", RESET_BG_COLOR).unwrap();
+	write!(
+		stdout,
+		"{}(j/k) move, space (de)select, a (de)select all, enter continues\n\n",
+		RESET_BG_COLOR
+	).unwrap();
 
 	let mut index = *cursor_index;
 
@@ -61,7 +68,7 @@ pub fn draw_add_remove_selection<R: BufRead, W: Write>(
 		let selection = if e.selected { "+" } else { " " };
 		write!(
 			stdout,
-			"{}{} {} {}{:<10?} {}{}\n",
+			"{}{} {} {}{:?}\t{}{}\n",
 			RESET_COLOR,
 			cursor,
 			selection,
@@ -77,10 +84,11 @@ pub fn draw_add_remove_selection<R: BufRead, W: Write>(
 	let key = stdin.keys().next().unwrap().unwrap();
 
 	match key {
+		Key::Char('\n') => return false,
 		Key::Ctrl('c') => return false,
 		Key::Char('j') => index = (index + 1) % entries.len(),
 		Key::Char('k') => index = (index + entries.len() - 1) % entries.len(),
-		Key::Char('s') => entries[index].selected = !entries[index].selected,
+		Key::Char(' ') => entries[index].selected = !entries[index].selected,
 		Key::Char('a') => if let Some(first) = entries.first().cloned() {
 			for e in entries.iter_mut() {
 				e.selected = !first.selected;

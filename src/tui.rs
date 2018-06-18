@@ -132,6 +132,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 						Ok(mut entries) => {
 							self.show_add_remove_ui(&mut entries);
 
+							write!(self.stdout, "\n\n");
 							if let Some(input) =
 								self.handle_input("commit message (ctrl+c to cancel): ")
 							{
@@ -340,6 +341,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 
 		loop {
 			write!(self.stdout, "{}", termion::clear::All).unwrap();
+			self.show_action("commit selected");
 
 			if !draw_add_remove_selection(&mut self.stdin, &mut self.stdout, entries, &mut index) {
 				break;
