@@ -29,7 +29,7 @@ impl<'a> HgActions<'a> {
 
 impl<'a> VersionControlActions for HgActions<'a> {
 	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String> {
-		let output = handle_command(self.command().args(&["status", "--porcelain"]))?;
+		let output = handle_command(self.command().args(&["status"]))?;
 
 		let files: Vec<_> = output
 			.trim()
@@ -107,7 +107,17 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
 		for e in entries.iter() {
 			if e.selected {
-				handle_command(self.command().arg("add").arg(&e.filename))?;
+				match e.state {
+					State::Missing => {
+						handle_command(self.command().arg("remove").arg(&e.filename))?;
+					}
+					State::Deleted => {
+						handle_command(self.command().arg("remove").arg(&e.filename))?;
+					}
+					_ => {
+						handle_command(self.command().arg("add").arg(&e.filename))?;
+					}
+				}
 			}
 		}
 

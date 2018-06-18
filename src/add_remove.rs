@@ -21,6 +21,8 @@ pub enum State {
 const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
 const RESET_BG_COLOR: color::Bg<color::Reset> = color::Bg(color::Reset);
 
+const HELP_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 180, 100));
+
 const UNTRACKED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(100, 180, 255));
 const UNMODIFIED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 255, 255));
 const MODIFIED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 200, 0));
@@ -66,8 +68,16 @@ pub fn draw_add_remove_selection<R: BufRead, W: Write>(
 ) -> bool {
 	write!(
 		stdout,
-		"{}(j/k) move, space (de)select, a (de)select all, enter continues\n\n",
-		RESET_BG_COLOR
+		"{}({}jk{}) move, {}space{} (de)select, {}a{} (de)select all, {}enter{} continues\n\n",
+		RESET_BG_COLOR,
+		HELP_COLOR,
+		RESET_COLOR,
+		HELP_COLOR,
+		RESET_COLOR,
+		HELP_COLOR,
+		RESET_COLOR,
+		HELP_COLOR,
+		RESET_COLOR,
 	).unwrap();
 
 	let mut index = *cursor_index;
