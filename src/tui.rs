@@ -274,7 +274,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn show_help(&mut self) {
-		write!(self.stdout, "Verco 0.6.0\n\n").unwrap();
+		write!(self.stdout, "Verco 0.7.0\n\n").unwrap();
 
 		match self.version_control.version() {
 			Ok(version) => {

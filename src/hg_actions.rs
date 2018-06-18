@@ -1,6 +1,19 @@
-use add_remove::Entry;
+use add_remove::{Entry, State};
 use std::process::Command;
 use version_control_actions::{handle_command, VersionControlActions};
+
+fn str_to_state(s: &str) -> State {
+	match s {
+		"?" => State::Untracked,
+		"M" => State::Modified,
+		"A" => State::Added,
+		"R" => State::Deleted,
+		"!" => State::Missing,
+		"I" => State::Ignored,
+		"C" => State::Clean,
+		_ => State::Copied,
+	}
+}
 
 pub struct HgActions<'a> {
 	pub current_dir: &'a str,
@@ -16,7 +29,23 @@ impl<'a> HgActions<'a> {
 
 impl<'a> VersionControlActions for HgActions<'a> {
 	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String> {
-		Ok(Vec::new())
+		let output = handle_command(self.command().args(&["status", "--porcelain"]))?;
+
+		let files: Vec<_> = output
+			.trim()
+			.split('\n')
+			.map(|e| e.trim())
+			.filter(|e| e.len() > 1)
+			.map(|e| {
+				let (state, filename) = e.split_at(1);
+				Entry {
+					filename: String::from(filename.trim()),
+					selected: false,
+					state: str_to_state(&state[..1]),
+				}
+			})
+			.collect();
+		Ok(files)
 	}
 
 	fn version(&self) -> Result<String, String> {
@@ -75,7 +104,13 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		)
 	}
 
-	fn commit_selected(&self, message: &str, _entries: &Vec<Entry>) -> Result<String, String> {
+	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
+		for e in entries.iter() {
+			if e.selected {
+				handle_command(self.command().arg("add").arg(&e.filename))?;
+			}
+		}
+
 		handle_command(
 			self.command()
 				.arg("commit")

@@ -13,6 +13,9 @@ pub enum State {
 	Renamed,
 	Copied,
 	Unmerged,
+	Missing,
+	Ignored,
+	Clean,
 }
 
 const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
@@ -26,6 +29,9 @@ const DELETED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 0, 0));
 const RENAMED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(100, 100, 255));
 const COPIED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 0, 255));
 const UNMERGED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 180, 100));
+const MISSING_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 0, 0));
+const IGNORED_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(255, 180, 0));
+const CLEAN_COLOR: color::Fg<color::Rgb> = color::Fg(color::Rgb(100, 180, 255));
 
 impl State {
 	fn color(&self) -> color::Fg<color::Rgb> {
@@ -38,6 +44,9 @@ impl State {
 			State::Renamed => RENAMED_COLOR,
 			State::Copied => COPIED_COLOR,
 			State::Unmerged => UNMERGED_COLOR,
+			State::Missing => MISSING_COLOR,
+			State::Ignored => IGNORED_COLOR,
+			State::Clean => CLEAN_COLOR,
 		}
 	}
 }
