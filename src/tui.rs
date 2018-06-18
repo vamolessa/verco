@@ -132,7 +132,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 						Ok(mut entries) => {
 							self.show_add_remove_ui(&mut entries);
 
-							write!(self.stdout, "\n\n");
+							write!(self.stdout, "\n\n").unwrap();
 							if let Some(input) =
 								self.handle_input("commit message (ctrl+c to cancel): ")
 							{
