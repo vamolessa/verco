@@ -1,4 +1,4 @@
-use add_remove::{Entry, State};
+use select::{Entry, State};
 use std::process::Command;
 use version_control_actions::{handle_command, VersionControlActions};
 

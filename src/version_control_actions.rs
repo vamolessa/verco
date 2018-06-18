@@ -1,4 +1,4 @@
-use add_remove::Entry;
+use select::Entry;
 use std::process::Command;
 
 pub trait VersionControlActions {

@@ -4,9 +4,9 @@ extern crate termion;
 use std::env;
 use std::path::PathBuf;
 
-mod add_remove;
 mod git_actions;
 mod hg_actions;
+mod select;
 mod tui;
 mod version_control_actions;
 

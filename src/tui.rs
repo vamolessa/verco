@@ -10,7 +10,7 @@ use rustyline::Editor;
 use std::io::{stdin, stdout, BufRead, Write};
 use std::process::Command;
 
-use add_remove::{draw_add_remove_selection, Entry};
+use select::{draw_select, Entry};
 use version_control_actions::VersionControlActions;
 
 const RESET_COLOR: color::Fg<color::Reset> = color::Fg(color::Reset);
@@ -343,7 +343,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			write!(self.stdout, "{}", termion::clear::All).unwrap();
 			self.show_action("commit selected");
 
-			if !draw_add_remove_selection(&mut self.stdin, &mut self.stdout, entries, &mut index) {
+			if !draw_select(&mut self.stdin, &mut self.stdout, entries, &mut index) {
 				break;
 			}
 		}

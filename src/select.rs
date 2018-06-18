@@ -60,12 +60,16 @@ pub struct Entry {
 	pub state: State,
 }
 
-pub fn draw_add_remove_selection<R: BufRead, W: Write>(
+pub fn draw_select<R: BufRead, W: Write>(
 	stdin: &mut R,
 	stdout: &mut W,
 	entries: &mut Vec<Entry>,
 	cursor_index: &mut usize,
 ) -> bool {
+	if entries.len() == 0 {
+		return false;
+	}
+
 	write!(
 		stdout,
 		"{}({}jk{}) move, {}space{} (de)select, {}a{} (de)select all, {}enter{} continues\n\n",
