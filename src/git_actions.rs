@@ -34,8 +34,10 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		let files: Vec<_> = output
 			.trim()
 			.split('\n')
+			.map(|e| e.trim())
+			.filter(|e| e.len() > 2)
 			.map(|e| {
-				let (state, filename) = e.trim().split_at(2);
+				let (state, filename) = e.split_at(2);
 				Entry {
 					filename: String::from(filename.trim()),
 					selected: false,
