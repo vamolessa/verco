@@ -105,30 +105,26 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
+		let mut cmd = self.command();
+		cmd.arg("commit");
+
 		for e in entries.iter() {
 			if e.selected {
 				match e.state {
-					State::Missing => {
+					State::Missing | State::Deleted => {
 						handle_command(self.command().arg("remove").arg(&e.filename))?;
 					}
-					State::Deleted => {
-						handle_command(self.command().arg("remove").arg(&e.filename))?;
-					}
-					_ => {
+					State::Untracked => {
 						handle_command(self.command().arg("add").arg(&e.filename))?;
 					}
+					_ => (),
 				}
+
+				cmd.arg(&e.filename);
 			}
 		}
 
-		handle_command(
-			self.command()
-				.arg("commit")
-				.arg("-m")
-				.arg(message)
-				.arg("--color")
-				.arg("always"),
-		)
+		handle_command(cmd.arg("-m").arg(message).arg("--color").arg("always"))
 	}
 
 	fn revert(&self) -> Result<String, String> {

@@ -131,8 +131,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					match self.version_control.get_files_to_commit() {
 						Ok(mut entries) => {
 							self.show_add_remove_ui(&mut entries);
-
 							write!(self.stdout, "\n\n").unwrap();
+
 							if let Some(input) =
 								self.handle_input("commit message (ctrl+c to cancel): ")
 							{
@@ -274,7 +274,7 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn show_help(&mut self) {
-		write!(self.stdout, "Verco 0.7.0\n\n").unwrap();
+		write!(self.stdout, "Verco 0.7.1\n\n").unwrap();
 
 		match self.version_control.version() {
 			Ok(version) => {
