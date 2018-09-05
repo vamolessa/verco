@@ -163,6 +163,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		output.push_str(&handle_command(self.command().arg("branch").arg(name))?[..]);
 		output.push_str("\n");
 		output.push_str(&self.update(name)?[..]);
+		output.push_str("\n");
 		output.push_str(
 			&handle_command(
 				self.command()
