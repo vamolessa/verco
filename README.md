@@ -39,21 +39,33 @@ Use your keyboard to perform git/hg actions (also, press `h` for help).
 ```
 h               help
 
+e               explorer
+
 s               status
 l               log
 
-c               commit
-shift+r         revert
+d               revision changes
+shift+d         revision diff
+
+c               commit all
+shift+c         commit selected
+shift+u         revert
 u               update/checkout
 m               merge
+
+r               unresolved conflicts
+shift+r         resolve taking other
+ctrl+r          resolve taking local
 
 f               fetch
 p               pull
 shift+p         push
 
-shift+t         new tag
+shift+t         create tag
+
 b               list branches
-shift+b         new branch
+shift+b         create branch
+ctrl+b          close branch
 ```
 
 ## Screenshots
