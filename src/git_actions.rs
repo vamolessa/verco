@@ -43,8 +43,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 					selected: false,
 					state: str_to_state(&state[..1]),
 				}
-			})
-			.collect();
+			}).collect();
 		Ok(files)
 	}
 
@@ -164,11 +163,28 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		output.push_str(&handle_command(self.command().arg("branch").arg(name))?[..]);
 		output.push_str("\n");
 		output.push_str(&self.update(name)?[..]);
+		output.push_str(
+			&handle_command(
+				self.command()
+					.arg("push")
+					.arg("--set-upstream")
+					.arg("origin")
+					.arg(name),
+			)?[..],
+		);
 
 		Ok(output)
 	}
 
 	fn close_branch(&self, name: &str) -> Result<String, String> {
-		handle_command(self.command().arg("branch").arg("-d").arg(name))
+		let mut output = String::new();
+
+		output.push_str(&handle_command(self.command().arg("branch").arg("-d").arg(name))?[..]);
+		output.push_str("\n");
+		output.push_str(
+			&handle_command(self.command().arg("push").arg("-d").arg("origin").arg(name))?[..],
+		);
+
+		Ok(output)
 	}
 }
