@@ -7,9 +7,9 @@ This project uses Cargo and pure Rust stable so Windows, Mac and Linux should wo
 
 It depends on:
 - [rustyline](https://github.com/kkawakam/rustyline)
-- [termion windows fork](https://github.com/mcgoo/termion)
+- [termion windows fork](https://github.com/ErichDonGubler/termion)
   - `windows` branch
-  - watch the windows port [issue](https://github.com/ticki/termion/issues/103)
+  - watch the windows port [issue](https://gitlab.redox-os.org/redox-os/termion/issues/103)
 
 ## Install
 
