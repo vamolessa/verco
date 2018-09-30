@@ -43,8 +43,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 					selected: false,
 					state: str_to_state(state),
 				}
-			})
-			.collect();
+			}).collect();
 		Ok(files)
 	}
 
@@ -89,7 +88,14 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn diff(&self, target: &str) -> Result<String, String> {
-		handle_command(self.command().arg("diff").arg("--change").arg(target))
+		handle_command(
+			self.command()
+				.arg("diff")
+				.arg("--change")
+				.arg(target)
+				.arg("--color")
+				.arg("always"),
+		)
 	}
 
 	fn commit_all(&self, message: &str) -> Result<String, String> {

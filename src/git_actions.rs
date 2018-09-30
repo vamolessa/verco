@@ -130,6 +130,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn take_other(&self) -> Result<String, String> {
+		//git merge --strategy-option theirs
 		handle_command(self.command().args(&["checkout", ".", "--theirs"]))
 	}
 
