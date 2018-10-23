@@ -25,6 +25,8 @@ const DONE_COLOR: color::Fg<color::LightGreen> = color::Fg(color::LightGreen);
 const CANCEL_COLOR: color::Fg<color::LightYellow> = color::Fg(color::LightYellow);
 const ERROR_COLOR: color::Fg<color::Red> = color::Fg(color::Red);
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 pub fn show_tui<'a, T: VersionControlActions>(repository_name: &str, version_control: &'a T) {
 	let _guard = termion::init();
 
@@ -59,13 +61,13 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 		self.show_help();
 
 		loop {
-			let key = (&mut self.stdin).keys().next().unwrap().unwrap();
-
-			match key {
-				Key::Ctrl('c') => break,
-				Key::Ctrl(key) => self.handle_key(key, true),
-				Key::Char(key) => self.handle_key(key, false),
-				_ => (),
+			if let Some(Ok(key)) = (&mut self.stdin).keys().next() {
+				match key {
+					Key::Ctrl('c') => break,
+					Key::Ctrl(key) => self.handle_key(key, true),
+					Key::Char(key) => self.handle_key(key, false),
+					_ => (),
+				}
 			}
 
 			self.stdout.flush().unwrap();
@@ -213,7 +215,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 					self.stdout,
 					"\n\n{}canceled{}\n\n",
 					CANCEL_COLOR, RESET_COLOR
-				).unwrap();
+				)
+				.unwrap();
 				None
 			}
 			Err(err) => {
@@ -246,7 +249,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				termion::cursor::Goto(1, 1),
 				HEADER_COLOR,
 				HEADER_BG_COLOR,
-			).unwrap();
+			)
+			.unwrap();
 
 			write!(self.stdout, "{}", " ".repeat(w as usize)).unwrap();
 		}
@@ -259,7 +263,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			self.repository_name,
 			RESET_COLOR,
 			RESET_BG_COLOR,
-		).unwrap();
+		)
+		.unwrap();
 
 		self.stdout.flush().unwrap();
 	}
@@ -270,11 +275,12 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			self.stdout,
 			"{}{}{}\n\n",
 			ACTION_COLOR, action_name, RESET_COLOR
-		).unwrap();
+		)
+		.unwrap();
 	}
 
 	fn show_help(&mut self) {
-		write!(self.stdout, "Verco 0.8.1\n\n").unwrap();
+		write!(self.stdout, "Verco {}\n\n", VERSION).unwrap();
 
 		match self.version_control.version() {
 			Ok(version) => {
@@ -325,7 +331,8 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 			self.stdout,
 			"\t{}{}{}\t\t{}\n",
 			ENTRY_COLOR, shortcut, RESET_COLOR, action
-		).unwrap();
+		)
+		.unwrap();
 	}
 
 	fn open_explorer(&mut self) {
