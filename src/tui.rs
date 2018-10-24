@@ -206,9 +206,12 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 	}
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
+		write!(self.stdout, "{}{}{}\n", ENTRY_COLOR, prompt, RESET_COLOR).unwrap();
+
 		let readline = self
 			.readline
-			.readline(&format!("{}{}{}", ENTRY_COLOR, prompt, RESET_COLOR)[..]);
+			//.readline(&format!("{}{}{}", ENTRY_COLOR, prompt, RESET_COLOR)[..]);
+			.readline("");
 
 		match readline {
 			Ok(line) => Some(line),

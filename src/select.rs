@@ -72,7 +72,7 @@ pub fn draw_select<R: BufRead, W: Write>(
 
 	write!(
 		stdout,
-		"{}({}jk{}) move, {}space{} (de)select, {}a{} (de)select all, {}enter{} continues\n\n",
+		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}enter{} continues\n\n",
 		RESET_BG_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
@@ -82,7 +82,8 @@ pub fn draw_select<R: BufRead, W: Write>(
 		RESET_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
-	).unwrap();
+	)
+	.unwrap();
 
 	let mut index = *cursor_index;
 
@@ -99,26 +100,31 @@ pub fn draw_select<R: BufRead, W: Write>(
 			e.state,
 			RESET_COLOR,
 			e.filename
-		).unwrap();
+		)
+		.unwrap();
 	}
 
 	stdout.flush().unwrap();
 
-	let key = stdin.keys().next().unwrap().unwrap();
-
-	match key {
-		Key::Char('\n') => return false,
-		Key::Ctrl('c') => return false,
-		Key::Char('j') => index = (index + 1) % entries.len(),
-		Key::Char('k') => index = (index + entries.len() - 1) % entries.len(),
-		Key::Char(' ') => entries[index].selected = !entries[index].selected,
-		Key::Char('a') => if let Some(first) = entries.first().cloned() {
-			for e in entries.iter_mut() {
-				e.selected = !first.selected;
+	if let Some(Ok(key)) = stdin.keys().next() {
+		match key {
+			Key::Char('\n') => return false,
+			Key::Ctrl('c') => return false,
+			Key::Char('j') => index = (index + 1) % entries.len(),
+			Key::Char('k') => index = (index + entries.len() - 1) % entries.len(),
+			Key::Char(' ') => entries[index].selected = !entries[index].selected,
+			Key::Char('a') => {
+				if let Some(first) = entries.first().cloned() {
+					for e in entries.iter_mut() {
+						e.selected = !first.selected;
+					}
+				}
 			}
-		},
-		_ => (),
-	};
+			_ => (),
+		};
+	} else {
+		return false;
+	}
 
 	*cursor_index = index;
 	true
