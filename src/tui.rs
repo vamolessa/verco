@@ -1,3 +1,5 @@
+// maybe consider rewriting with https://github.com/TimonPost/crossterm
+
 use termion;
 use termion::color;
 use termion::event::Key;
