@@ -155,7 +155,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		let mut output = String::new();
 
 		output.push_str(&handle_command(self.command().arg("tag").arg(name).arg("-f"))?[..]);
-		output.push_str(&handle_command(self.command().args(&["push", "--tags"]))?[..]);
+		output.push_str(&handle_command(self.command().arg("push").arg("origin").arg(name))?[..]);
 
 		Ok(output)
 	}
