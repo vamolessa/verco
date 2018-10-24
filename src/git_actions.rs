@@ -43,7 +43,8 @@ impl<'a> VersionControlActions for GitActions<'a> {
 					selected: false,
 					state: str_to_state(&state[..1]),
 				}
-			}).collect();
+			})
+			.collect();
 		Ok(files)
 	}
 
@@ -151,7 +152,12 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn create_tag(&self, name: &str) -> Result<String, String> {
-		handle_command(self.command().arg("tag").arg(name).arg("-f"))
+		let mut output = String::new();
+
+		output.push_str(&handle_command(self.command().arg("tag").arg(name).arg("-f"))?[..]);
+		output.push_str(&handle_command(self.command().args(&["push", "--tags"]))?[..]);
+
+		Ok(output)
 	}
 
 	fn list_branches(&self) -> Result<String, String> {
