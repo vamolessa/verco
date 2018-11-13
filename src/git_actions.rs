@@ -72,22 +72,38 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn changes(&self, target: &str) -> Result<String, String> {
-		handle_command(
-			self.command()
-				.arg("diff-tree")
-				.arg("--no-commit-id")
-				.arg("--name-status")
-				.arg("-r")
-				.arg(target)
-				.arg("--color"),
-		)
+		if target.len() > 0 {
+			let mut parents = String::from(target);
+			parents.push_str("^@");
+
+			handle_command(
+				self.command()
+					.arg("diff")
+					.arg("--name-status")
+					.arg(target)
+					.arg(parents)
+					.arg("--color"),
+			)
+		} else {
+			handle_command(self.command().args(&["diff", "--name-status", "--color"]))
+		}
 	}
 
 	fn diff(&self, target: &str) -> Result<String, String> {
-		let mut arg = String::from(target);
-		arg.push_str("^!");
+		if target.len() > 0 {
+			let mut parents = String::from(target);
+			parents.push_str("^@");
 
-		handle_command(self.command().arg("diff").arg(arg).arg("--color"))
+			handle_command(
+				self.command()
+					.arg("diff")
+					.arg(target)
+					.arg(parents)
+					.arg("--color"),
+			)
+		} else {
+			handle_command(self.command().args(&["diff", "--color"]))
+		}
 	}
 
 	fn commit_all(&self, message: &str) -> Result<String, String> {
