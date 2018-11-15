@@ -28,7 +28,7 @@ impl<'a> HgActions<'a> {
 }
 
 impl<'a> VersionControlActions for HgActions<'a> {
-	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String> {
+	fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String> {
 		let output = handle_command(self.command().args(&["status"]))?;
 
 		let files: Vec<_> = output
@@ -43,15 +43,16 @@ impl<'a> VersionControlActions for HgActions<'a> {
 					selected: false,
 					state: str_to_state(state),
 				}
-			}).collect();
+			})
+			.collect();
 		Ok(files)
 	}
 
-	fn version(&self) -> Result<String, String> {
+	fn version(&mut self) -> Result<String, String> {
 		handle_command(self.command().arg("--version"))
 	}
 
-	fn status(&self) -> Result<String, String> {
+	fn status(&mut self) -> Result<String, String> {
 		let mut output = String::new();
 
 		output
@@ -63,7 +64,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		Ok(output)
 	}
 
-	fn log(&self) -> Result<String, String> {
+	fn log(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&[
 			"log",
 			"--graph",
@@ -76,7 +77,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		]))
 	}
 
-	fn changes(&self, target: &str) -> Result<String, String> {
+	fn changes(&mut self, target: &str) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.arg("status")
@@ -87,7 +88,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		)
 	}
 
-	fn diff(&self, target: &str) -> Result<String, String> {
+	fn diff(&mut self, target: &str) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.arg("diff")
@@ -98,7 +99,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		)
 	}
 
-	fn commit_all(&self, message: &str) -> Result<String, String> {
+	fn commit_all(&mut self, message: &str) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.arg("commit")
@@ -110,7 +111,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		)
 	}
 
-	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
+	fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
 		let mut cmd = self.command();
 		cmd.arg("commit");
 
@@ -133,61 +134,61 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		handle_command(cmd.arg("-m").arg(message).arg("--color").arg("always"))
 	}
 
-	fn revert(&self) -> Result<String, String> {
+	fn revert(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&["revert", "-C", "--all"]))
 	}
 
-	fn update(&self, target: &str) -> Result<String, String> {
+	fn update(&mut self, target: &str) -> Result<String, String> {
 		handle_command(self.command().arg("update").arg(target))
 	}
 
-	fn merge(&self, target: &str) -> Result<String, String> {
+	fn merge(&mut self, target: &str) -> Result<String, String> {
 		handle_command(self.command().arg("merge").arg(target))
 	}
 
-	fn conflicts(&self) -> Result<String, String> {
+	fn conflicts(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&["resolve", "-l", "--color", "always"]))
 	}
 
-	fn take_other(&self) -> Result<String, String> {
+	fn take_other(&mut self) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.args(&["resolve", "-a", "-t", "internal:other"]),
 		)
 	}
 
-	fn take_local(&self) -> Result<String, String> {
+	fn take_local(&mut self) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.args(&["resolve", "-a", "-t", "internal:local"]),
 		)
 	}
 
-	fn fetch(&self) -> Result<String, String> {
+	fn fetch(&mut self) -> Result<String, String> {
 		self.pull()
 	}
 
-	fn pull(&self) -> Result<String, String> {
+	fn pull(&mut self) -> Result<String, String> {
 		handle_command(self.command().arg("pull"))
 	}
 
-	fn push(&self) -> Result<String, String> {
+	fn push(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&["push", "--new-branch"]))
 	}
 
-	fn create_tag(&self, name: &str) -> Result<String, String> {
+	fn create_tag(&mut self, name: &str) -> Result<String, String> {
 		handle_command(self.command().arg("tag").arg(name).arg("-f"))
 	}
 
-	fn list_branches(&self) -> Result<String, String> {
+	fn list_branches(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&["branches", "--color", "always"]))
 	}
 
-	fn create_branch(&self, name: &str) -> Result<String, String> {
+	fn create_branch(&mut self, name: &str) -> Result<String, String> {
 		handle_command(self.command().arg("branch").arg(name))
 	}
 
-	fn close_branch(&self, name: &str) -> Result<String, String> {
+	fn close_branch(&mut self, name: &str) -> Result<String, String> {
 		let changeset = handle_command(self.command().args(&["identify", "--num"]))?;
 		self.update(name)?;
 

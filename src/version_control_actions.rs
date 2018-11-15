@@ -2,34 +2,34 @@ use select::Entry;
 use std::process::Command;
 
 pub trait VersionControlActions {
-	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String>;
+	fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String>;
 
-	fn version(&self) -> Result<String, String>;
+	fn version(&mut self) -> Result<String, String>;
 
-	fn status(&self) -> Result<String, String>;
-	fn log(&self) -> Result<String, String>;
+	fn status(&mut self) -> Result<String, String>;
+	fn log(&mut self) -> Result<String, String>;
 
-	fn changes(&self, target: &str) -> Result<String, String>;
-	fn diff(&self, target: &str) -> Result<String, String>;
+	fn changes(&mut self, target: &str) -> Result<String, String>;
+	fn diff(&mut self, target: &str) -> Result<String, String>;
 
-	fn commit_all(&self, message: &str) -> Result<String, String>;
-	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String>;
-	fn revert(&self) -> Result<String, String>;
-	fn update(&self, target: &str) -> Result<String, String>;
-	fn merge(&self, target: &str) -> Result<String, String>;
+	fn commit_all(&mut self, message: &str) -> Result<String, String>;
+	fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String>;
+	fn revert(&mut self) -> Result<String, String>;
+	fn update(&mut self, target: &str) -> Result<String, String>;
+	fn merge(&mut self, target: &str) -> Result<String, String>;
 
-	fn conflicts(&self) -> Result<String, String>;
-	fn take_other(&self) -> Result<String, String>;
-	fn take_local(&self) -> Result<String, String>;
+	fn conflicts(&mut self) -> Result<String, String>;
+	fn take_other(&mut self) -> Result<String, String>;
+	fn take_local(&mut self) -> Result<String, String>;
 
-	fn fetch(&self) -> Result<String, String>;
-	fn pull(&self) -> Result<String, String>;
-	fn push(&self) -> Result<String, String>;
+	fn fetch(&mut self) -> Result<String, String>;
+	fn pull(&mut self) -> Result<String, String>;
+	fn push(&mut self) -> Result<String, String>;
 
-	fn create_tag(&self, name: &str) -> Result<String, String>;
-	fn list_branches(&self) -> Result<String, String>;
-	fn create_branch(&self, name: &str) -> Result<String, String>;
-	fn close_branch(&self, name: &str) -> Result<String, String>;
+	fn create_tag(&mut self, name: &str) -> Result<String, String>;
+	fn list_branches(&mut self) -> Result<String, String>;
+	fn create_branch(&mut self, name: &str) -> Result<String, String>;
+	fn close_branch(&mut self, name: &str) -> Result<String, String>;
 }
 
 pub fn handle_command(command: &mut Command) -> Result<String, String> {

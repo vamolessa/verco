@@ -1,5 +1,7 @@
 use select::{Entry, State};
 use std::process::Command;
+
+use revision_shortcut::RevisionShortcut;
 use version_control_actions::{handle_command, VersionControlActions};
 
 fn str_to_state(s: &str) -> State {
@@ -17,6 +19,7 @@ fn str_to_state(s: &str) -> State {
 
 pub struct GitActions<'a> {
 	pub current_dir: &'a str,
+	pub revision_shortcut: RevisionShortcut,
 }
 
 impl<'a> GitActions<'a> {
@@ -28,7 +31,7 @@ impl<'a> GitActions<'a> {
 }
 
 impl<'a> VersionControlActions for GitActions<'a> {
-	fn get_files_to_commit(&self) -> Result<Vec<Entry>, String> {
+	fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String> {
 		let output = handle_command(self.command().args(&["status", "--porcelain"]))?;
 
 		let files: Vec<_> = output
@@ -48,19 +51,27 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		Ok(files)
 	}
 
-	fn version(&self) -> Result<String, String> {
+	fn version(&mut self) -> Result<String, String> {
 		handle_command(self.command().arg("--version"))
 	}
 
-	fn status(&self) -> Result<String, String> {
+	fn status(&mut self) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.args(&["-c", "color.status=always", "status"]),
 		)
 	}
 
-	fn log(&self) -> Result<String, String> {
-		handle_command(self.command().args(&[
+	fn log(&mut self) -> Result<String, String> {
+		let hashes_output =
+			handle_command(
+				self.command()
+					.args(&["log", "--all", "--format=format:%h", "-20"]),
+			)?;
+		let hashes: Vec<_> = hashes_output.split_whitespace().map(String::from).collect();
+		self.revision_shortcut.update_hashes(hashes);
+
+		let mut output = handle_command(self.command().args(&[
 			"log",
 			"--all",
 			"--decorate",
@@ -68,10 +79,14 @@ impl<'a> VersionControlActions for GitActions<'a> {
 			"--graph",
 			"-20",
 			"--color",
-		]))
+		]))?;
+
+		self.revision_shortcut.replace_occurrences(&mut output);
+
+		Ok(output)
 	}
 
-	fn changes(&self, target: &str) -> Result<String, String> {
+	fn changes(&mut self, target: &str) -> Result<String, String> {
 		if target.len() > 0 {
 			let mut parents = String::from(target);
 			parents.push_str("^@");
@@ -89,7 +104,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		}
 	}
 
-	fn diff(&self, target: &str) -> Result<String, String> {
+	fn diff(&mut self, target: &str) -> Result<String, String> {
 		if target.len() > 0 {
 			let mut parents = String::from(target);
 			parents.push_str("^@");
@@ -106,12 +121,12 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		}
 	}
 
-	fn commit_all(&self, message: &str) -> Result<String, String> {
+	fn commit_all(&mut self, message: &str) -> Result<String, String> {
 		handle_command(self.command().args(&["add", "--all"]))?;
 		handle_command(self.command().arg("commit").arg("-m").arg(message))
 	}
 
-	fn commit_selected(&self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
+	fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
 		for e in entries.iter() {
 			if e.selected {
 				handle_command(self.command().arg("add").arg(&e.filename))?;
@@ -121,7 +136,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		handle_command(self.command().arg("commit").arg("-m").arg(message))
 	}
 
-	fn revert(&self) -> Result<String, String> {
+	fn revert(&mut self) -> Result<String, String> {
 		let mut output = String::new();
 
 		output.push_str(&handle_command(self.command().args(&["reset", "--hard"]))?[..]);
@@ -131,43 +146,44 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		Ok(output)
 	}
 
-	fn update(&self, target: &str) -> Result<String, String> {
+	fn update(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		handle_command(self.command().arg("checkout").arg(target))
 	}
 
-	fn merge(&self, target: &str) -> Result<String, String> {
+	fn merge(&mut self, target: &str) -> Result<String, String> {
 		handle_command(self.command().arg("merge").arg(target))
 	}
 
-	fn conflicts(&self) -> Result<String, String> {
+	fn conflicts(&mut self) -> Result<String, String> {
 		handle_command(
 			self.command()
 				.args(&["diff", "--name-only", "--diff-filter=U"]),
 		)
 	}
 
-	fn take_other(&self) -> Result<String, String> {
+	fn take_other(&mut self) -> Result<String, String> {
 		//git merge --strategy-option theirs
 		handle_command(self.command().args(&["checkout", ".", "--theirs"]))
 	}
 
-	fn take_local(&self) -> Result<String, String> {
+	fn take_local(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&["checkout", ".", "--ours"]))
 	}
 
-	fn fetch(&self) -> Result<String, String> {
+	fn fetch(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&["fetch", "--all"]))
 	}
 
-	fn pull(&self) -> Result<String, String> {
+	fn pull(&mut self) -> Result<String, String> {
 		handle_command(self.command().arg("pull"))
 	}
 
-	fn push(&self) -> Result<String, String> {
+	fn push(&mut self) -> Result<String, String> {
 		handle_command(self.command().arg("push"))
 	}
 
-	fn create_tag(&self, name: &str) -> Result<String, String> {
+	fn create_tag(&mut self, name: &str) -> Result<String, String> {
 		let mut output = String::new();
 
 		output.push_str(&handle_command(self.command().arg("tag").arg(name).arg("-f"))?[..]);
@@ -176,11 +192,11 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		Ok(output)
 	}
 
-	fn list_branches(&self) -> Result<String, String> {
+	fn list_branches(&mut self) -> Result<String, String> {
 		handle_command(self.command().args(&["branch", "--all", "--color"]))
 	}
 
-	fn create_branch(&self, name: &str) -> Result<String, String> {
+	fn create_branch(&mut self, name: &str) -> Result<String, String> {
 		let mut output = String::new();
 
 		output.push_str(&handle_command(self.command().arg("branch").arg(name))?[..]);
@@ -200,7 +216,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		Ok(output)
 	}
 
-	fn close_branch(&self, name: &str) -> Result<String, String> {
+	fn close_branch(&mut self, name: &str) -> Result<String, String> {
 		let mut output = String::new();
 
 		output.push_str(&handle_command(self.command().arg("branch").arg("-d").arg(name))?[..]);

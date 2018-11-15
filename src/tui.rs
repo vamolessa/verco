@@ -29,7 +29,7 @@ const ERROR_COLOR: color::Fg<color::Red> = color::Fg(color::Red);
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
-pub fn show_tui<'a, T: VersionControlActions>(repository_name: &str, version_control: &'a T) {
+pub fn show_tui<'a, T: VersionControlActions>(repository_name: &str, version_control: &'a mut T) {
 	let _guard = termion::init();
 
 	let stdin = stdin();
@@ -43,12 +43,12 @@ struct Tui<'a, R: BufRead, W: Write, T: VersionControlActions + 'a> {
 	stdin: R,
 	stdout: W,
 	repository_name: &'a str,
-	version_control: &'a T,
+	version_control: &'a mut T,
 	readline: Editor<()>,
 }
 
 impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
-	fn new(stdin: R, stdout: W, repository_name: &'a str, version_control: &'a T) -> Self {
+	fn new(stdin: R, stdout: W, repository_name: &'a str, version_control: &'a mut T) -> Self {
 		Tui {
 			stdin: stdin,
 			stdout: stdout,
@@ -82,12 +82,14 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				'b' => {
 					self.show_action("close branch");
 					if let Some(input) = self.handle_input("branch to close (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.close_branch(&input[..]));
+						let result = self.version_control.close_branch(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				'r' => {
 					self.show_action("merge taking local");
-					self.handle_result(self.version_control.take_local());
+					let result = self.version_control.take_local();
+					self.handle_result(result);
 				}
 				_ => (),
 			}
@@ -103,30 +105,35 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				}
 				's' => {
 					self.show_action("status");
-					self.handle_result(self.version_control.status());
+					let result = self.version_control.status();
+					self.handle_result(result);
 				}
 				'l' => {
 					self.show_action("log");
-					self.handle_result(self.version_control.log());
+					let result = self.version_control.log();
+					self.handle_result(result);
 				}
 				'd' => {
 					self.show_action("revision changes");
 					if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
 					{
-						self.handle_result(self.version_control.changes(&input[..]));
+						let result = self.version_control.changes(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				'D' => {
 					self.show_action("revision diff");
 					if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.diff(&input[..]));
+						let result = self.version_control.diff(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				'c' => {
 					self.show_action("commit all");
 
 					if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.commit_all(&input[..]));
+						let result = self.version_control.commit_all(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				'C' => {
@@ -140,9 +147,9 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 							if let Some(input) =
 								self.handle_input("commit message (ctrl+c to cancel): ")
 							{
-								self.handle_result(
-									self.version_control.commit_selected(&input[..], &entries),
-								);
+								let result =
+									self.version_control.commit_selected(&input[..], &entries);
+								self.handle_result(result);
 							}
 						}
 						Err(error) => self.handle_result(Err(error)),
@@ -150,54 +157,65 @@ impl<'a, R: BufRead, W: Write, T: VersionControlActions> Tui<'a, R, W, T> {
 				}
 				'U' => {
 					self.show_action("revert");
-					self.handle_result(self.version_control.revert());
+					let result = self.version_control.revert();
+					self.handle_result(result);
 				}
 				'u' => {
 					self.show_action("update");
 					if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.update(&input[..]));
+						let result = self.version_control.update(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				'm' => {
 					self.show_action("merge");
 					if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.merge(&input[..]));
+						let result = self.version_control.merge(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				'r' => {
 					self.show_action("unresolved conflicts");
-					self.handle_result(self.version_control.conflicts());
+					let result = self.version_control.conflicts();
+					self.handle_result(result);
 				}
 				'R' => {
 					self.show_action("merge taking other");
-					self.handle_result(self.version_control.take_other());
+					let result = self.version_control.take_other();
+					self.handle_result(result);
 				}
 				'f' => {
 					self.show_action("fetch");
-					self.handle_result(self.version_control.fetch());
+					let result = self.version_control.fetch();
+					self.handle_result(result);
 				}
 				'p' => {
 					self.show_action("pull");
-					self.handle_result(self.version_control.pull());
+					let result = self.version_control.pull();
+					self.handle_result(result);
 				}
 				'P' => {
 					self.show_action("push");
-					self.handle_result(self.version_control.push());
+					let result = self.version_control.push();
+					self.handle_result(result);
 				}
 				'T' => {
 					self.show_action("tag");
 					if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.create_tag(&input[..]));
+						let result = self.version_control.create_tag(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				'b' => {
 					self.show_action("branches");
-					self.handle_result(self.version_control.list_branches());
+					let result = self.version_control.list_branches();
+					self.handle_result(result);
 				}
 				'B' => {
 					self.show_action("branch");
 					if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
-						self.handle_result(self.version_control.create_branch(&input[..]));
+						let result = self.version_control.create_branch(&input[..]);
+						self.handle_result(result);
 					}
 				}
 				_ => (),
