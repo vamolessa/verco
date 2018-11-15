@@ -30,6 +30,7 @@ fn main() {
 	} else if subdir_exists(&current_dir_path, ".hg") {
 		let mut actions = HgActions {
 			current_dir: &current_dir,
+			revision_shortcut: revision_shortcut,
 		};
 		tui::show_tui(&current_dir, &mut actions);
 	} else {

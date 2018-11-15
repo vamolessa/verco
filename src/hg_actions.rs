@@ -1,5 +1,7 @@
 use select::{Entry, State};
 use std::process::Command;
+
+use revision_shortcut::RevisionShortcut;
 use version_control_actions::{handle_command, VersionControlActions};
 
 fn str_to_state(s: &str) -> State {
@@ -17,6 +19,7 @@ fn str_to_state(s: &str) -> State {
 
 pub struct HgActions<'a> {
 	pub current_dir: &'a str,
+	pub revision_shortcut: RevisionShortcut,
 }
 
 impl<'a> HgActions<'a> {
@@ -65,7 +68,17 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn log(&mut self) -> Result<String, String> {
-		handle_command(self.command().args(&[
+		let hashes_output = handle_command(self.command().args(&[
+			"log",
+			"--template",
+			"{node|short}\n",
+			"-l",
+			"20",
+		]))?;
+		let hashes: Vec<_> = hashes_output.split_whitespace().map(String::from).collect();
+		self.revision_shortcut.update_hashes(hashes);
+
+		let mut output = handle_command(self.command().args(&[
 			"log",
 			"--graph",
 			"--template",
@@ -74,10 +87,15 @@ impl<'a> VersionControlActions for HgActions<'a> {
 			"20",
 			"--color",
 			"always",
-		]))
+		]))?;
+
+		self.revision_shortcut.replace_occurrences(&mut output);
+
+		Ok(output)
 	}
 
 	fn changes(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		handle_command(
 			self.command()
 				.arg("status")
@@ -89,6 +107,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn diff(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		handle_command(
 			self.command()
 				.arg("diff")
@@ -139,10 +158,12 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn update(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		handle_command(self.command().arg("update").arg(target))
 	}
 
 	fn merge(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		handle_command(self.command().arg("merge").arg(target))
 	}
 
