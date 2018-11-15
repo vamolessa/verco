@@ -87,6 +87,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn changes(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		if target.len() > 0 {
 			let mut parents = String::from(target);
 			parents.push_str("^@");
@@ -105,6 +106,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn diff(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		if target.len() > 0 {
 			let mut parents = String::from(target);
 			parents.push_str("^@");
@@ -152,6 +154,7 @@ impl<'a> VersionControlActions for GitActions<'a> {
 	}
 
 	fn merge(&mut self, target: &str) -> Result<String, String> {
+		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 		handle_command(self.command().arg("merge").arg(target))
 	}
 
