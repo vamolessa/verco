@@ -146,7 +146,6 @@ pub fn select(
 				if key.is_control() {
 					// ctrl+c
 					if key as u8 == 3 {
-						entries.clear();
 						selected = false;
 						break;
 					}
@@ -184,7 +183,6 @@ pub fn select(
 				}
 			}
 			Err(_) => {
-				entries.clear();
 				selected = false;
 				break;
 			}

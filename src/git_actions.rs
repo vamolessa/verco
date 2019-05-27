@@ -138,12 +138,25 @@ impl<'a> VersionControlActions for GitActions<'a> {
 		handle_command(self.command().arg("commit").arg("-m").arg(message))
 	}
 
-	fn revert(&mut self) -> Result<String, String> {
+	fn revert_all(&mut self) -> Result<String, String> {
 		let mut output = String::new();
 
 		output.push_str(&handle_command(self.command().args(&["reset", "--hard"]))?[..]);
 		output.push_str("\n");
 		output.push_str(&handle_command(self.command().args(&["clean", "-df"]))?[..]);
+
+		Ok(output)
+	}
+
+	fn revert_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+		let mut output = String::new();
+
+		for e in entries.iter() {
+			if e.selected {
+				let o = handle_command(self.command().arg("checkout").arg("--").arg(&e.filename))?;
+				output.push_str(&o[..]);
+			}
+		}
 
 		Ok(output)
 	}

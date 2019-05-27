@@ -153,7 +153,7 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		handle_command(cmd.arg("-m").arg(message).arg("--color").arg("always"))
 	}
 
-	fn revert(&mut self) -> Result<String, String> {
+	fn revert_all(&mut self) -> Result<String, String> {
 		let mut output = String::new();
 
 		output.push_str(&handle_command(self.command().args(&["revert", "-C", "--all"]))?[..]);
@@ -161,6 +161,19 @@ impl<'a> VersionControlActions for HgActions<'a> {
 		output.push_str(&handle_command(self.command().args(&["purge"]))?[..]);
 
 		Ok(output)
+	}
+
+	fn revert_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+		let mut cmd = self.command();
+		cmd.arg("revert").arg("-C").arg("--color").arg("always");
+
+		for e in entries.iter() {
+			if e.selected {
+				cmd.arg(&e.filename);
+			}
+		}
+
+		handle_command(&mut cmd)
 	}
 
 	fn update(&mut self, target: &str) -> Result<String, String> {

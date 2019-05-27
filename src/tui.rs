@@ -186,13 +186,22 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 				}
 				'x' => {
 					self.show_action("revert");
-					let result = self.version_control.revert();
+					let result = self.version_control.revert_all();
 					self.handle_result(result);
 				}
 				'X' => {
 					self.show_action("revert selected");
-					let result = self.version_control.revert();
-					self.handle_result(result);
+
+					match self.version_control.get_files_to_commit() {
+						Ok(mut entries) => {
+							if self.show_add_remove_ui("revert selected", &mut entries) {
+								print!("\n\n");
+								let result = self.version_control.revert_selected(&entries);
+								self.handle_result(result);
+							}
+						}
+						Err(error) => self.handle_result(Err(error)),
+					}
 				}
 				'm' => {
 					self.show_action("merge");

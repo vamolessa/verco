@@ -15,7 +15,8 @@ pub trait VersionControlActions {
 
 	fn commit_all(&mut self, message: &str) -> Result<String, String>;
 	fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String>;
-	fn revert(&mut self) -> Result<String, String>;
+	fn revert_all(&mut self) -> Result<String, String>;
+	fn revert_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String>;
 	fn update(&mut self, target: &str) -> Result<String, String>;
 	fn merge(&mut self, target: &str) -> Result<String, String>;
 
