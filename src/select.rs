@@ -101,7 +101,7 @@ pub fn select(
 	}
 
 	print!(
-		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c/enter{} continue, {}ctrl+c{} cancel \n\n",
+		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continue, {}ctrl+c{} cancel \n\n",
 		RESET_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
@@ -144,16 +144,14 @@ pub fn select(
 				cursor.move_left(1);
 
 				if key.is_control() {
-					// ctrl+c
-					if key as u8 == 3 {
+					const CTRL_C: char = 3u8 as char;
+					if key == CTRL_C {
 						selected = false;
 						break;
 					}
 				} else {
-					const ENTER: char = 13u8 as char;
-
 					match key {
-						'c' | ENTER => {
+						'c' => {
 							selected = entries.iter().any(|e| e.selected);
 							break;
 						}
