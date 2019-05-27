@@ -1,5 +1,55 @@
 use crossterm::*;
 
+const RESET_COLOR: Attribute = Attribute::Reset;
+const HELP_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 180,
+	b: 100,
+});
+const UNTRACKED_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 100,
+	g: 180,
+	b: 255,
+});
+const UNMODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 255,
+	b: 255,
+});
+const MODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 200,
+	b: 0,
+});
+const ADDED_COLOR: Colored = Colored::Fg(Color::Rgb { r: 0, g: 255, b: 0 });
+const DELETED_COLOR: Colored = Colored::Fg(Color::Rgb { r: 255, g: 0, b: 0 });
+const RENAMED_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 100,
+	g: 100,
+	b: 255,
+});
+const COPIED_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 0,
+	b: 255,
+});
+const UNMERGED_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 180,
+	b: 100,
+});
+const MISSING_COLOR: Colored = Colored::Fg(Color::Rgb { r: 255, g: 0, b: 0 });
+const IGNORED_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 180,
+	b: 0,
+});
+const CLEAN_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 100,
+	g: 180,
+	b: 255,
+});
+
 #[derive(Clone, Debug)]
 pub enum State {
 	Untracked,
@@ -14,23 +64,6 @@ pub enum State {
 	Ignored,
 	Clean,
 }
-
-const RESET_COLOR: Attribute = Attribute::Reset;
-const RESET_BG_COLOR: Attribute = Attribute::Reset;
-
-const HELP_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 100});
-
-const UNTRACKED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 100, g: 180, b: 255});
-const UNMODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 255, b: 255});
-const MODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 200, b: 0});
-const ADDED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 0, g: 255, b: 0});
-const DELETED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 0, b: 0});
-const RENAMED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 100, g: 100, b: 255});
-const COPIED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 0, b: 255});
-const UNMERGED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 100});
-const MISSING_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 0, b: 0});
-const IGNORED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 0});
-const CLEAN_COLOR: Colored = Colored::Fg(Color::Rgb{r: 100, g: 180, b: 255});
 
 impl State {
 	fn color(&self) -> Colored {
@@ -57,18 +90,28 @@ pub struct Entry {
 	pub state: State,
 }
 
+pub enum SelectResult {
+	Repeat,
+	Cancel,
+	Selected,
+}
+
 pub fn draw_select(
+	terminal: &mut Terminal,
+	cursor: &mut TerminalCursor,
 	input: &mut TerminalInput,
 	entries: &mut Vec<Entry>,
 	cursor_index: &mut usize,
-) -> bool {
+) -> SelectResult {
 	if entries.len() == 0 {
-		return false;
+		return SelectResult::Cancel;
 	}
 
 	print!(
-		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continues\n\n",
-		RESET_BG_COLOR,
+		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continues, {}ctrl+c{} cancel \n\n",
+		RESET_COLOR,
+		HELP_COLOR,
+		RESET_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
 		HELP_COLOR,
@@ -98,27 +141,38 @@ pub fn draw_select(
 
 	match input.read_char() {
 		Ok(key) => {
-			match key {
-				'\r' => return false,
-				'c' => return false,
-				'j' => index = (index + 1) % entries.len(),
-				'k' => index = (index + entries.len() - 1) % entries.len(),
-				' ' => entries[index].selected = !entries[index].selected,
-				'a' => {
-					if let Some(first) = entries.first().cloned() {
-						for e in entries.iter_mut() {
-							e.selected = !first.selected;
+			terminal.clear(ClearType::CurrentLine).unwrap();
+			cursor.move_left(1);
+
+			if key.is_control() {
+				// ctrl+c
+				if key as u8 == 3 {
+					entries.clear();
+					return SelectResult::Cancel;
+				}
+			} else {
+				match key {
+					'c' => return SelectResult::Selected,
+					'j' => index = (index + 1) % entries.len(),
+					'k' => index = (index + entries.len() - 1) % entries.len(),
+					' ' => entries[index].selected = !entries[index].selected,
+					'a' => {
+						if let Some(first) = entries.first().cloned() {
+							for e in entries.iter_mut() {
+								e.selected = !first.selected;
+							}
 						}
 					}
-				}
-				_ => (),
-			};
+					_ => (),
+				};
+			}
 		}
 		Err(_) => {
-			return false;
+			entries.clear();
+			return SelectResult::Cancel;
 		}
 	}
 
 	*cursor_index = index;
-	true
+	SelectResult::Repeat
 }

@@ -5,12 +5,10 @@ use std::process::Command;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-use crate::select::{draw_select, Entry};
+use crate::select::{draw_select, Entry, SelectResult};
 use crate::version_control_actions::VersionControlActions;
 
 const RESET_COLOR: Attribute = Attribute::Reset;
-const RESET_BG_COLOR: Attribute = Attribute::Reset;
-
 const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
 const HEADER_BG_COLOR: Colored = Colored::Bg(Color::Magenta);
 const ACTION_COLOR: Colored = Colored::Fg(Color::Rgb {
@@ -166,12 +164,16 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 							self.show_add_remove_ui(&mut entries);
 							print!("\n\n");
 
-							if let Some(input) =
-								self.handle_input("commit message (ctrl+c to cancel): ")
-							{
-								let result =
-									self.version_control.commit_selected(&input[..], &entries);
-								self.handle_result(result);
+							if entries.iter().any(|e| e.selected) {
+								if let Some(input) =
+									self.handle_input("commit message (ctrl+c to cancel): ")
+								{
+									let result =
+										self.version_control.commit_selected(&input[..], &entries);
+									self.handle_result(result);
+								}
+							} else {
+								print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
 							}
 						}
 						Err(error) => self.handle_result(Err(error)),
@@ -291,7 +293,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		self.cursor.goto(0, 0).unwrap();
 		print!(
 			"{}Verco @ {}{}{}\n\n",
-			HEADER_COLOR, self.repository_name, RESET_COLOR, RESET_BG_COLOR,
+			HEADER_COLOR, self.repository_name, RESET_COLOR, RESET_COLOR,
 		);
 	}
 
@@ -370,8 +372,16 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			self.terminal.clear(ClearType::All).unwrap();
 			self.show_action("commit selected");
 
-			if !draw_select(&mut self.input, entries, &mut index) {
-				break;
+			match draw_select(
+				&mut self.terminal,
+				&mut self.cursor,
+				&mut self.input,
+				entries,
+				&mut index,
+			) {
+				SelectResult::Cancel => break,
+				SelectResult::Selected => break,
+				SelectResult::Repeat => (),
 			}
 		}
 	}
