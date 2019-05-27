@@ -21,7 +21,7 @@ Open a terminal and run these commands to clone and install verco:
 ```
 git clone https://github.com/matheuslessarodrigues/verco.git
 cd verco
-cargo install
+cargo install --path . --force
 ```
 
 Once you close and open again your terminal, you'll be able to use `verco` in whichever directory you need.
