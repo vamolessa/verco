@@ -13,7 +13,7 @@ documentation = "https://github.com/matheuslessarodrigues/verco"
 homepage = "https://github.com/matheuslessarodrigues/verco"
 repository = "https://github.com/matheuslessarodrigues/verco"
 readme = "README.md"
-keywords = ["version control", "tool", "git", "hg", "cli"]
+keywords = ["version-control", "tool", "git", "hg", "cli"]
 categories = ["command-line-utilities"]
 
 [[bin]]
