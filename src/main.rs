@@ -1,6 +1,3 @@
-extern crate rustyline;
-extern crate termion;
-
 use std::env;
 use std::path::PathBuf;
 

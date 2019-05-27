@@ -11,5 +11,6 @@ name = "verco"
 path = "src/main.rs"
 
 [dependencies]
+crossterm = "0.9"
 termion = { git = "https://github.com/ErichDonGubler/termion", branch = "windows" }
 rustyline = "2.1.0"
