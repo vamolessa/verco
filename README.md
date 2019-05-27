@@ -49,7 +49,8 @@ shift+d         revision diff
 
 c               commit all
 shift+c         commit selected
-shift+u         revert
+x               revert all
+shift+x         revert selected
 u               update/checkout
 m               merge
 
