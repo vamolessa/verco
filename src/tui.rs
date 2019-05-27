@@ -162,7 +162,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 					match self.version_control.get_files_to_commit() {
 						Ok(mut entries) => {
-							if self.show_add_remove_ui("commit selected", &mut entries) {
+							if self.show_select_ui(&mut entries) {
 								print!("\n\n");
 
 								if let Some(input) =
@@ -194,7 +194,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 					match self.version_control.get_files_to_commit() {
 						Ok(mut entries) => {
-							if self.show_add_remove_ui("revert selected", &mut entries) {
+							if self.show_select_ui(&mut entries) {
 								print!("\n\n");
 								let result = self.version_control.revert_selected(&entries);
 								self.handle_result(result);
@@ -372,10 +372,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		print!("{}done{}\n\n", DONE_COLOR, RESET_COLOR);
 	}
 
-	pub fn show_add_remove_ui(&mut self, action_name: &str, entries: &mut Vec<Entry>) -> bool {
-		self.terminal.clear(ClearType::All).unwrap();
-		self.show_action(action_name);
-
+	pub fn show_select_ui(&mut self, entries: &mut Vec<Entry>) -> bool {
 		if select(
 			&mut self.terminal,
 			&mut self.cursor,
