@@ -5,7 +5,7 @@ use std::process::Command;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-use crate::select::{draw_select, Entry, SelectResult};
+use crate::select::{select, Entry};
 use crate::version_control_actions::VersionControlActions;
 
 const RESET_COLOR: Attribute = Attribute::Reset;
@@ -71,6 +71,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		loop {
 			match self.input.read_char() {
 				Ok(key) => {
+
 					if !self.handle_key(key) {
 						return;
 					}
@@ -161,10 +162,9 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 					match self.version_control.get_files_to_commit() {
 						Ok(mut entries) => {
-							self.show_add_remove_ui(&mut entries);
-							print!("\n\n");
+							if self.show_add_remove_ui("commit selected", &mut entries) {
+								print!("\n\n");
 
-							if entries.iter().any(|e| e.selected) {
 								if let Some(input) =
 									self.handle_input("commit message (ctrl+c to cancel): ")
 								{
@@ -172,8 +172,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 										self.version_control.commit_selected(&input[..], &entries);
 									self.handle_result(result);
 								}
-							} else {
-								print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
 							}
 						}
 						Err(error) => self.handle_result(Err(error)),
@@ -365,24 +363,20 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		print!("{}done{}\n\n", DONE_COLOR, RESET_COLOR);
 	}
 
-	pub fn show_add_remove_ui(&mut self, entries: &mut Vec<Entry>) {
-		let mut index = 0;
+	pub fn show_add_remove_ui(&mut self, action_name: &str, entries: &mut Vec<Entry>) -> bool {
+		self.terminal.clear(ClearType::All).unwrap();
+		self.show_action(action_name);
 
-		loop {
-			self.terminal.clear(ClearType::All).unwrap();
-			self.show_action("commit selected");
-
-			match draw_select(
-				&mut self.terminal,
-				&mut self.cursor,
-				&mut self.input,
-				entries,
-				&mut index,
-			) {
-				SelectResult::Cancel => break,
-				SelectResult::Selected => break,
-				SelectResult::Repeat => (),
-			}
+		if select(
+			&mut self.terminal,
+			&mut self.cursor,
+			&mut self.input,
+			entries,
+		) {
+			true
+		} else {
+			print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
+			false
 		}
 	}
 }

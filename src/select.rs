@@ -90,21 +90,14 @@ pub struct Entry {
 	pub state: State,
 }
 
-pub enum SelectResult {
-	Repeat,
-	Cancel,
-	Selected,
-}
-
-pub fn draw_select(
+pub fn select(
 	terminal: &mut Terminal,
 	cursor: &mut TerminalCursor,
 	input: &mut TerminalInput,
 	entries: &mut Vec<Entry>,
-	cursor_index: &mut usize,
-) -> SelectResult {
+) -> bool {
 	if entries.len() == 0 {
-		return SelectResult::Cancel;
+		return false;
 	}
 
 	print!(
@@ -122,57 +115,100 @@ pub fn draw_select(
 		RESET_COLOR,
 	);
 
-	let mut index = *cursor_index;
+	cursor.hide().unwrap();
+	cursor.save_position().unwrap();
 
-	for (i, e) in entries.iter().enumerate() {
-		let cursor = if i == index { ">" } else { " " };
-		let selection = if e.selected { "+" } else { " " };
-		print!(
-			"{}{} {} {}{:?}\t{}{}\n",
-			RESET_COLOR,
-			cursor,
-			selection,
+	for e in entries.iter() {
+		println!(
+			"    {}{:?}{}\t{}",
 			e.state.color(),
 			e.state,
 			RESET_COLOR,
-			e.filename
+			e.filename,
 		);
 	}
 
-	match input.read_char() {
-		Ok(key) => {
-			terminal.clear(ClearType::CurrentLine).unwrap();
-			cursor.move_left(1);
+	let mut index = 0;
+	let terminal_size = terminal.terminal_size();
+	let selected;
 
-			if key.is_control() {
-				// ctrl+c
-				if key as u8 == 3 {
-					entries.clear();
-					return SelectResult::Cancel;
-				}
-			} else {
-				match key {
-					'c' => return SelectResult::Selected,
-					'j' => index = (index + 1) % entries.len(),
-					'k' => index = (index + entries.len() - 1) % entries.len(),
-					' ' => entries[index].selected = !entries[index].selected,
-					'a' => {
-						if let Some(first) = entries.first().cloned() {
+	for i in 0..entries.len() {
+		draw_entry_state(cursor, entries, i, i == index);
+	}
+
+	loop {
+		cursor.goto(terminal_size.0, terminal_size.1).unwrap();
+		match input.read_char() {
+			Ok(key) => {
+				terminal.clear(ClearType::CurrentLine).unwrap();
+				cursor.move_left(1);
+
+				if key.is_control() {
+					// ctrl+c
+					if key as u8 == 3 {
+						entries.clear();
+						selected = false;
+						break;
+					}
+				} else {
+					match key {
+						'c' => {
+							selected = entries.iter().any(|e| e.selected);
+							break;
+						}
+						'j' => {
+							draw_entry_state(cursor, entries, index, false);
+							index = (index + 1) % entries.len();
+							draw_entry_state(cursor, entries, index, true);
+						}
+						'k' => {
+							draw_entry_state(cursor, entries, index, false);
+							index = (index + entries.len() - 1) % entries.len();
+							draw_entry_state(cursor, entries, index, true);
+						}
+						' ' => {
+							entries[index].selected = !entries[index].selected;
+							draw_entry_state(cursor, entries, index, true);
+						}
+						'a' => {
+							let all_selected = entries.iter().all(|e| e.selected);
 							for e in entries.iter_mut() {
-								e.selected = !first.selected;
+								e.selected = !all_selected;
+							}
+							for i in 0..entries.len() {
+								draw_entry_state(cursor, entries, i, i == index);
 							}
 						}
-					}
-					_ => (),
-				};
+						_ => (),
+					};
+				}
 			}
-		}
-		Err(_) => {
-			entries.clear();
-			return SelectResult::Cancel;
+			Err(_) => {
+				entries.clear();
+				selected = false;
+				break;
+			}
 		}
 	}
 
-	*cursor_index = index;
-	SelectResult::Repeat
+	cursor.reset_position().unwrap();
+	cursor.move_down(entries.len() as u16);
+	cursor.show().unwrap();
+	selected
+}
+
+fn draw_entry_state(
+	cursor: &mut TerminalCursor,
+	entries: &Vec<Entry>,
+	index: usize,
+	cursor_on: bool,
+) {
+	cursor.reset_position().unwrap();
+	if index > 0 {
+		cursor.move_down(index as u16);
+	}
+
+	let cursor_char = if cursor_on { '>' } else { ' ' };
+	let select_char = if entries[index].selected { '+' } else { ' ' };
+	print!("{}{} {}", RESET_COLOR, cursor_char, select_char);
 }
