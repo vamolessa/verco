@@ -71,7 +71,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		loop {
 			match self.input.read_char() {
 				Ok(key) => {
-
 					if !self.handle_key(key) {
 						return;
 					}
