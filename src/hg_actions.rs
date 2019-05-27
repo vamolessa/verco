@@ -1,7 +1,7 @@
 use std::process::Command;
 
-use crate::select::{Entry, State};
 use crate::revision_shortcut::RevisionShortcut;
+use crate::select::{Entry, State};
 use crate::version_control_actions::{handle_command, VersionControlActions};
 
 fn str_to_state(s: &str) -> State {
@@ -154,7 +154,13 @@ impl<'a> VersionControlActions for HgActions<'a> {
 	}
 
 	fn revert(&mut self) -> Result<String, String> {
-		handle_command(self.command().args(&["revert", "-C", "--all"]))
+		let mut output = String::new();
+
+		output.push_str(&handle_command(self.command().args(&["revert", "-C", "--all"]))?[..]);
+		output.push_str("\n");
+		output.push_str(&handle_command(self.command().args(&["purge"]))?[..]);
+
+		Ok(output)
 	}
 
 	fn update(&mut self, target: &str) -> Result<String, String> {
