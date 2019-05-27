@@ -13,8 +13,16 @@ const RESET_BG_COLOR: Attribute = Attribute::Reset;
 
 const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
 const HEADER_BG_COLOR: Colored = Colored::Bg(Color::Magenta);
-const ACTION_COLOR: Colored = Colored::Fg(Color::Rgb{r:255, g: 100, b: 180});
-const ENTRY_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 100});
+const ACTION_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 100,
+	b: 180,
+});
+const ENTRY_COLOR: Colored = Colored::Fg(Color::Rgb {
+	r: 255,
+	g: 180,
+	b: 100,
+});
 
 const DONE_COLOR: Colored = Colored::Fg(Color::Green);
 const CANCEL_COLOR: Colored = Colored::Fg(Color::Yellow);
@@ -64,9 +72,11 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 		loop {
 			match self.input.read_char() {
-				Ok(key) => if !self.handle_key(key) {
-					return;
-				},
+				Ok(key) => {
+					if !self.handle_key(key) {
+						return;
+					}
+				}
 				Err(error) => {
 					println!("Error reading input: {}", error);
 					return;
@@ -76,12 +86,14 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 	}
 
 	fn handle_key(&mut self, key: char) -> bool {
+		self.terminal.clear(ClearType::CurrentLine).unwrap();
+		self.cursor.move_left(1);
+
 		const CTRL_C: char = 3u8 as char;
 		const CTRL_R: char = 18u8 as char;
 		const CTRL_B: char = 2u8 as char;
 
 		if key.is_control() {
-			println!("{} -> {}", key, key as i32);
 			match key {
 				CTRL_C => {
 					return false;
@@ -245,10 +257,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		match self.readline.readline("") {
 			Ok(line) => Some(line),
 			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-				print!(
-					"\n\n{}canceled{}\n\n",
-					CANCEL_COLOR, RESET_COLOR
-				);
+				print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
 				None
 			}
 			Err(err) => {
@@ -272,31 +281,23 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 	}
 
 	fn show_header(&mut self) {
-		print!("{}", termion::clear::All);
+		self.terminal.clear(ClearType::All).unwrap();
 
 		let (w, _) = self.terminal.terminal_size();
 		self.cursor.goto(0, 0).unwrap();
-		print!("{}{}",
-			HEADER_COLOR,
-			HEADER_BG_COLOR,
-		);
+		print!("{}{}", HEADER_COLOR, HEADER_BG_COLOR,);
 		print!("{}", " ".repeat(w as usize + 1));
 
 		self.cursor.goto(0, 0).unwrap();
-		print!("{}Verco @ {}{}{}\n\n",
-			HEADER_COLOR,
-			self.repository_name,
-			RESET_COLOR,
-			RESET_BG_COLOR,
+		print!(
+			"{}Verco @ {}{}{}\n\n",
+			HEADER_COLOR, self.repository_name, RESET_COLOR, RESET_BG_COLOR,
 		);
 	}
 
 	fn show_action(&mut self, action_name: &str) {
 		self.show_header();
-		print!(
-			"{}{}{}\n\n",
-			ACTION_COLOR, action_name, RESET_COLOR
-		);
+		print!("{}{}{}\n\n", ACTION_COLOR, action_name, RESET_COLOR);
 	}
 
 	fn show_help(&mut self) {
