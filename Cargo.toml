@@ -6,6 +6,8 @@ edition = "2018"
 exclude = [
     "images/*",
 ]
+description = "A simple Git/Hg version control client based on keyboard shortcuts"
+license = "MIT"
 
 [[bin]]
 name = "verco"
