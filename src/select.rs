@@ -101,7 +101,7 @@ pub fn select(
 	}
 
 	print!(
-		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continues, {}ctrl+c{} cancel \n\n",
+		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c/enter{} continue, {}ctrl+c{} cancel \n\n",
 		RESET_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
@@ -150,8 +150,10 @@ pub fn select(
 						break;
 					}
 				} else {
+					const ENTER: char = 13u8 as char;
+
 					match key {
-						'c' => {
+						'c' | ENTER => {
 							selected = entries.iter().any(|e| e.selected);
 							break;
 						}
