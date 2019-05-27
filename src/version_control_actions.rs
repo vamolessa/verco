@@ -1,5 +1,6 @@
-use select::Entry;
 use std::process::Command;
+
+use crate::select::Entry;
 
 pub trait VersionControlActions {
 	fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String>;

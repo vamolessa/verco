@@ -1,4 +1,3 @@
-use std::io::{BufRead, Write};
 use crossterm::*;
 
 #[derive(Clone, Debug)]
@@ -19,22 +18,22 @@ pub enum State {
 const RESET_COLOR: Attribute = Attribute::Reset;
 const RESET_BG_COLOR: Attribute = Attribute::Reset;
 
-const HELP_COLOR: Color = Colored::Fg(Color::Rgb(255, 180, 100));
+const HELP_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 100});
 
-const UNTRACKED_COLOR: Color = Colored::Fg(Color::Rgb(100, 180, 255));
-const UNMODIFIED_COLOR: Color = Colored::Fg(Color::Rgb(255, 255, 255));
-const MODIFIED_COLOR: Color = Colored::Fg(Color::Rgb(255, 200, 0));
-const ADDED_COLOR: Color = Colored::Fg(Color::Rgb(0, 255, 0));
-const DELETED_COLOR: Color = Colored::Fg(Color::Rgb(255, 0, 0));
-const RENAMED_COLOR: Color = Colored::Fg(Color::Rgb(100, 100, 255));
-const COPIED_COLOR: Color = Colored::Fg(Color::Rgb(255, 0, 255));
-const UNMERGED_COLOR: Color = Colored::Fg(Color::Rgb(255, 180, 100));
-const MISSING_COLOR: Color = Colored::Fg(Color::Rgb(255, 0, 0));
-const IGNORED_COLOR: Color = Colored::Fg(Color::Rgb(255, 180, 0));
-const CLEAN_COLOR: Color = Colored::Fg(Color::Rgb(100, 180, 255));
+const UNTRACKED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 100, g: 180, b: 255});
+const UNMODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 255, b: 255});
+const MODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 200, b: 0});
+const ADDED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 0, g: 255, b: 0});
+const DELETED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 0, b: 0});
+const RENAMED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 100, g: 100, b: 255});
+const COPIED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 0, b: 255});
+const UNMERGED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 100});
+const MISSING_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 0, b: 0});
+const IGNORED_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 0});
+const CLEAN_COLOR: Colored = Colored::Fg(Color::Rgb{r: 100, g: 180, b: 255});
 
 impl State {
-	fn color(&self) -> Color {
+	fn color(&self) -> Colored {
 		match self {
 			State::Untracked => UNTRACKED_COLOR,
 			State::Unmodified => UNMODIFIED_COLOR,
@@ -68,7 +67,7 @@ pub fn draw_select(
 	}
 
 	print!(
-		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}enter{} continues\n\n",
+		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continues\n\n",
 		RESET_BG_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
@@ -97,13 +96,11 @@ pub fn draw_select(
 		);
 	}
 
-	//stdout.flush().unwrap();
-
 	match input.read_char() {
-		Some(key) => {
+		Ok(key) => {
 			match key {
-				'\n' => return false,
-				'q' => return false,
+				'\r' => return false,
+				'c' => return false,
 				'j' => index = (index + 1) % entries.len(),
 				'k' => index = (index + entries.len() - 1) % entries.len(),
 				' ' => entries[index].selected = !entries[index].selected,
@@ -117,7 +114,7 @@ pub fn draw_select(
 				_ => (),
 			};
 		}
-		Err(error) => {
+		Err(_) => {
 			return false;
 		}
 	}

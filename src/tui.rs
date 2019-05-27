@@ -1,38 +1,32 @@
 use crossterm::*;
 
+use std::process::Command;
+
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-use std::io::{stdin, stdout, BufRead, Write};
-use std::process::Command;
-
-use select::{draw_select, Entry};
-use version_control_actions::VersionControlActions;
+use crate::select::{draw_select, Entry};
+use crate::version_control_actions::VersionControlActions;
 
 const RESET_COLOR: Attribute = Attribute::Reset;
 const RESET_BG_COLOR: Attribute = Attribute::Reset;
 
-const HEADER_COLOR: Color = Colored::Fg(Color::Black);
-const HEADER_BG_COLOR: Color = Colored::Bg(Color::Magenta);
-const ACTION_COLOR: Color = Colored::Fg(Color::Rgb{r:255, g: 100, b: 180});
-const ENTRY_COLOR: Color = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 100});
+const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
+const HEADER_BG_COLOR: Colored = Colored::Bg(Color::Magenta);
+const ACTION_COLOR: Colored = Colored::Fg(Color::Rgb{r:255, g: 100, b: 180});
+const ENTRY_COLOR: Colored = Colored::Fg(Color::Rgb{r: 255, g: 180, b: 100});
 
-const DONE_COLOR: Color = Colored::Fg(Color::LightGreen);
-const CANCEL_COLOR: Color = Colored::Fg(Color::LightYellow);
-const ERROR_COLOR: Color = Colored::Fg(Color::Red);
+const DONE_COLOR: Colored = Colored::Fg(Color::Green);
+const CANCEL_COLOR: Colored = Colored::Fg(Color::Yellow);
+const ERROR_COLOR: Colored = Colored::Fg(Color::Red);
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub fn show_tui<'a, T: VersionControlActions>(repository_name: &str, version_control: &'a mut T) {
-	let _guard = termion::init();
-
-	let stdin = stdin().lock();
-	Tui::new(stdin, repository_name, version_control).show();
+	Tui::new(repository_name, version_control).show();
 }
 
-struct Tui<'a, R: BufRead, T: VersionControlActions + 'a> {
-	stdin: R,
-
+struct Tui<'a, T: VersionControlActions + 'a> {
 	repository_name: &'a str,
 	version_control: &'a mut T,
 
@@ -44,16 +38,14 @@ struct Tui<'a, R: BufRead, T: VersionControlActions + 'a> {
 	readline: Editor<()>,
 }
 
-impl<'a, R: BufRead, T: VersionControlActions> Tui<'a, R, T> {
-	fn new(stdin: R, repository_name: &'a str, version_control: &'a mut T) -> Self {
+impl<'a, T: VersionControlActions> Tui<'a, T> {
+	fn new(repository_name: &'a str, version_control: &'a mut T) -> Self {
 		let crossterm = Crossterm::new();
 		let terminal = crossterm.terminal();
 		let input = crossterm.input();
 		let cursor = crossterm.cursor();
 
 		Tui {
-			stdin,
-
 			repository_name: repository_name,
 			version_control: version_control,
 
@@ -72,7 +64,9 @@ impl<'a, R: BufRead, T: VersionControlActions> Tui<'a, R, T> {
 
 		loop {
 			match self.input.read_char() {
-				Ok(key) => self.handle_key(key),
+				Ok(key) => if !self.handle_key(key) {
+					return;
+				},
 				Err(error) => {
 					println!("Error reading input: {}", error);
 					return;
@@ -81,150 +75,169 @@ impl<'a, R: BufRead, T: VersionControlActions> Tui<'a, R, T> {
 		}
 	}
 
-	fn handle_key(&mut self, key: char) {
-		match key {
-			'h' => {
-				self.show_action("help");
-				self.show_help();
-			}
-			'e' => {
-				self.show_action("explorer");
-				self.open_explorer();
-			}
-			's' => {
-				self.show_action("status");
-				let result = self.version_control.status();
-				self.handle_result(result);
-			}
-			'l' => {
-				self.show_action("log");
-				let result = self.version_control.log();
-				self.handle_result(result);
-			}
-			'd' => {
-				self.show_action("revision changes");
-				if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
-				{
-					let result = self.version_control.changes(&input[..]);
+	fn handle_key(&mut self, key: char) -> bool {
+		const CTRL_C: char = 3u8 as char;
+		const CTRL_R: char = 18u8 as char;
+		const CTRL_B: char = 2u8 as char;
+
+		if key.is_control() {
+			println!("{} -> {}", key, key as i32);
+			match key {
+				CTRL_C => {
+					return false;
+				}
+				CTRL_R => {
+					self.show_action("merge taking local");
+					let result = self.version_control.take_local();
 					self.handle_result(result);
 				}
-			}
-			'D' => {
-				self.show_action("revision diff");
-				if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ") {
-					let result = self.version_control.diff(&input[..]);
-					self.handle_result(result);
-				}
-			}
-			'c' => {
-				self.show_action("commit all");
-
-				if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
-					let result = self.version_control.commit_all(&input[..]);
-					self.handle_result(result);
-				}
-			}
-			'C' => {
-				self.show_action("commit selected");
-
-				match self.version_control.get_files_to_commit() {
-					Ok(mut entries) => {
-						self.show_add_remove_ui(&mut entries);
-						write!(self.stdout, "\n\n").unwrap();
-
-						if let Some(input) =
-							self.handle_input("commit message (ctrl+c to cancel): ")
-						{
-							let result =
-								self.version_control.commit_selected(&input[..], &entries);
-							self.handle_result(result);
-						}
+				CTRL_B => {
+					self.show_action("close branch");
+					if let Some(input) = self.handle_input("branch to close (ctrl+c to cancel): ") {
+						let result = self.version_control.close_branch(&input[..]);
+						self.handle_result(result);
 					}
-					Err(error) => self.handle_result(Err(error)),
 				}
+				_ => (),
 			}
-			'u' => {
-				self.show_action("update");
-				if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
-					let result = self.version_control.update(&input[..]);
+		} else {
+			match key {
+				'q' => {
+					return false;
+				}
+				'h' => {
+					self.show_action("help");
+					self.show_help();
+				}
+				'e' => {
+					self.show_action("explorer");
+					self.open_explorer();
+				}
+				's' => {
+					self.show_action("status");
+					let result = self.version_control.status();
 					self.handle_result(result);
 				}
-			}
-			'x' => {
-				self.show_action("revert");
-				let result = self.version_control.revert();
-				self.handle_result(result);
-			}
-			'X' => {
-				self.show_action("revert selected");
-				let result = self.version_control.revert();
-				self.handle_result(result);
-			}
-			'm' => {
-				self.show_action("merge");
-				if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
-					let result = self.version_control.merge(&input[..]);
+				'l' => {
+					self.show_action("log");
+					let result = self.version_control.log();
 					self.handle_result(result);
 				}
-			}
-			'r' => {
-				self.show_action("unresolved conflicts");
-				let result = self.version_control.conflicts();
-				self.handle_result(result);
-			}
-			'L' => {
-				self.show_action("merge taking local");
-				let result = self.version_control.take_local();
-				self.handle_result(result);
-			}
-			'O' => {
-				self.show_action("merge taking other");
-				let result = self.version_control.take_other();
-				self.handle_result(result);
-			}
-			'f' => {
-				self.show_action("fetch");
-				let result = self.version_control.fetch();
-				self.handle_result(result);
-			}
-			'p' => {
-				self.show_action("pull");
-				let result = self.version_control.pull();
-				self.handle_result(result);
-			}
-			'P' => {
-				self.show_action("push");
-				let result = self.version_control.push();
-				self.handle_result(result);
-			}
-			'T' => {
-				self.show_action("create tag");
-				if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
-					let result = self.version_control.create_tag(&input[..]);
+				'd' => {
+					self.show_action("revision changes");
+					if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
+					{
+						let result = self.version_control.changes(&input[..]);
+						self.handle_result(result);
+					}
+				}
+				'D' => {
+					self.show_action("revision diff");
+					if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ") {
+						let result = self.version_control.diff(&input[..]);
+						self.handle_result(result);
+					}
+				}
+				'c' => {
+					self.show_action("commit all");
+
+					if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
+						let result = self.version_control.commit_all(&input[..]);
+						self.handle_result(result);
+					}
+				}
+				'C' => {
+					self.show_action("commit selected");
+
+					match self.version_control.get_files_to_commit() {
+						Ok(mut entries) => {
+							self.show_add_remove_ui(&mut entries);
+							print!("\n\n");
+
+							if let Some(input) =
+								self.handle_input("commit message (ctrl+c to cancel): ")
+							{
+								let result =
+									self.version_control.commit_selected(&input[..], &entries);
+								self.handle_result(result);
+							}
+						}
+						Err(error) => self.handle_result(Err(error)),
+					}
+				}
+				'u' => {
+					self.show_action("update");
+					if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
+						let result = self.version_control.update(&input[..]);
+						self.handle_result(result);
+					}
+				}
+				'x' => {
+					self.show_action("revert");
+					let result = self.version_control.revert();
 					self.handle_result(result);
 				}
-			}
-			'b' => {
-				self.show_action("list branches");
-				let result = self.version_control.list_branches();
-				self.handle_result(result);
-			}
-			'B' => {
-				self.show_action("create branch");
-				if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
-					let result = self.version_control.create_branch(&input[..]);
+				'X' => {
+					self.show_action("revert selected");
+					let result = self.version_control.revert();
 					self.handle_result(result);
 				}
-			}
-			'V' => {
-				self.show_action("close branch");
-				if let Some(input) = self.handle_input("branch to close (ctrl+c to cancel): ") {
-					let result = self.version_control.close_branch(&input[..]);
+				'm' => {
+					self.show_action("merge");
+					if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
+						let result = self.version_control.merge(&input[..]);
+						self.handle_result(result);
+					}
+				}
+				'r' => {
+					self.show_action("unresolved conflicts");
+					let result = self.version_control.conflicts();
 					self.handle_result(result);
 				}
+				'R' => {
+					self.show_action("merge taking other");
+					let result = self.version_control.take_other();
+					self.handle_result(result);
+				}
+				'f' => {
+					self.show_action("fetch");
+					let result = self.version_control.fetch();
+					self.handle_result(result);
+				}
+				'p' => {
+					self.show_action("pull");
+					let result = self.version_control.pull();
+					self.handle_result(result);
+				}
+				'P' => {
+					self.show_action("push");
+					let result = self.version_control.push();
+					self.handle_result(result);
+				}
+				'T' => {
+					self.show_action("create tag");
+					if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
+						let result = self.version_control.create_tag(&input[..]);
+						self.handle_result(result);
+					}
+				}
+				'b' => {
+					self.show_action("list branches");
+					let result = self.version_control.list_branches();
+					self.handle_result(result);
+				}
+				'B' => {
+					self.show_action("create branch");
+					if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
+						let result = self.version_control.create_branch(&input[..]);
+						self.handle_result(result);
+					}
+				}
+				_ => (),
 			}
-			_ => (),
 		}
+
+		true
 	}
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
@@ -245,7 +258,7 @@ impl<'a, R: BufRead, T: VersionControlActions> Tui<'a, R, T> {
 		}
 	}
 
-	fn handle_result(&mut self, result: Result<String, String>) {
+	fn handle_result(&mut self, result: std::result::Result<String, String>) {
 		match result {
 			Ok(output) => {
 				print!("{}\n\n", output);
@@ -262,14 +275,14 @@ impl<'a, R: BufRead, T: VersionControlActions> Tui<'a, R, T> {
 		print!("{}", termion::clear::All);
 
 		let (w, _) = self.terminal.terminal_size();
-		self.cursor.goto(1,1).unwrap();
+		self.cursor.goto(0, 0).unwrap();
 		print!("{}{}",
 			HEADER_COLOR,
 			HEADER_BG_COLOR,
 		);
-		print!("{}", " ".repeat(w as usize));
+		print!("{}", " ".repeat(w as usize + 1));
 
-		self.cursor.goto(1, 1).unwrap();
+		self.cursor.goto(0, 0).unwrap();
 		print!("{}Verco @ {}{}{}\n\n",
 			HEADER_COLOR,
 			self.repository_name,
@@ -320,8 +333,8 @@ impl<'a, R: BufRead, T: VersionControlActions> Tui<'a, R, T> {
 		self.show_help_action("m", "merge\n");
 
 		self.show_help_action("r", "unresolved conflicts");
-		self.show_help_action("shift+o", "resolve taking other");
-		self.show_help_action("ctrl+l", "resolve taking local\n");
+		self.show_help_action("shift+r", "resolve taking other");
+		self.show_help_action("ctrl+r", "resolve taking local\n");
 
 		self.show_help_action("f", "fetch");
 		self.show_help_action("p", "pull");
@@ -331,7 +344,7 @@ impl<'a, R: BufRead, T: VersionControlActions> Tui<'a, R, T> {
 
 		self.show_help_action("b", "list branches");
 		self.show_help_action("shift+b", "create branch");
-		self.show_help_action("shift+v", "close branch\n");
+		self.show_help_action("ctrl+b", "close branch\n");
 	}
 
 	fn show_help_action(&mut self, shortcut: &str, action: &str) {
