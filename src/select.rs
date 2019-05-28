@@ -180,10 +180,7 @@ pub fn select(
 					_ => (),
 				};
 			}
-			Err(_error) => {
-				//selected = false;
-				//break;
-			}
+			Err(_error) => ()
 		}
 	}
 
