@@ -101,7 +101,7 @@ pub fn select(
 	}
 
 	print!(
-		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continue, {}ctrl+c{} cancel \n\n",
+		"{}{}j/down and k/up{} move, {}space{} (de)select, {}a{} (de)select all, {}c/enter{} continue, {}ctrl+c{} cancel \n\n",
 		RESET_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
@@ -137,57 +137,61 @@ pub fn select(
 	}
 
 	loop {
+		let sync_stdin = input.read_sync();
+		for event in sync_stdin {
+			match event {
+				InputEvent::Keyboard(KeyEvent::Down) | InputEvent::Keyboard(KeyEvent::Char('j')) => {
+				}
+				crossterm::InputEvent::Keyboard(crossterm::KeyEvent::Char('q')) => {
+					println!("quit");
+				}
+				_ => break 'outer,
+			}
+		}
+
 		//cursor.goto(terminal_size.0, terminal_size.1).unwrap();
-		cursor.goto(0, terminal_size.1).unwrap();
 		match input.read_char() {
 			Ok(key) => {
 				terminal.clear(ClearType::CurrentLine).unwrap();
 				cursor.move_left(1);
-
-				if key as u8 == 13 {
-					println!("ENTER!");
-				}
-
-				if key.is_control() {
-					const CTRL_C: char = 3u8 as char;
-					if key == CTRL_C {
+				match key {
+					// ctrl+c
+					'\x03' => {
 						selected = false;
 						break;
 					}
-				} else {
-					match key {
-						'c' => {
-							selected = entries.iter().any(|e| e.selected);
-							break;
+					// enter
+					'c' | '\x0d' => {
+						selected = entries.iter().any(|e| e.selected);
+						break;
+					}
+					'j' => {
+						draw_entry_state(cursor, entries, index, false);
+						index = (index + 1) % entries.len();
+						draw_entry_state(cursor, entries, index, true);
+					}
+					'k' => {
+						draw_entry_state(cursor, entries, index, false);
+						index = (index + entries.len() - 1) % entries.len();
+						draw_entry_state(cursor, entries, index, true);
+					}
+					' ' => {
+						entries[index].selected = !entries[index].selected;
+						draw_entry_state(cursor, entries, index, true);
+					}
+					'a' => {
+						let all_selected = entries.iter().all(|e| e.selected);
+						for e in entries.iter_mut() {
+							e.selected = !all_selected;
 						}
-						'j' => {
-							draw_entry_state(cursor, entries, index, false);
-							index = (index + 1) % entries.len();
-							draw_entry_state(cursor, entries, index, true);
+						for i in 0..entries.len() {
+							draw_entry_state(cursor, entries, i, i == index);
 						}
-						'k' => {
-							draw_entry_state(cursor, entries, index, false);
-							index = (index + entries.len() - 1) % entries.len();
-							draw_entry_state(cursor, entries, index, true);
-						}
-						' ' => {
-							entries[index].selected = !entries[index].selected;
-							draw_entry_state(cursor, entries, index, true);
-						}
-						'a' => {
-							let all_selected = entries.iter().all(|e| e.selected);
-							for e in entries.iter_mut() {
-								e.selected = !all_selected;
-							}
-							for i in 0..entries.len() {
-								draw_entry_state(cursor, entries, i, i == index);
-							}
-						}
-						_ => (),
-					};
-				}
+					}
+					_ => (),
+				};
 			}
-			Err(_) => {
+			Err(_error) => {
 				selected = false;
 				break;
 			}

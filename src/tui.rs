@@ -90,174 +90,164 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		self.terminal.clear(ClearType::CurrentLine).unwrap();
 		self.cursor.move_left(1);
 
-		const CTRL_C: char = 3u8 as char;
-		const CTRL_R: char = 18u8 as char;
-		const CTRL_B: char = 2u8 as char;
-
-		if key.is_control() {
-			match key {
-				CTRL_C => {
-					return false;
-				}
-				CTRL_R => {
-					self.show_action("merge taking local");
-					let result = self.version_control.take_local();
-					self.handle_result(result);
-				}
-				CTRL_B => {
-					self.show_action("close branch");
-					if let Some(input) = self.handle_input("branch to close (ctrl+c to cancel): ") {
-						let result = self.version_control.close_branch(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				_ => (),
+		match key {
+			// ctrl+c
+			'q' | '\x03' => {
+				return false;
 			}
-		} else {
-			match key {
-				'q' => {
-					return false;
-				}
-				'h' => {
-					self.show_action("help");
-					self.show_help();
-				}
-				'e' => {
-					self.show_action("explorer");
-					self.open_explorer();
-				}
-				's' => {
-					self.show_action("status");
-					let result = self.version_control.status();
+			'h' => {
+				self.show_action("help");
+				self.show_help();
+			}
+			'e' => {
+				self.show_action("explorer");
+				self.open_explorer();
+			}
+			's' => {
+				self.show_action("status");
+				let result = self.version_control.status();
+				self.handle_result(result);
+			}
+			'l' => {
+				self.show_action("log");
+				let result = self.version_control.log();
+				self.handle_result(result);
+			}
+			'd' => {
+				self.show_action("revision changes");
+				if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
+				{
+					let result = self.version_control.changes(&input[..]);
 					self.handle_result(result);
 				}
-				'l' => {
-					self.show_action("log");
-					let result = self.version_control.log();
+			}
+			'D' => {
+				self.show_action("revision diff");
+				if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ") {
+					let result = self.version_control.diff(&input[..]);
 					self.handle_result(result);
 				}
-				'd' => {
-					self.show_action("revision changes");
-					if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
-					{
-						let result = self.version_control.changes(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				'D' => {
-					self.show_action("revision diff");
-					if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ") {
-						let result = self.version_control.diff(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				'c' => {
-					self.show_action("commit all");
+			}
+			'c' => {
+				self.show_action("commit all");
 
-					if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
-						let result = self.version_control.commit_all(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				'C' => {
-					self.show_action("commit selected");
-
-					match self.version_control.get_files_to_commit() {
-						Ok(mut entries) => {
-							if self.show_select_ui(&mut entries) {
-								print!("\n\n");
-
-								if let Some(input) =
-									self.handle_input("commit message (ctrl+c to cancel): ")
-								{
-									let result =
-										self.version_control.commit_selected(&input[..], &entries);
-									self.handle_result(result);
-								}
-							}
-						}
-						Err(error) => self.handle_result(Err(error)),
-					}
-				}
-				'u' => {
-					self.show_action("update");
-					if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
-						let result = self.version_control.update(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				'x' => {
-					self.show_action("revert all");
-					let result = self.version_control.revert_all();
+				if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
+					let result = self.version_control.commit_all(&input[..]);
 					self.handle_result(result);
 				}
-				'X' => {
-					self.show_action("revert selected");
+			}
+			'C' => {
+				self.show_action("commit selected");
 
-					match self.version_control.get_files_to_commit() {
-						Ok(mut entries) => {
-							if self.show_select_ui(&mut entries) {
-								print!("\n\n");
-								let result = self.version_control.revert_selected(&entries);
+				match self.version_control.get_files_to_commit() {
+					Ok(mut entries) => {
+						if self.show_select_ui(&mut entries) {
+							print!("\n\n");
+
+							if let Some(input) =
+								self.handle_input("commit message (ctrl+c to cancel): ")
+							{
+								let result =
+									self.version_control.commit_selected(&input[..], &entries);
 								self.handle_result(result);
 							}
 						}
-						Err(error) => self.handle_result(Err(error)),
 					}
+					Err(error) => self.handle_result(Err(error)),
 				}
-				'm' => {
-					self.show_action("merge");
-					if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
-						let result = self.version_control.merge(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				'r' => {
-					self.show_action("unresolved conflicts");
-					let result = self.version_control.conflicts();
-					self.handle_result(result);
-				}
-				'R' => {
-					self.show_action("merge taking other");
-					let result = self.version_control.take_other();
-					self.handle_result(result);
-				}
-				'f' => {
-					self.show_action("fetch");
-					let result = self.version_control.fetch();
-					self.handle_result(result);
-				}
-				'p' => {
-					self.show_action("pull");
-					let result = self.version_control.pull();
-					self.handle_result(result);
-				}
-				'P' => {
-					self.show_action("push");
-					let result = self.version_control.push();
-					self.handle_result(result);
-				}
-				'T' => {
-					self.show_action("create tag");
-					if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
-						let result = self.version_control.create_tag(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				'b' => {
-					self.show_action("list branches");
-					let result = self.version_control.list_branches();
-					self.handle_result(result);
-				}
-				'B' => {
-					self.show_action("create branch");
-					if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
-						let result = self.version_control.create_branch(&input[..]);
-						self.handle_result(result);
-					}
-				}
-				_ => (),
 			}
+			'u' => {
+				self.show_action("update");
+				if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ") {
+					let result = self.version_control.update(&input[..]);
+					self.handle_result(result);
+				}
+			}
+			'x' => {
+				self.show_action("revert all");
+				let result = self.version_control.revert_all();
+				self.handle_result(result);
+			}
+			'X' => {
+				self.show_action("revert selected");
+
+				match self.version_control.get_files_to_commit() {
+					Ok(mut entries) => {
+						if self.show_select_ui(&mut entries) {
+							print!("\n\n");
+							let result = self.version_control.revert_selected(&entries);
+							self.handle_result(result);
+						}
+					}
+					Err(error) => self.handle_result(Err(error)),
+				}
+			}
+			'm' => {
+				self.show_action("merge");
+				if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ") {
+					let result = self.version_control.merge(&input[..]);
+					self.handle_result(result);
+				}
+			}
+			'r' => {
+				self.show_action("unresolved conflicts");
+				let result = self.version_control.conflicts();
+				self.handle_result(result);
+			}
+			'R' => {
+				self.show_action("merge taking other");
+				let result = self.version_control.take_other();
+				self.handle_result(result);
+			}
+			// ctrl+r
+			'\x12' => {
+				self.show_action("merge taking local");
+				let result = self.version_control.take_local();
+				self.handle_result(result);
+			}
+			'f' => {
+				self.show_action("fetch");
+				let result = self.version_control.fetch();
+				self.handle_result(result);
+			}
+			'p' => {
+				self.show_action("pull");
+				let result = self.version_control.pull();
+				self.handle_result(result);
+			}
+			'P' => {
+				self.show_action("push");
+				let result = self.version_control.push();
+				self.handle_result(result);
+			}
+			'T' => {
+				self.show_action("create tag");
+				if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
+					let result = self.version_control.create_tag(&input[..]);
+					self.handle_result(result);
+				}
+			}
+			'b' => {
+				self.show_action("list branches");
+				let result = self.version_control.list_branches();
+				self.handle_result(result);
+			}
+			'B' => {
+				self.show_action("create branch");
+				if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
+					let result = self.version_control.create_branch(&input[..]);
+					self.handle_result(result);
+				}
+			}
+			// ctrl+b
+			'\x02' => {
+				self.show_action("close branch");
+				if let Some(input) = self.handle_input("branch to close (ctrl+c to cancel): ") {
+					let result = self.version_control.close_branch(&input[..]);
+					self.handle_result(result);
+				}
+			}
+			_ => (),
 		}
 
 		true
