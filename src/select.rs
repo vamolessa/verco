@@ -101,7 +101,7 @@ pub fn select(
 	}
 
 	print!(
-		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c/enter{} continue, {}ctrl+c{} cancel \n\n",
+		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continue, {}ctrl+c{} cancel \n\n",
 		RESET_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
@@ -142,6 +142,7 @@ pub fn select(
 			Ok(key) => {
 				terminal.clear(ClearType::CurrentLine).unwrap();
 				cursor.move_left(1);
+
 				match key {
 					// ctrl+c
 					'\x03' => {
@@ -153,12 +154,12 @@ pub fn select(
 						selected = entries.iter().any(|e| e.selected);
 						break;
 					}
-					'j' => {
+					'j' | 'P' => {
 						draw_entry_state(cursor, entries, index, false);
 						index = (index + 1) % entries.len();
 						draw_entry_state(cursor, entries, index, true);
 					}
-					'k' => {
+					'k' | 'H' => {
 						draw_entry_state(cursor, entries, index, false);
 						index = (index + entries.len() - 1) % entries.len();
 						draw_entry_state(cursor, entries, index, true);
@@ -180,8 +181,8 @@ pub fn select(
 				};
 			}
 			Err(_error) => {
-				selected = false;
-				break;
+				//selected = false;
+				//break;
 			}
 		}
 	}

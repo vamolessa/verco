@@ -4,9 +4,9 @@ use std::process::Command;
 
 use rustyline::{error::ReadlineError, Editor};
 
-use crate::select::{select, Entry};
-use crate::version_control_actions::VersionControlActions;
 use crate::keybindings::set_keybindings;
+use crate::version_control_actions::VersionControlActions;
+use crate::select::{select, Entry};
 
 const RESET_COLOR: Attribute = Attribute::Reset;
 const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
@@ -71,25 +71,30 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		self.show_header();
 		self.show_help();
 
+		let mut ignore_next = false;
 		loop {
 			match self.input.read_char() {
 				Ok(key) => {
+					self.terminal.clear(ClearType::CurrentLine).unwrap();
+					self.cursor.move_left(1);
+
+					if ignore_next {
+						ignore_next = false;
+						continue;
+					}
+
 					if !self.handle_key(key) {
 						return;
 					}
 				}
-				Err(error) => {
-					println!("Error reading input: {}", error);
-					return;
+				Err(_error) => {
+					ignore_next = true;
 				}
 			}
 		}
 	}
 
 	fn handle_key(&mut self, key: char) -> bool {
-		self.terminal.clear(ClearType::CurrentLine).unwrap();
-		self.cursor.move_left(1);
-
 		match key {
 			// ctrl+c
 			'q' | '\x03' => {
@@ -115,8 +120,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			}
 			'd' => {
 				self.show_action("revision changes");
-				if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")
-				{
+				if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ") {
 					let result = self.version_control.changes(&input[..]);
 					self.handle_result(result);
 				}
@@ -130,7 +134,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			}
 			'c' => {
 				self.show_action("commit all");
-
 				if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
 					let result = self.version_control.commit_all(&input[..]);
 					self.handle_result(result);
@@ -138,7 +141,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			}
 			'C' => {
 				self.show_action("commit selected");
-
 				match self.version_control.get_files_to_commit() {
 					Ok(mut entries) => {
 						if self.show_select_ui(&mut entries) {
@@ -170,7 +172,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			}
 			'X' => {
 				self.show_action("revert selected");
-
 				match self.version_control.get_files_to_commit() {
 					Ok(mut entries) => {
 						if self.show_select_ui(&mut entries) {
