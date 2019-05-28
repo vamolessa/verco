@@ -101,7 +101,7 @@ pub fn select(
 	}
 
 	print!(
-		"{}{}j/down and k/up{} move, {}space{} (de)select, {}a{} (de)select all, {}c/enter{} continue, {}ctrl+c{} cancel \n\n",
+		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c/enter{} continue, {}ctrl+c{} cancel \n\n",
 		RESET_COLOR,
 		HELP_COLOR,
 		RESET_COLOR,
@@ -137,19 +137,7 @@ pub fn select(
 	}
 
 	loop {
-		let sync_stdin = input.read_sync();
-		for event in sync_stdin {
-			match event {
-				InputEvent::Keyboard(KeyEvent::Down) | InputEvent::Keyboard(KeyEvent::Char('j')) => {
-				}
-				crossterm::InputEvent::Keyboard(crossterm::KeyEvent::Char('q')) => {
-					println!("quit");
-				}
-				_ => break 'outer,
-			}
-		}
-
-		//cursor.goto(terminal_size.0, terminal_size.1).unwrap();
+		cursor.goto(terminal_size.0, terminal_size.1).unwrap();
 		match input.read_char() {
 			Ok(key) => {
 				terminal.clear(ClearType::CurrentLine).unwrap();
