@@ -137,11 +137,16 @@ pub fn select(
 	}
 
 	loop {
-		cursor.goto(terminal_size.0, terminal_size.1).unwrap();
+		//cursor.goto(terminal_size.0, terminal_size.1).unwrap();
+		cursor.goto(0, terminal_size.1).unwrap();
 		match input.read_char() {
 			Ok(key) => {
 				terminal.clear(ClearType::CurrentLine).unwrap();
 				cursor.move_left(1);
+
+				if key as u8 == 13 {
+					println!("ENTER!");
+				}
 
 				if key.is_control() {
 					const CTRL_C: char = 3u8 as char;

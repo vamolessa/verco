@@ -2,11 +2,11 @@ use crossterm::*;
 
 use std::process::Command;
 
-use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::{error::ReadlineError, Editor};
 
 use crate::select::{select, Entry};
 use crate::version_control_actions::VersionControlActions;
+use crate::keybindings::set_keybindings;
 
 const RESET_COLOR: Attribute = Attribute::Reset;
 const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
@@ -51,6 +51,9 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		let input = crossterm.input();
 		let cursor = crossterm.cursor();
 
+		let mut readline = Editor::new();
+		set_keybindings(&mut readline);
+
 		Tui {
 			repository_name: repository_name,
 			version_control: version_control,
@@ -60,7 +63,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			input,
 			cursor,
 
-			readline: Editor::new(),
+			readline,
 		}
 	}
 
