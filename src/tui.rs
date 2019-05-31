@@ -2,12 +2,12 @@ use crossterm::*;
 
 use std::process::Command;
 
-use rustyline::{error::ReadlineError, Editor};
+//use rustyline::{error::ReadlineError, Editor};
 
-use crate::keybindings::set_keybindings;
-use crate::version_control_actions::VersionControlActions;
+//use crate::keybindings::set_keybindings;
+
 use crate::select::{select, Entry};
-
+use crate::version_control_actions::VersionControlActions;
 const RESET_COLOR: Attribute = Attribute::Reset;
 const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
 const HEADER_BG_COLOR: Colored = Colored::Bg(Color::Magenta);
@@ -41,7 +41,7 @@ struct Tui<'a, T: VersionControlActions + 'a> {
 	input: TerminalInput,
 	cursor: TerminalCursor,
 
-	readline: Editor<()>,
+	//readline: Editor<()>,
 }
 
 impl<'a, T: VersionControlActions> Tui<'a, T> {
@@ -51,8 +51,8 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		let input = crossterm.input();
 		let cursor = crossterm.cursor();
 
-		let mut readline = Editor::new();
-		set_keybindings(&mut readline);
+		//let mut readline = Editor::new();
+		//set_keybindings(&mut readline);
 
 		Tui {
 			repository_name: repository_name,
@@ -63,7 +63,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			input,
 			cursor,
 
-			readline,
+			//readline,
 		}
 	}
 
@@ -256,6 +256,17 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 	fn handle_input(&mut self, prompt: &str) -> Option<String> {
 		print!("{}{}{}\n", ENTRY_COLOR, prompt, RESET_COLOR);
+		self.cursor.show().unwrap();
+		let res = match self.input.read_line() {
+			Ok(line) => Some(line),
+			Err(_error) => {
+				print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
+				None
+			}
+		};
+		self.cursor.hide().unwrap();
+		res
+		/*
 		match self.readline.readline("") {
 			Ok(line) => Some(line),
 			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
@@ -267,6 +278,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 				None
 			}
 		}
+		*/
 	}
 
 	fn handle_result(&mut self, result: std::result::Result<String, String>) {

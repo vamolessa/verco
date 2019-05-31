@@ -7,7 +7,7 @@ mod revision_shortcut;
 mod select;
 mod tui;
 mod version_control_actions;
-mod keybindings;
+//mod keybindings;
 
 use git_actions::GitActions;
 use hg_actions::HgActions;
