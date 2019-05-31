@@ -2,10 +2,6 @@ use crossterm::*;
 
 use std::process::Command;
 
-//use rustyline::{error::ReadlineError, Editor};
-
-//use crate::keybindings::set_keybindings;
-
 use crate::select::{select, Entry};
 use crate::version_control_actions::VersionControlActions;
 const RESET_COLOR: Attribute = Attribute::Reset;
@@ -40,8 +36,6 @@ struct Tui<'a, T: VersionControlActions + 'a> {
 	terminal: Terminal,
 	input: TerminalInput,
 	cursor: TerminalCursor,
-
-	//readline: Editor<()>,
 }
 
 impl<'a, T: VersionControlActions> Tui<'a, T> {
@@ -51,9 +45,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		let input = crossterm.input();
 		let cursor = crossterm.cursor();
 
-		//let mut readline = Editor::new();
-		//set_keybindings(&mut readline);
-
 		Tui {
 			repository_name: repository_name,
 			version_control: version_control,
@@ -62,8 +53,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			terminal,
 			input,
 			cursor,
-
-			//readline,
 		}
 	}
 
@@ -258,7 +247,10 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		print!("{}{}{}\n", ENTRY_COLOR, prompt, RESET_COLOR);
 		self.cursor.show().unwrap();
 		let res = match self.input.read_line() {
-			Ok(line) => Some(line),
+			Ok(line) => {
+				println!();
+				Some(line)
+			}
 			Err(_error) => {
 				print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
 				None
@@ -266,19 +258,6 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		};
 		self.cursor.hide().unwrap();
 		res
-		/*
-		match self.readline.readline("") {
-			Ok(line) => Some(line),
-			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-				print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
-				None
-			}
-			Err(err) => {
-				println!("error {:?}\n\n", err);
-				None
-			}
-		}
-		*/
 	}
 
 	fn handle_result(&mut self, result: std::result::Result<String, String>) {
