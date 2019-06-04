@@ -73,7 +73,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 					}
 
 					if !self.handle_key(key) {
-						return;
+						break;
 					}
 				}
 				Err(_error) => {
@@ -81,6 +81,8 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 				}
 			}
 		}
+
+		self.cursor.show().unwrap();
 	}
 
 	fn handle_key(&mut self, key: char) -> bool {
@@ -123,6 +125,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 			}
 			'c' => {
 				self.show_action("commit all");
+
 				if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ") {
 					let result = self.version_control.commit_all(&input[..]);
 					self.handle_result(result);
@@ -248,14 +251,19 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		self.cursor.show().unwrap();
 		let res = match self.input.read_line() {
 			Ok(line) => {
-				println!();
-				Some(line)
+				if line.len() > 0 {
+					Some(line)
+				} else {
+					None
+				}
 			}
-			Err(_error) => {
-				print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
-				None
-			}
+			Err(_error) => None,
 		};
+
+		if res.is_none() {
+			print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
+		}
+
 		self.cursor.hide().unwrap();
 		res
 	}

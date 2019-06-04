@@ -7,13 +7,14 @@ mod revision_shortcut;
 mod select;
 mod tui;
 mod version_control_actions;
-//mod keybindings;
 
 use git_actions::GitActions;
 use hg_actions::HgActions;
 use revision_shortcut::RevisionShortcut;
 
 fn main() {
+	ctrlc::set_handler(move || {}).unwrap();
+
 	let current_dir_path = env::current_dir().unwrap();
 	let current_dir = current_dir_path.to_str().unwrap();
 
