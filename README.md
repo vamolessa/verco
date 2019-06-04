@@ -6,10 +6,8 @@ A simple Git/Hg version control client based on keyboard shortcuts
 This project uses Cargo and pure Rust stable so Windows, Mac and Linux should work.
 
 It depends on:
-- [rustyline](https://github.com/kkawakam/rustyline)
-- [termion windows fork](https://github.com/ErichDonGubler/termion)
-  - `windows` branch
-  - watch the windows port [issue](https://gitlab.redox-os.org/redox-os/termion/issues/103)
+- [crossterm](https://crates.io/crates/crossterm)
+- [ctrlc](https://crates.io/crates/ctrlc)
 
 ## Install
 
@@ -19,9 +17,7 @@ Once it's installed, you can proceed to install verco using Cargo (Rust's packag
 Open a terminal and run these commands to clone and install verco:
 
 ```
-git clone https://github.com/matheuslessarodrigues/verco.git
-cd verco
-cargo install --path . --force
+cargo install verco
 ```
 
 Once you close and open again your terminal, you'll be able to use `verco` in whichever directory you need.
