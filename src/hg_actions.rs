@@ -96,26 +96,48 @@ impl<'a> VersionControlActions for HgActions<'a> {
 
 	fn changes(&mut self, target: &str) -> Result<String, String> {
 		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-		handle_command(
-			self.command()
-				.arg("status")
-				.arg("--change")
-				.arg(target)
-				.arg("--color")
-				.arg("always"),
-		)
+		if target == "." {
+			handle_command(
+				self.command()
+					.arg("status")
+					.arg("--change")
+					.arg("")
+					.arg("--color")
+					.arg("always"),
+			)
+		} else {
+			handle_command(
+				self.command()
+					.arg("status")
+					.arg("--change")
+					.arg(target)
+					.arg("--color")
+					.arg("always"),
+			)
+		}
 	}
 
 	fn diff(&mut self, target: &str) -> Result<String, String> {
 		let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-		handle_command(
-			self.command()
-				.arg("diff")
-				.arg("--change")
-				.arg(target)
-				.arg("--color")
-				.arg("always"),
-		)
+		if target == "." {
+			handle_command(
+				self.command()
+					.arg("diff")
+					.arg("--change")
+					.arg("")
+					.arg("--color")
+					.arg("always"),
+			)
+		} else {
+			handle_command(
+				self.command()
+					.arg("diff")
+					.arg("--change")
+					.arg(target)
+					.arg("--color")
+					.arg("always"),
+			)
+		}
 	}
 
 	fn commit_all(&mut self, message: &str) -> Result<String, String> {
