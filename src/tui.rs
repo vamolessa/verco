@@ -287,7 +287,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 		let (w, _) = self.terminal.terminal_size();
 		self.cursor.goto(0, 0).unwrap();
 		print!("{}{}", HEADER_COLOR, HEADER_BG_COLOR,);
-		print!("{}", " ".repeat(w as usize + 1));
+		print!("{}", " ".repeat(w as usize));
 
 		self.cursor.goto(0, 0).unwrap();
 		print!(
