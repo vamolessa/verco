@@ -21,5 +21,5 @@ name = "verco"
 path = "src/main.rs"
 
 [dependencies]
-crossterm = "0.9"
+crossterm = "0.10.2"
 ctrlc = "3.1.2"
