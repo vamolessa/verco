@@ -157,7 +157,8 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 					self.handle_result(result);
 				}
 			}
-			'x' => {
+			// ctrl+x
+			'\x24' => {
 				self.show_action("revert all");
 				let result = self.version_control.revert_all();
 				self.handle_result(result);
@@ -329,7 +330,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 		self.show_help_action("c", "commit all");
 		self.show_help_action("shift+c", "commit selected");
-		self.show_help_action("x", "revert all");
+		self.show_help_action("ctrl+x", "revert all");
 		self.show_help_action("shift+x", "revert selected");
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
