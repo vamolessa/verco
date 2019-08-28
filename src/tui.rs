@@ -158,7 +158,7 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 				}
 			}
 			// ctrl+x
-			'\x24' => {
+			'\x18' => {
 				self.show_action("revert all");
 				let result = self.version_control.revert_all();
 				self.handle_result(result);
