@@ -157,13 +157,14 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 					self.handle_result(result);
 				}
 			}
-			// ctrl+x
-			'\x18' => {
+			// backspace
+			'\x08' => {
 				self.show_action("revert all");
 				let result = self.version_control.revert_all();
 				self.handle_result(result);
 			}
-			'X' => {
+			// ctrl+backspace
+			'\x7f' => {
 				self.show_action("revert selected");
 				match self.version_control.get_files_to_commit() {
 					Ok(mut entries) => {
@@ -330,8 +331,8 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 		self.show_help_action("c", "commit all");
 		self.show_help_action("shift+c", "commit selected");
-		self.show_help_action("ctrl+x", "revert all");
-		self.show_help_action("shift+x", "revert selected");
+		self.show_help_action("backspace", "revert all");
+		self.show_help_action("ctrl+backspace", "revert selected");
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
 
