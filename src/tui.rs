@@ -331,8 +331,8 @@ impl<'a, T: VersionControlActions> Tui<'a, T> {
 
 		self.show_help_action("c", "commit all");
 		self.show_help_action("shift+c", "commit selected");
-		self.show_help_action("backspace", "revert all");
-		self.show_help_action("ctrl+backspace", "revert selected");
+		self.show_help_action("bckspc", "revert all");
+		self.show_help_action("ctrl+bckspc", "revert selected");
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
 
