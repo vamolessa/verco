@@ -99,7 +99,7 @@ impl Tui {
 			'\x03' => {
 				self.version_controls
 					.remove(self.current_version_control_index);
-				repositories::set_version_controls(&self.version_controls);
+				repositories::set_version_controls(&self.version_controls).unwrap();
 				return false;
 			}
 			// tab
@@ -116,7 +116,7 @@ impl Tui {
 			'\x1b' => {
 				self.version_controls
 					.remove(self.current_version_control_index);
-				repositories::set_version_controls(&self.version_controls);
+				repositories::set_version_controls(&self.version_controls).unwrap();
 
 				let count = self.version_controls.len();
 				if count == 0 {
@@ -125,10 +125,11 @@ impl Tui {
 
 				if self.current_version_control_index >= count {
 					self.current_version_control_index = count - 1;
-					self.show_action("log");
-					let result = self.current_version_control_mut().log();
-					self.handle_result(result);
 				}
+
+				self.show_action("log");
+				let result = self.current_version_control_mut().log();
+				self.handle_result(result);
 			}
 			'h' => {
 				self.show_action("help");
