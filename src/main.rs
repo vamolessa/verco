@@ -21,17 +21,17 @@ fn main() {
 	let revision_shortcut = RevisionShortcut::default();
 
 	if subdir_exists(&current_dir_path, ".git") {
-		let mut actions = GitActions {
-			current_dir: &current_dir,
+		let actions = GitActions {
+			current_dir: current_dir.into(),
 			revision_shortcut: revision_shortcut,
 		};
-		tui::show_tui(&current_dir, &mut actions);
+		tui::show_tui(vec![Box::new(actions)]);
 	} else if subdir_exists(&current_dir_path, ".hg") {
-		let mut actions = HgActions {
-			current_dir: &current_dir,
+		let actions = HgActions {
+			current_dir: current_dir.into(),
 			revision_shortcut: revision_shortcut,
 		};
-		tui::show_tui(&current_dir, &mut actions);
+		tui::show_tui(vec![Box::new(actions)]);
 	} else {
 		println!("no repository found");
 	}

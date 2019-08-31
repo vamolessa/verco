@@ -17,20 +17,24 @@ fn str_to_state(s: &str) -> State {
 	}
 }
 
-pub struct HgActions<'a> {
-	pub current_dir: &'a str,
+pub struct HgActions {
+	pub current_dir: String,
 	pub revision_shortcut: RevisionShortcut,
 }
 
-impl<'a> HgActions<'a> {
+impl HgActions {
 	fn command(&self) -> Command {
 		let mut command = Command::new("hg");
-		command.current_dir(self.current_dir);
+		command.current_dir(&self.current_dir[..]);
 		command
 	}
 }
 
-impl<'a> VersionControlActions for HgActions<'a> {
+impl<'a> VersionControlActions for HgActions {
+	fn repository_directory(&self) -> &str {
+		&self.current_dir[..]
+	}
+
 	fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String> {
 		let output = handle_command(self.command().args(&["status"]))?;
 

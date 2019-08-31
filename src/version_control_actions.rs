@@ -3,6 +3,8 @@ use std::process::Command;
 use crate::select::Entry;
 
 pub trait VersionControlActions {
+	fn repository_directory(&self) -> &str;
+
 	fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String>;
 
 	fn version(&mut self) -> Result<String, String>;
@@ -36,15 +38,17 @@ pub trait VersionControlActions {
 
 pub fn handle_command(command: &mut Command) -> Result<String, String> {
 	match command.output() {
-		Ok(output) => if output.status.success() {
-			Ok(String::from_utf8_lossy(&output.stdout[..]).into_owned())
-		} else {
-			let mut out = String::new();
-			out.push_str(&String::from_utf8_lossy(&output.stdout[..]).into_owned()[..]);
-			out.push_str("\n\n");
-			out.push_str(&String::from_utf8_lossy(&output.stderr[..]).into_owned()[..]);
-			Err(out)
-		},
+		Ok(output) => {
+			if output.status.success() {
+				Ok(String::from_utf8_lossy(&output.stdout[..]).into_owned())
+			} else {
+				let mut out = String::new();
+				out.push_str(&String::from_utf8_lossy(&output.stdout[..]).into_owned()[..]);
+				out.push_str("\n\n");
+				out.push_str(&String::from_utf8_lossy(&output.stderr[..]).into_owned()[..]);
+				Err(out)
+			}
+		}
 		Err(error) => Err(error.to_string()),
 	}
 }

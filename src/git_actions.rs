@@ -1,7 +1,7 @@
 use std::process::Command;
 
-use crate::select::{Entry, State};
 use crate::revision_shortcut::RevisionShortcut;
+use crate::select::{Entry, State};
 use crate::version_control_actions::{handle_command, VersionControlActions};
 
 fn str_to_state(s: &str) -> State {
@@ -17,20 +17,24 @@ fn str_to_state(s: &str) -> State {
 	}
 }
 
-pub struct GitActions<'a> {
-	pub current_dir: &'a str,
+pub struct GitActions {
+	pub current_dir: String,
 	pub revision_shortcut: RevisionShortcut,
 }
 
-impl<'a> GitActions<'a> {
+impl GitActions {
 	fn command(&self) -> Command {
 		let mut command = Command::new("git");
-		command.current_dir(self.current_dir);
+		command.current_dir(&self.current_dir[..]);
 		command
 	}
 }
 
-impl<'a> VersionControlActions for GitActions<'a> {
+impl VersionControlActions for GitActions {
+	fn repository_directory(&self) -> &str {
+		&self.current_dir[..]
+	}
+
 	fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String> {
 		let output = handle_command(self.command().args(&["status", "--porcelain"]))?;
 
