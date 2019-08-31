@@ -97,7 +97,13 @@ impl Tui {
 			}
 			// tab
 			'\x09' => {
-				println!("TAB!");
+				if self.version_controls.len() > 1 {
+					self.current_version_control_index =
+						(self.current_version_control_index + 1) % self.version_controls.len();
+					self.show_action("log");
+					let result = self.current_version_control_mut().log();
+					self.handle_result(result);
+				}
 			}
 			'h' => {
 				self.show_action("help");
