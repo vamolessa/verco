@@ -3,8 +3,10 @@ use crossterm::*;
 use std::borrow::BorrowMut;
 use std::process::Command;
 
+use crate::repositories;
 use crate::select::{select, Entry};
 use crate::version_control_actions::VersionControlActions;
+
 const RESET_COLOR: Attribute = Attribute::Reset;
 const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
 const HEADER_BG_COLOR: Colored = Colored::Bg(Color::Magenta);
@@ -61,6 +63,7 @@ impl Tui {
 	}
 
 	fn show(&mut self) {
+		self.cursor.hide().unwrap();
 		self.show_header();
 		self.show_help();
 
@@ -92,7 +95,11 @@ impl Tui {
 	fn handle_key(&mut self, key: char) -> bool {
 		match key {
 			// ctrl+c
-			'q' | '\x03' => {
+			'q' => return false,
+			'\x03' => {
+				self.version_controls
+					.remove(self.current_version_control_index);
+				repositories::set_version_controls(&self.version_controls);
 				return false;
 			}
 			// tab
@@ -100,6 +107,24 @@ impl Tui {
 				if self.version_controls.len() > 1 {
 					self.current_version_control_index =
 						(self.current_version_control_index + 1) % self.version_controls.len();
+					self.show_action("log");
+					let result = self.current_version_control_mut().log();
+					self.handle_result(result);
+				}
+			}
+			// esc
+			'\x1b' => {
+				self.version_controls
+					.remove(self.current_version_control_index);
+				repositories::set_version_controls(&self.version_controls);
+
+				let count = self.version_controls.len();
+				if count == 0 {
+					return false;
+				}
+
+				if self.current_version_control_index >= count {
+					self.current_version_control_index = count - 1;
 					self.show_action("log");
 					let result = self.current_version_control_mut().log();
 					self.handle_result(result);
@@ -308,12 +333,21 @@ impl Tui {
 		print!("{}", " ".repeat(w as usize));
 
 		self.cursor.goto(0, 0).unwrap();
+		print!("{}Verco @ ", HEADER_COLOR);
+
+		if self.version_controls.len() > 1 {
+			print!(
+				"({}/{}) ",
+				self.current_version_control_index + 1,
+				self.version_controls.len()
+			);
+		}
+
 		print!(
-			"{}Verco @ {}{}{}\n\n",
-			HEADER_COLOR,
+			"{}{}{}\n\n",
 			self.current_version_control_mut().repository_directory(),
 			RESET_COLOR,
-			RESET_COLOR,
+			RESET_COLOR
 		);
 	}
 
@@ -338,9 +372,11 @@ impl Tui {
 
 		print!("press a key and peform an action\n\n");
 
-		self.show_help_action("h", "help\n");
-
+		self.show_help_action("h", "help");
 		self.show_help_action("e", "explorer\n");
+
+		self.show_help_action("tab", "next repository");
+		self.show_help_action("esc", "close repository\n");
 
 		self.show_help_action("s", "status");
 		self.show_help_action("l", "log\n");
