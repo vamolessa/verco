@@ -95,13 +95,7 @@ impl Tui {
 	fn handle_key(&mut self, key: char) -> bool {
 		match key {
 			// ctrl+c
-			'q' => return false,
-			'\x03' => {
-				self.version_controls
-					.remove(self.current_version_control_index);
-				repositories::set_version_controls(&self.version_controls).unwrap();
-				return false;
-			}
+			'q' | '\x03' => return false,
 			// tab
 			'\x09' => {
 				if self.version_controls.len() > 1 {
