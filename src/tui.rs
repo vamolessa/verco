@@ -95,7 +95,7 @@ impl Tui {
 	fn handle_key(&mut self, key: char) -> bool {
 		match key {
 			// ctrl+c
-			'q' | '\x03' => return false,
+			'\x03' => return false,
 			// tab
 			'\x09' => {
 				if self.version_controls.len() > 1 {

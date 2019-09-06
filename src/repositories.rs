@@ -23,8 +23,19 @@ pub fn get_version_controls() -> io::Result<Vec<Box<dyn VersionControlActions>>>
 		contents.split(";").map(|r| String::from(r)).collect()
 	};
 
-	repositories.insert(0, env::current_dir().unwrap().to_str().unwrap().into());
-	repositories.dedup();
+	{
+		let current_dir = env::current_dir().unwrap();
+		let current_repository = current_dir.to_str().unwrap();
+		repositories.push(current_repository.into());
+		repositories.sort();
+		repositories.dedup();
+
+		if let Some(current_repository_index) =
+			repositories.iter().position(|r| r == current_repository)
+		{
+			repositories.swap(0, current_repository_index);
+		}
+	}
 
 	let version_controls: Vec<_> = repositories
 		.iter()
