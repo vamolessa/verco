@@ -97,7 +97,7 @@ impl Tui {
 			// ctrl+c
 			'\x03' => return false,
 			// tab
-			'\x09' => {
+			'\x09' if false => {
 				if self.version_controls.len() > 1 {
 					self.current_version_control_index =
 						(self.current_version_control_index + 1) % self.version_controls.len();
@@ -370,7 +370,7 @@ impl Tui {
 		self.show_help_action("h", "help");
 		self.show_help_action("e", "explorer\n");
 
-		self.show_help_action("tab", "next repository");
+		// self.show_help_action("tab", "next repository");
 		self.show_help_action("esc", "close repository\n");
 
 		self.show_help_action("s", "status");

@@ -9,6 +9,22 @@ use crate::git_actions::GitActions;
 use crate::hg_actions::HgActions;
 use crate::revision_shortcut::RevisionShortcut;
 
+pub fn get_current_version_control() -> io::Result<Vec<Box<dyn VersionControlActions>>> {
+	let mut repositories = Vec::new();
+
+	let current_dir = env::current_dir().unwrap();
+	let current_repository = current_dir.to_str().unwrap();
+	repositories.push(current_repository.into());
+
+	if let Some(current_repository_index) =
+		repositories.iter().position(|r| r == current_repository)
+	{
+		repositories.swap(0, current_repository_index);
+	}
+
+	Ok(get_version_controls_from_repositories(repositories))
+}
+
 pub fn get_version_controls() -> io::Result<Vec<Box<dyn VersionControlActions>>> {
 	let path = get_repositories_path();
 	let mut contents = String::new();
@@ -23,21 +39,25 @@ pub fn get_version_controls() -> io::Result<Vec<Box<dyn VersionControlActions>>>
 		contents.split(";").map(|r| String::from(r)).collect()
 	};
 
-	{
-		let current_dir = env::current_dir().unwrap();
-		let current_repository = current_dir.to_str().unwrap();
-		repositories.push(current_repository.into());
-		repositories.sort();
-		repositories.dedup();
+	let current_dir = env::current_dir().unwrap();
+	let current_repository = current_dir.to_str().unwrap();
+	repositories.push(current_repository.into());
+	repositories.sort();
+	repositories.dedup();
 
-		if let Some(current_repository_index) =
-			repositories.iter().position(|r| r == current_repository)
-		{
-			repositories.swap(0, current_repository_index);
-		}
+	if let Some(current_repository_index) =
+		repositories.iter().position(|r| r == current_repository)
+	{
+		repositories.swap(0, current_repository_index);
 	}
 
-	let version_controls: Vec<_> = repositories
+	Ok(get_version_controls_from_repositories(repositories))
+}
+
+fn get_version_controls_from_repositories(
+	repositories: Vec<String>,
+) -> Vec<Box<dyn VersionControlActions>> {
+	repositories
 		.iter()
 		.filter_map(|r| {
 			let path = PathBuf::from(r);
@@ -56,9 +76,7 @@ pub fn get_version_controls() -> io::Result<Vec<Box<dyn VersionControlActions>>>
 			};
 			res
 		})
-		.collect();
-
-	Ok(version_controls)
+		.collect()
 }
 
 pub fn set_version_controls(

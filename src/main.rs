@@ -9,8 +9,9 @@ mod version_control_actions;
 fn main() {
 	ctrlc::set_handler(move || {}).unwrap();
 
-	let version_controls = repositories::get_version_controls().unwrap();
-	repositories::set_version_controls(&version_controls).unwrap();
+	//let version_controls = repositories::get_version_controls().unwrap();
+	//repositories::set_version_controls(&version_controls).unwrap();
+	let version_controls = repositories::get_current_version_control().unwrap();
 
 	if version_controls.len() == 0 {
 		println!("no repository found");
