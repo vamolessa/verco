@@ -15,4 +15,3 @@ fn main() {
 		eprintln!("no repository found");
 	}
 }
-//

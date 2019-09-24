@@ -133,16 +133,13 @@ impl VersionControlActions for GitActions {
 	}
 
 	fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
-		let mut command = self.command();
-		let mut command = command.arg("commit").arg("-m").arg(message).arg("--");
-
 		for e in entries.iter() {
 			if e.selected {
-				command = command.arg(&e.filename);
+				handle_command(self.command().arg("add").arg(&e.filename))?;
 			}
 		}
 
-		handle_command(command)
+		handle_command(self.command().arg("commit").arg("-m").arg(message))
 	}
 
 	fn revert_all(&mut self) -> Result<String, String> {
