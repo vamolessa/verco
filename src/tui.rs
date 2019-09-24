@@ -162,14 +162,14 @@ impl Tui {
 					self.handle_result(result);
 				}
 			}
-			// backspace
-			'\x08' => {
+			// ctrl+backspace
+			'\x7f' => {
 				self.show_action("revert all");
 				let result = self.current_version_control_mut().revert_all();
 				self.handle_result(result);
 			}
-			// ctrl+backspace
-			'\x7f' => {
+			// backspace
+			'\x08' => {
 				self.show_action("revert selected");
 				match self.current_version_control_mut().get_files_to_commit() {
 					Ok(mut entries) => {
@@ -348,8 +348,8 @@ impl Tui {
 
 		self.show_help_action("c", "commit all");
 		self.show_help_action("shift+c", "commit selected");
-		self.show_help_action("bckspc", "revert all");
-		self.show_help_action("ctrl+bckspc", "revert selected");
+		self.show_help_action("bs", "revert selected");
+		self.show_help_action("ctrl+bs", "revert all");
 		self.show_help_action("u", "update/checkout");
 		self.show_help_action("m", "merge\n");
 
@@ -369,10 +369,7 @@ impl Tui {
 	}
 
 	fn show_help_action(&mut self, shortcut: &str, action: &str) {
-		print!(
-			"\t{}{}{}\t\t{}\n",
-			ENTRY_COLOR, shortcut, RESET_COLOR, action
-		);
+		print!("\t{}{}{}\t\t{}\n", ENTRY_COLOR, shortcut, RESET_COLOR, action);
 	}
 
 	fn open_explorer(&mut self) {
