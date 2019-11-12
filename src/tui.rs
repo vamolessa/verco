@@ -260,8 +260,8 @@ impl Tui {
             }
             't' => match self.next_key() {
                 'n' => {
-                    self.show_action("create tag");
-                    if let Some(input) = self.handle_input("tag name (ctrl+c to cancel): ") {
+                    self.show_action("new tag");
+                    if let Some(input) = self.handle_input("new tag name (ctrl+c to cancel): ") {
                         let result = self.current_version_control_mut().create_tag(&input[..]);
                         self.handle_result(result);
                     }
@@ -275,15 +275,15 @@ impl Tui {
                     self.handle_result(result);
                 }
                 'n' => {
-                    self.show_action("create branch");
-                    if let Some(input) = self.handle_input("branch name (ctrl+c to cancel): ") {
+                    self.show_action("new branch");
+                    if let Some(input) = self.handle_input("new branch name (ctrl+c to cancel): ") {
                         let result = self.current_version_control_mut().create_branch(&input[..]);
                         self.handle_result(result);
                     }
                 }
                 'd' => {
-                    self.show_action("close branch");
-                    if let Some(input) = self.handle_input("branch to close (ctrl+c to cancel): ") {
+                    self.show_action("delete branch");
+                    if let Some(input) = self.handle_input("branch to delete (ctrl+c to cancel): ") {
                         let result = self.current_version_control_mut().close_branch(&input[..]);
                         self.handle_result(result);
                     }
@@ -471,7 +471,7 @@ impl Tui {
         self.show_help_action("S-ra", "revert all");
         self.show_help_action("S-rs", "revert selected\n");
 
-        self.show_help_action("rr", "unresolved conflicts");
+        self.show_help_action("rr", "list unresolved conflicts");
         self.show_help_action("ro", "resolve taking other");
         self.show_help_action("rl", "resolve taking local\n");
 
