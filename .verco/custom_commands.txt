@@ -1,0 +1,2 @@
+ee echo "oiee"
+r git --version

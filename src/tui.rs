@@ -1,10 +1,12 @@
 use crossterm::*;
 
-use std::borrow::BorrowMut;
-use std::process::Command;
+use std::{borrow::BorrowMut, process::Command};
 
-use crate::select::{select, Entry};
-use crate::version_control_actions::VersionControlActions;
+use crate::{
+    custom_commands::CustomCommand,
+    select::{select, Entry},
+    version_control_actions::VersionControlActions,
+};
 
 const RESET_COLOR: Attribute = Attribute::Reset;
 const HEADER_COLOR: Colored = Colored::Fg(Color::Black);
@@ -26,12 +28,17 @@ const ERROR_COLOR: Colored = Colored::Fg(Color::Red);
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
-pub fn show_tui(version_controls: Vec<Box<dyn 'static + VersionControlActions>>) {
-    Tui::new(version_controls).show();
+pub fn show_tui(
+    version_controls: Vec<Box<dyn 'static + VersionControlActions>>,
+    custom_commands: Vec<CustomCommand>,
+) {
+    Tui::new(version_controls, custom_commands).show();
 }
 
 struct Tui {
     version_controls: Vec<Box<dyn 'static + VersionControlActions>>,
+    custom_commands: Vec<CustomCommand>,
+
     current_version_control_index: usize,
     current_key_chord: Vec<char>,
 
@@ -42,7 +49,10 @@ struct Tui {
 }
 
 impl Tui {
-    fn new(version_controls: Vec<Box<dyn 'static + VersionControlActions>>) -> Self {
+    fn new(
+        version_controls: Vec<Box<dyn 'static + VersionControlActions>>,
+        custom_commands: Vec<CustomCommand>,
+    ) -> Self {
         let crossterm = Crossterm::new();
         let terminal = crossterm.terminal();
         let input = crossterm.input();
@@ -50,6 +60,7 @@ impl Tui {
 
         Tui {
             version_controls,
+            custom_commands,
             current_version_control_index: 0,
             current_key_chord: Vec::new(),
             _crossterm: crossterm,
@@ -274,6 +285,7 @@ impl Tui {
             },
             'x' => {
                 self.show_action("custom command");
+                println!("SDASD");
             }
             _ => (),
         }
@@ -350,7 +362,9 @@ impl Tui {
 
     fn show_current_key_chord(&mut self) {
         let (w, h) = self.terminal.terminal_size();
-        self.cursor.goto(w - self.current_key_chord.len() as u16 - 2, h - 2).unwrap();
+        self.cursor
+            .goto(w - self.current_key_chord.len() as u16 - 2, h - 2)
+            .unwrap();
         self.terminal.clear(ClearType::CurrentLine).unwrap();
         print!("{}", ACTION_COLOR);
         for k in &self.current_key_chord {
