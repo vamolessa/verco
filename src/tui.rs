@@ -292,25 +292,25 @@ impl Tui {
             },
             'x' => {
                 self.show_action("custom command");
-                if self.custom_commands.len() == 0 {
+                if self.custom_commands.len() > 0 {
                     print!("{}available commands\n\n", RESET_COLOR);
+                    for c in &self.custom_commands {
+                        print!(
+                            "\t{}{}{}\t\t{}",
+                            ENTRY_COLOR, c.shortcut, RESET_COLOR, c.command
+                        );
+                        for a in &c.args {
+                            print!(" {}", a);
+                        }
+                        println!();
+                    }
+                    self.handle_custom_command();
+                } else {
+                    print!("{}no commands available\n\n", RESET_COLOR);
                     println!(
                         "create commands by placing them inside './verco/custom_commands.txt'"
                     );
                 }
-
-                print!("{}available commands\n\n", RESET_COLOR);
-                for c in &self.custom_commands {
-                    print!(
-                        "\t{}{}{}\t\t{}",
-                        ENTRY_COLOR, c.shortcut, RESET_COLOR, c.command
-                    );
-                    for a in &c.args {
-                        print!(" {}", a);
-                    }
-                    println!();
-                }
-                self.handle_custom_command();
             }
             _ => (),
         }
