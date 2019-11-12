@@ -1,6 +1,9 @@
 use crossterm::*;
 
-use std::{borrow::BorrowMut, process::Command};
+use std::{
+    borrow::{Borrow, BorrowMut},
+    process::Command,
+};
 
 use crate::{
     custom_commands::CustomCommand,
@@ -68,6 +71,10 @@ impl Tui {
             input,
             cursor,
         }
+    }
+
+    fn current_version_control(&self) -> &(dyn 'static + VersionControlActions) {
+        self.version_controls[self.current_version_control_index].borrow()
     }
 
     fn current_version_control_mut(&mut self) -> &mut (dyn 'static + VersionControlActions) {
@@ -149,7 +156,7 @@ impl Tui {
                         self.handle_result(result);
                     }
                 }
-                _ => {}
+                _ => (),
             },
             'c' => match self.next_key() {
                 'c' => {
@@ -180,7 +187,7 @@ impl Tui {
                         Err(error) => self.handle_result(Err(error)),
                     }
                 }
-                _ => {}
+                _ => (),
             },
             'u' => {
                 self.show_action("update");
@@ -216,7 +223,7 @@ impl Tui {
                         Err(error) => self.handle_result(Err(error)),
                     }
                 }
-                _ => {}
+                _ => (),
             },
             'r' => match self.next_key() {
                 'r' => {
@@ -234,7 +241,7 @@ impl Tui {
                     let result = self.current_version_control_mut().take_local();
                     self.handle_result(result);
                 }
-                _ => {}
+                _ => (),
             },
             'f' => {
                 self.show_action("fetch");
@@ -259,7 +266,7 @@ impl Tui {
                         self.handle_result(result);
                     }
                 }
-                _ => {}
+                _ => (),
             },
             'b' => match self.next_key() {
                 'b' => {
@@ -281,10 +288,17 @@ impl Tui {
                         self.handle_result(result);
                     }
                 }
-                _ => {}
+                _ => (),
             },
             'x' => {
                 self.show_action("custom command");
+                if self.custom_commands.len() == 0 {
+                    print!("{}available commands\n\n", RESET_COLOR);
+                    println!(
+                        "create commands by placing them inside './verco/custom_commands.txt'"
+                    );
+                }
+
                 print!("{}available commands\n\n", RESET_COLOR);
                 for c in &self.custom_commands {
                     print!(
@@ -306,13 +320,43 @@ impl Tui {
 
     fn handle_custom_command(&mut self) {
         let mut current_key_chord = String::new();
-            current_key_chord.push(self.next_key());
+        self.cursor.save_position().unwrap();
+
+        'outer: loop {
+            let key = self.next_key();
+            // ctrl+c or esc
+            if key == '\x03' || key == '\x1b' {
+                self.cursor.reset_position().unwrap();
+                print!("\n\n{}canceled{}\n\n", CANCEL_COLOR, RESET_COLOR);
+                return;
+            }
+
+            current_key_chord.push(key);
             for c in &self.custom_commands {
-                if c.command == current_key_chord {
+                if c.shortcut == current_key_chord {
+                    self.cursor.reset_position().unwrap();
+                    print!("\n\n{}{}{}", ACTION_COLOR, c.command, RESET_COLOR);
+                    for a in &c.args {
+                        print!(" {}", a);
+                    }
+                    print!("\n\n");
+
+                    let result = c.execute(self.current_version_control().repository_directory());
+                    self.handle_result(result);
                     return;
                 }
             }
-        };
+
+            for c in &self.custom_commands {
+                if c.shortcut.starts_with(&current_key_chord) {
+                    continue 'outer;
+                }
+            }
+
+            self.cursor.reset_position().unwrap();
+            print!("\n\n{}no match found{}\n\n", CANCEL_COLOR, RESET_COLOR);
+            return;
+        }
     }
 
     fn handle_input(&mut self, prompt: &str) -> Option<String> {

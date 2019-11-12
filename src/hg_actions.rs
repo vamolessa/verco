@@ -1,8 +1,10 @@
 use std::process::Command;
 
-use crate::revision_shortcut::RevisionShortcut;
-use crate::select::{Entry, State};
-use crate::version_control_actions::{handle_command, VersionControlActions};
+use crate::{
+    revision_shortcut::RevisionShortcut,
+    select::{Entry, State},
+    version_control_actions::{handle_command, VersionControlActions},
+};
 
 fn str_to_state(s: &str) -> State {
     match s {

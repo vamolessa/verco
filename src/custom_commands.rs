@@ -2,6 +2,7 @@ use std::{
     env,
     fs::File,
     io::{self, BufRead, BufReader},
+    process::Command,
 };
 
 pub struct CustomCommand {
@@ -54,6 +55,29 @@ impl CustomCommand {
         }
 
         Ok(commands)
+    }
+
+    pub fn execute(&self, current_dir: &str) -> Result<String, String> {
+        let mut command = Command::new(&self.command);
+        command.current_dir(current_dir);
+        for a in &self.args {
+            command.arg(a);
+        }
+
+        match command.output() {
+            Ok(output) => {
+                if output.status.success() {
+                    Ok(String::from_utf8_lossy(&output.stdout[..]).into_owned())
+                } else {
+                    let mut out = String::new();
+                    out.push_str(&String::from_utf8_lossy(&output.stdout[..]).into_owned()[..]);
+                    out.push_str("\n\n");
+                    out.push_str(&String::from_utf8_lossy(&output.stderr[..]).into_owned()[..]);
+                    Err(out)
+                }
+            }
+            Err(error) => Err(error.to_string()),
+        }
     }
 }
 
