@@ -1,9 +1,6 @@
 use crossterm::*;
 
-use std::{
-    borrow::{Borrow, BorrowMut},
-    process::Command,
-};
+use std::borrow::{Borrow, BorrowMut};
 
 use crate::{
     custom_commands::CustomCommand,
@@ -125,10 +122,6 @@ impl Tui {
             'h' => {
                 self.show_action("help");
                 self.show_help();
-            }
-            'e' => {
-                self.show_action("explorer");
-                self.open_explorer();
             }
             's' => {
                 self.show_action("status");
@@ -283,7 +276,8 @@ impl Tui {
                 }
                 'd' => {
                     self.show_action("delete branch");
-                    if let Some(input) = self.handle_input("branch to delete (ctrl+c to cancel): ") {
+                    if let Some(input) = self.handle_input("branch to delete (ctrl+c to cancel): ")
+                    {
                         let result = self.current_version_control_mut().close_branch(&input[..]);
                         self.handle_result(result);
                     }
@@ -455,8 +449,7 @@ impl Tui {
 
         print!("press a key and peform an action\n\n");
 
-        self.show_help_action("h", "help");
-        self.show_help_action("e", "explorer\n");
+        self.show_help_action("h", "help\n");
 
         self.show_help_action("s", "status");
         self.show_help_action("l", "log\n");
@@ -493,14 +486,6 @@ impl Tui {
             "\t{}{}{}\t\t{}\n",
             ENTRY_COLOR, shortcut, RESET_COLOR, action
         );
-    }
-
-    fn open_explorer(&mut self) {
-        let mut command = Command::new("explorer");
-        command.arg(self.current_version_control_mut().repository_directory());
-        command.spawn().expect("failed to open explorer");
-
-        print!("{}done{}\n\n", DONE_COLOR, RESET_COLOR);
     }
 
     pub fn show_select_ui(&mut self, entries: &mut Vec<Entry>) -> bool {
