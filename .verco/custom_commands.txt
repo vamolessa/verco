@@ -1,2 +1,2 @@
-ee echo "oiee"
-r git --version
+gv git --version
+hv hg --version
