@@ -160,7 +160,7 @@ impl Tui {
                         self.handle_result(result);
                     }
                 }
-                'C' => {
+                's' => {
                     self.show_action("commit selected");
                     match self.current_version_control_mut().get_files_to_commit() {
                         Ok(mut entries) => {
@@ -285,12 +285,34 @@ impl Tui {
             },
             'x' => {
                 self.show_action("custom command");
-                println!("SDASD");
+                print!("{}available commands\n\n", RESET_COLOR);
+                for c in &self.custom_commands {
+                    print!(
+                        "\t{}{}{}\t\t{}",
+                        ENTRY_COLOR, c.shortcut, RESET_COLOR, c.command
+                    );
+                    for a in &c.args {
+                        print!(" {}", a);
+                    }
+                    println!();
+                }
+                self.handle_custom_command();
             }
             _ => (),
         }
 
         true
+    }
+
+    fn handle_custom_command(&mut self) {
+        let mut current_key_chord = String::new();
+            current_key_chord.push(self.next_key());
+            for c in &self.custom_commands {
+                if c.command == current_key_chord {
+                    return;
+                }
+            }
+        };
     }
 
     fn handle_input(&mut self, prompt: &str) -> Option<String> {

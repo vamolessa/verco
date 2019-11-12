@@ -5,7 +5,7 @@ use std::{
 };
 
 pub struct CustomCommand {
-    pub key_chord: String,
+    pub shortcut: String,
     pub command: String,
     pub args: Vec<String>,
 }
@@ -35,8 +35,8 @@ impl CustomCommand {
 
             let mut it = line.split(' ');
 
-            let key_chord = it.nth(0);
-            if key_chord.is_none() {
+            let shortcut = it.nth(0);
+            if shortcut.is_none() {
                 continue;
             }
 
@@ -46,7 +46,7 @@ impl CustomCommand {
             }
 
             let command = CustomCommand {
-                key_chord: key_chord.unwrap().into(),
+                shortcut: shortcut.unwrap().into(),
                 command: command.unwrap().into(),
                 args: it.map(|s| s.into()).collect(),
             };
