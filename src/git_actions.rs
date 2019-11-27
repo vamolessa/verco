@@ -83,6 +83,8 @@ impl VersionControlActions for GitActions {
             "--graph",
             "-20",
             "--color",
+            "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s",
+            "--date=short",
         ]))?;
 
         self.revision_shortcut.replace_occurrences(&mut output);
