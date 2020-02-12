@@ -117,8 +117,8 @@ impl Tui {
 
     fn handle_command(&mut self) -> bool {
         match self.next_key() {
-            // ctrl+c or esc
-            '\x03' | '\x1b' => return false,
+            // q or ctrl+c or esc
+            'q' | '\x03' | '\x1b' => return false,
             'h' => {
                 self.show_action("help");
                 self.show_help();
@@ -202,7 +202,10 @@ impl Tui {
                     let result = self.current_version_control_mut().revert_all();
                     self.handle_result(result);
                 }
-                's' | 'S' => {
+                _ => (),
+            },
+            'r' => match self.next_key() {
+                's' => {
                     self.show_action("revert selected");
                     match self.current_version_control_mut().get_files_to_commit() {
                         Ok(mut entries) => {
@@ -216,9 +219,6 @@ impl Tui {
                         Err(error) => self.handle_result(Err(error)),
                     }
                 }
-                _ => (),
-            },
-            'r' => match self.next_key() {
                 'r' => {
                     self.show_action("unresolved conflicts");
                     let result = self.current_version_control_mut().conflicts();
@@ -449,7 +449,8 @@ impl Tui {
 
         print!("press a key and peform an action\n\n");
 
-        self.show_help_action("h", "help\n");
+        self.show_help_action("h", "help");
+        self.show_help_action("q", "quit\n");
 
         self.show_help_action("s", "status");
         self.show_help_action("l", "log\n");
@@ -462,7 +463,7 @@ impl Tui {
         self.show_help_action("u", "update/checkout");
         self.show_help_action("m", "merge");
         self.show_help_action("S-ra", "revert all");
-        self.show_help_action("S-rs", "revert selected\n");
+        self.show_help_action("rs", "revert selected\n");
 
         self.show_help_action("rr", "list unresolved conflicts");
         self.show_help_action("ro", "resolve taking other");

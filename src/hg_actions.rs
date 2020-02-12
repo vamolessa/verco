@@ -192,16 +192,36 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn revert_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+        let mut output = String::new();
+
         let mut cmd = self.command();
         cmd.arg("revert").arg("-C").arg("--color").arg("always");
 
+        let mut has_revert_file = false;
+
         for e in entries.iter() {
-            if e.selected {
-                cmd.arg(&e.filename);
+            if !e.selected {
+                continue;
+            }
+
+            match e.state {
+                State::Untracked => {
+                    output.push_str(
+                        &handle_command(self.command().arg("purge").arg(&e.filename))?[..],
+                    );
+                }
+                _ => {
+                    has_revert_file = true;
+                    cmd.arg(&e.filename);
+                }
             }
         }
 
-        handle_command(&mut cmd)
+        if has_revert_file {
+            output.push_str(&handle_command(&mut cmd)?[..]);
+        }
+
+        Ok(output)
     }
 
     fn update(&mut self, target: &str) -> Result<String, String> {

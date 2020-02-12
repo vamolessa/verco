@@ -1,6 +1,6 @@
 [package]
 name = "verco"
-version = "3.2.0"
+version = "3.3.0"
 authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
 edition = "2018"
 exclude = [
@@ -22,4 +22,4 @@ path = "src/main.rs"
 
 [dependencies]
 crossterm = "0.10.2"
-ctrlc = "3.1.2"
+ctrlc = "3.1.3"

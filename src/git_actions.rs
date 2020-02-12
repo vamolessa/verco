@@ -158,9 +158,34 @@ impl VersionControlActions for GitActions {
         let mut output = String::new();
 
         for e in entries.iter() {
-            if e.selected {
-                let o = handle_command(self.command().arg("checkout").arg("--").arg(&e.filename))?;
-                output.push_str(&o[..]);
+            if !e.selected {
+                continue;
+            }
+
+            match e.state {
+                State::Untracked => {
+                    handle_command(
+                        self.command()
+                            .arg("clean")
+                            .arg("-f")
+                            .arg("--")
+                            .arg(&e.filename),
+                    )?;
+                }
+                State::Added => {
+                    handle_command(
+                        self.command()
+                            .arg("rm")
+                            .arg("-f")
+                            .arg("--")
+                            .arg(&e.filename),
+                    )?;
+                }
+                _ => {
+                    let o =
+                        handle_command(self.command().arg("checkout").arg("--").arg(&e.filename))?;
+                    output.push_str(&o[..]);
+                }
             }
         }
 
