@@ -1,13 +1,97 @@
 name: Rust
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
+    name: Test rust ${{ matrix.rust }} on ${{ matrix.os }}
 
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest, 'windows-latest']
+        rust: [stable]
+
+    steps:
+    - uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: ${{ matrix.rust }}
+    - uses: actions/checkout@v1
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Build release
+      run: cargo build --verbose --release
+    - name: Upload unix binary
+      uses: actions/upload-artifact@v1
+      if: matrix.os != 'windows-latest'
+      with:
+        name: verco-${{ matrix.os }}
+        path: target/release/verco
+    - name: Upload windows binary
+      uses: actions/upload-artifact@v1
+      if: matrix.os == 'windows-latest'
+      with:
+        name: verco-${{ matrix.os }}
+        path: target/release/verco.exe
+
+  release:
+    name: Release
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Build
-      run: cargo build --verbose
+    - name: Checkout code
+      uses: actions/checkout@v1
+    - uses: actions/download-artifact@v1
+      with:
+        name: verco-ubuntu-latest
+        path: dist/verco-ubuntu-latest
+    - uses: actions/download-artifact@v1
+      with:
+        name: verco-macOS-latest
+        path: dist/verco-macOS-latest
+    - uses: actions/download-artifact@v1
+      with:
+        name: verco-windows-latest
+        path: dist/verco-windows-latest
+    - name: List release files
+      run: find dist/
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    - name: Upload linux release asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./dist/verco-ubuntu-latest/verco
+        asset_name: verco-linux-x86_64
+        asset_content_type: application/x-elf
+    - name: Upload macos release asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./dist/verco-macOS-latest/verco
+        asset_name: verco-darwin-x86_64
+        asset_content_type: application/x-mach-binary
+    - name: Upload windows release asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./dist/verco-windows-latest/verco.exe
+        asset_name: verco-windows-x86_64.exe
+        asset_content_type: application/vnd.microsoft.portable-executable
