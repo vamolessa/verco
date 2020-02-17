@@ -36,11 +36,11 @@ impl VersionControlActions for GitActions {
     }
 
     fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String> {
-        let output = handle_command(self.command().args(&["status", "--porcelain"]))?;
+        let output = handle_command(self.command().args(&["status", "-z"]))?;
 
         let files: Vec<_> = output
             .trim()
-            .split('\n')
+            .split('\0')
             .map(|e| e.trim())
             .filter(|e| e.len() > 2)
             .map(|e| {
@@ -137,7 +137,7 @@ impl VersionControlActions for GitActions {
     fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
         for e in entries.iter() {
             if e.selected {
-                handle_command(self.command().arg("add").arg(&e.filename))?;
+                handle_command(self.command().arg("add").arg("--").arg(&e.filename))?;
             }
         }
 
