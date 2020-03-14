@@ -1,54 +1,62 @@
-use crossterm::*;
+use crossterm::{
+    cursor, execute, queue,
+    style::{Color, Print, ResetColor, SetForegroundColor},
+    terminal::{self, Clear, ClearType},
+    Result,
+};
 
-const RESET_COLOR: Attribute = Attribute::Reset;
-const HELP_COLOR: Colored = Colored::Fg(Color::Rgb {
+use std::io::Write;
+
+use crate::input;
+
+const HELP_COLOR: Color = Color::Rgb {
     r: 255,
     g: 180,
     b: 100,
-});
-const UNTRACKED_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const UNTRACKED_COLOR: Color = Color::Rgb {
     r: 100,
     g: 180,
     b: 255,
-});
-const UNMODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const UNMODIFIED_COLOR: Color = Color::Rgb {
     r: 255,
     g: 255,
     b: 255,
-});
-const MODIFIED_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const MODIFIED_COLOR: Color = Color::Rgb {
     r: 255,
     g: 200,
     b: 0,
-});
-const ADDED_COLOR: Colored = Colored::Fg(Color::Rgb { r: 0, g: 255, b: 0 });
-const DELETED_COLOR: Colored = Colored::Fg(Color::Rgb { r: 255, g: 0, b: 0 });
-const RENAMED_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const ADDED_COLOR: Color = Color::Rgb { r: 0, g: 255, b: 0 };
+const DELETED_COLOR: Color = Color::Rgb { r: 255, g: 0, b: 0 };
+const RENAMED_COLOR: Color = Color::Rgb {
     r: 100,
     g: 100,
     b: 255,
-});
-const COPIED_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const COPIED_COLOR: Color = Color::Rgb {
     r: 255,
     g: 0,
     b: 255,
-});
-const UNMERGED_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const UNMERGED_COLOR: Color = Color::Rgb {
     r: 255,
     g: 180,
     b: 100,
-});
-const MISSING_COLOR: Colored = Colored::Fg(Color::Rgb { r: 255, g: 0, b: 0 });
-const IGNORED_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const MISSING_COLOR: Color = Color::Rgb { r: 255, g: 0, b: 0 };
+const IGNORED_COLOR: Color = Color::Rgb {
     r: 255,
     g: 180,
     b: 0,
-});
-const CLEAN_COLOR: Colored = Colored::Fg(Color::Rgb {
+};
+const CLEAN_COLOR: Color = Color::Rgb {
     r: 100,
     g: 180,
     b: 255,
-});
+};
 
 #[derive(Clone, Debug)]
 pub enum State {
@@ -66,7 +74,7 @@ pub enum State {
 }
 
 impl State {
-    fn color(&self) -> Colored {
+    fn color(&self) -> Color {
         match self {
             State::Untracked => UNTRACKED_COLOR,
             State::Unmodified => UNMODIFIED_COLOR,
@@ -90,62 +98,75 @@ pub struct Entry {
     pub state: State,
 }
 
-pub fn select(
-    terminal: &mut Terminal,
-    cursor: &mut TerminalCursor,
-    input: &mut TerminalInput,
-    entries: &mut Vec<Entry>,
-) -> bool {
+pub fn select<W>(stdout: &mut W, entries: &mut Vec<Entry>) -> Result<bool>
+where
+    W: Write,
+{
     if entries.len() == 0 {
-        return false;
+        return Ok(false);
     }
 
-    print!(
-		"{}{}j/k{} move, {}space{} (de)select, {}a{} (de)select all, {}c{} continue, {}ctrl+c{} cancel \n\n",
-		RESET_COLOR,
-		HELP_COLOR,
-		RESET_COLOR,
-		HELP_COLOR,
-		RESET_COLOR,
-		HELP_COLOR,
-		RESET_COLOR,
-		HELP_COLOR,
-		RESET_COLOR,
-		HELP_COLOR,
-		RESET_COLOR,
-	);
-
-    cursor.hide().unwrap();
-    cursor.save_position().unwrap();
+    queue!(
+        stdout,
+        ResetColor,
+        SetForegroundColor(HELP_COLOR),
+        Print("j/k"),
+        ResetColor,
+        Print(" move, "),
+        SetForegroundColor(HELP_COLOR),
+        Print("space"),
+        ResetColor,
+        Print(" (de)select, "),
+        SetForegroundColor(HELP_COLOR),
+        Print("a"),
+        ResetColor,
+        Print(" (de)select all, "),
+        SetForegroundColor(HELP_COLOR),
+        Print("c"),
+        ResetColor,
+        Print(" continue, "),
+        SetForegroundColor(HELP_COLOR),
+        Print("ctrl+c"),
+        ResetColor,
+        Print(" cancel\n\n"),
+        cursor::Hide,
+        cursor::SavePosition
+    )?;
 
     for e in entries.iter() {
-        println!(
-            "    {}{:?}{}\t{}",
-            e.state.color(),
-            e.state,
-            RESET_COLOR,
-            e.filename,
-        );
+        queue!(
+            stdout,
+            Print("    "),
+            SetForegroundColor(e.state.color()),
+            Print(format!("{:?}", e.state)),
+            ResetColor,
+            Print('\t'),
+            Print(&e.filename),
+            Print('\n')
+        )?;
     }
 
     let mut index = 0;
-    let terminal_size = terminal.terminal_size();
+    let terminal_size = terminal::size()?;
     let selected;
 
     for i in 0..entries.len() {
-        draw_entry_state(cursor, entries, i, i == index);
+        draw_entry_state(stdout, entries, i, i == index)?;
     }
 
     loop {
-        cursor.goto(terminal_size.0, terminal_size.1).unwrap();
-        match input.read_char() {
+        execute!(stdout, cursor::MoveTo(terminal_size.0, terminal_size.1))?;
+        match input::read_char() {
             Ok(key) => {
-                terminal.clear(ClearType::CurrentLine).unwrap();
-                cursor.move_left(1);
+                queue!(
+                    stdout,
+                    Clear(ClearType::CurrentLine),
+                    cursor::MoveTo(terminal_size.0, terminal_size.1)
+                )?;
 
                 match key {
-                    // ctrl+c
-                    '\x03' => {
+                    // q or ctrl+c or esc
+                    'q' | '\x03' | '\x1b' => {
                         selected = false;
                         break;
                     }
@@ -155,18 +176,18 @@ pub fn select(
                         break;
                     }
                     'j' | 'P' => {
-                        draw_entry_state(cursor, entries, index, false);
+                        draw_entry_state(stdout, entries, index, false)?;
                         index = (index + 1) % entries.len();
-                        draw_entry_state(cursor, entries, index, true);
+                        draw_entry_state(stdout, entries, index, true)?;
                     }
                     'k' | 'H' => {
-                        draw_entry_state(cursor, entries, index, false);
+                        draw_entry_state(stdout, entries, index, false)?;
                         index = (index + entries.len() - 1) % entries.len();
-                        draw_entry_state(cursor, entries, index, true);
+                        draw_entry_state(stdout, entries, index, true)?;
                     }
                     ' ' => {
                         entries[index].selected = !entries[index].selected;
-                        draw_entry_state(cursor, entries, index, true);
+                        draw_entry_state(stdout, entries, index, true)?;
                     }
                     'a' => {
                         let all_selected = entries.iter().all(|e| e.selected);
@@ -174,7 +195,7 @@ pub fn select(
                             e.selected = !all_selected;
                         }
                         for i in 0..entries.len() {
-                            draw_entry_state(cursor, entries, i, i == index);
+                            draw_entry_state(stdout, entries, i, i == index)?;
                         }
                     }
                     _ => (),
@@ -184,24 +205,38 @@ pub fn select(
         }
     }
 
-    cursor.reset_position().unwrap();
-    cursor.move_down(entries.len() as u16);
-    cursor.show().unwrap();
-    selected
+    queue!(
+        stdout,
+        cursor::RestorePosition,
+        cursor::MoveDown(entries.len() as u16),
+        cursor::Show
+    )?;
+    Ok(selected)
 }
 
-fn draw_entry_state(
-    cursor: &mut TerminalCursor,
+fn draw_entry_state<W>(
+    stdout: &mut W,
     entries: &Vec<Entry>,
     index: usize,
     cursor_on: bool,
-) {
-    cursor.reset_position().unwrap();
+) -> Result<()>
+where
+    W: Write,
+{
+    queue!(stdout, cursor::RestorePosition)?;
     if index > 0 {
-        cursor.move_down(index as u16);
+        queue!(stdout, cursor::MoveDown(index as u16))?;
     }
 
     let cursor_char = if cursor_on { '>' } else { ' ' };
     let select_char = if entries[index].selected { '+' } else { ' ' };
-    print!("{}{} {}", RESET_COLOR, cursor_char, select_char);
+
+    queue!(
+        stdout,
+        ResetColor,
+        Print(cursor_char),
+        Print(' '),
+        Print(select_char)
+    )?;
+    Ok(())
 }

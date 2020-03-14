@@ -1,6 +1,7 @@
 mod custom_commands;
 mod git_actions;
 mod hg_actions;
+mod input;
 mod repositories;
 mod revision_shortcut;
 mod select;
