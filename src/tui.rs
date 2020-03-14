@@ -407,8 +407,6 @@ where
             cursor::Show,
         )?;
 
-        self.stdout.flush()?;
-
         let res = match input::read_line() {
             Ok(line) => {
                 if line.len() > 0 {
