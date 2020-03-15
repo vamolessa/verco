@@ -511,6 +511,7 @@ where
             Print("\n\n"),
             ResetColor
         )?;
+        self.write.flush()?;
         Ok(())
     }
 
