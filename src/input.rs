@@ -1,14 +1,41 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 
-pub fn read_char() -> crossterm::Result<char> {
+use crate::ctrlc_handler::CtrlcHandler;
+use std::time::Duration;
+
+pub fn read_key(ctrlc_handler: &mut CtrlcHandler) -> crossterm::Result<KeyEvent> {
     loop {
-        if let Event::Key(KeyEvent {
-            code: KeyCode::Char(c),
-            ..
-        }) = event::read()?
-        {
-            return Ok(c);
+        if ctrlc_handler.get() {
+            return Ok(KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+            });
         }
+
+        if event::poll(Duration::from_millis(10))? {
+            match event::read()? {
+                Event::Key(key_event) => {
+                    return Ok(key_event);
+                }
+                _ => (),
+            }
+        }
+    }
+}
+
+pub fn key_to_char(key: KeyEvent) -> char {
+    match key {
+        KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers: m,
+        } => {
+            if m == KeyModifiers::SHIFT {
+                c.to_ascii_uppercase()
+            } else {
+                c
+            }
+        }
+        _ => '\0',
     }
 }
 
