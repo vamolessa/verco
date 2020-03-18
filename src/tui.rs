@@ -469,33 +469,26 @@ where
     fn show_header(&mut self) -> Result<()> {
         let (w, _) = terminal::size()?;
 
+        let header = "Verco @ ";
+
         queue!(
             self.write,
             Clear(ClearType::All),
             cursor::MoveTo(0, 0),
             SetBackgroundColor(HEADER_BG_COLOR),
             SetForegroundColor(HEADER_COLOR),
-            Print(" ".repeat(w as usize)),
-            cursor::MoveTo(0, 0),
-            Print("Verco @ ")
+            Print(header),
         )?;
 
-        if self.version_controls.len() > 1 {
-            queue!(
-                self.write,
-                Print(self.current_version_control_index + 1),
-                Print('/'),
-                Print(self.version_controls.len())
-            )?;
-        }
+        let directory_name = self.current_version_control()
+            .repository_directory()
+            .to_owned();
+        let width_left = w as usize - 1 - header.len() - directory_name.len();
 
         queue!(
             self.write,
-            Print(
-                self.current_version_control_mut()
-                    .repository_directory()
-                    .to_owned()
-            ),
+            Print(directory_name),
+            Print(" ".repeat(width_left)),
             ResetColor,
             Print("\n\n")
         )?;
