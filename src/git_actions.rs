@@ -223,7 +223,7 @@ impl VersionControlActions for GitActions {
     }
 
     fn pull(&mut self) -> Result<String, String> {
-        handle_command(self.command().arg("pull"))
+        handle_command(self.command().args(&["pull", "--all"]))
     }
 
     fn push(&mut self) -> Result<String, String> {
