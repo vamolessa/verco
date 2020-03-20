@@ -66,29 +66,32 @@ impl VersionControlActions for GitActions {
         )
     }
 
-    fn log(&mut self) -> Result<String, String> {
-        let hashes_output =
-            handle_command(
-                self.command()
-                    .args(&["log", "--all", "--format=format:%h", "-20"]),
-            )?;
+    fn log(&mut self, count: u32) -> Result<String, String> {
+        let hashes_output = handle_command(
+            self.command()
+                .arg("log")
+                .arg("--all")
+                .arg("--format=format:%h")
+                .arg(format!("-{}", count)),
+        )?;
         let hashes: Vec<_> = hashes_output.split_whitespace().map(String::from).collect();
         self.revision_shortcut.update_hashes(hashes);
 
-        let mut output = handle_command(self.command().args(&[
-            "log",
-            "--all",
-            "--decorate",
-            "--oneline",
-            "--graph",
-            "-20",
-            "--color",
-            "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s",
-            "--date=short",
-        ]))?;
+        let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C.arg((auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
+        let mut output = handle_command(
+            self.command()
+                .arg("log")
+                .arg("--all")
+                .arg("--decorate")
+                .arg("--oneline")
+                .arg("--graph")
+                .arg("-20")
+                .arg("--color")
+                .arg(template)
+                .arg("--date=short"),
+        )?;
 
         self.revision_shortcut.replace_occurrences(&mut output);
-
         Ok(output)
     }
 

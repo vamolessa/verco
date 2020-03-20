@@ -10,7 +10,7 @@ pub trait VersionControlActions {
     fn version(&mut self) -> Result<String, String>;
 
     fn status(&mut self) -> Result<String, String>;
-    fn log(&mut self) -> Result<String, String>;
+    fn log(&mut self, count: u32) -> Result<String, String>;
 
     fn changes(&mut self, target: &str) -> Result<String, String>;
     fn diff(&mut self, target: &str) -> Result<String, String>;

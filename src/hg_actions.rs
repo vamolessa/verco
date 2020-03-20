@@ -73,30 +73,32 @@ impl<'a> VersionControlActions for HgActions {
         Ok(output)
     }
 
-    fn log(&mut self) -> Result<String, String> {
-        let hashes_output = handle_command(self.command().args(&[
-            "log",
-            "--template",
-            "{node|short}\n",
-            "-l",
-            "20",
-        ]))?;
+    fn log(&mut self, count: u32) -> Result<String, String> {
+        let hashes_output = handle_command(
+            self.command()
+                .arg("log")
+                .arg("--template")
+                .arg("{node|short}")
+                .arg("-l")
+                .arg(format!("{}", count)),
+        )?;
         let hashes: Vec<_> = hashes_output.split_whitespace().map(String::from).collect();
         self.revision_shortcut.update_hashes(hashes);
 
-        let mut output = handle_command(self.command().args(&[
-			"log",
-			"--graph",
-			"--template",
-			"{label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}",
-			"-l",
-			"20",
-			"--color",
-			"always",
-		]))?;
+        let template = "{label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}";
+        let mut output = handle_command(
+            self.command()
+                .arg("log")
+                .arg("--graph")
+                .arg("--template")
+                .arg(template)
+                .arg("-l")
+                .arg(format!("{}", count))
+                .arg("--color")
+                .arg("always"),
+        )?;
 
         self.revision_shortcut.replace_occurrences(&mut output);
-
         Ok(output)
     }
 
