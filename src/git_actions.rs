@@ -77,7 +77,7 @@ impl VersionControlActions for GitActions {
         let hashes: Vec<_> = hashes_output.split_whitespace().map(String::from).collect();
         self.revision_shortcut.update_hashes(hashes);
 
-        let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C.arg((auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
+        let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
         let mut output = handle_command(
             self.command()
                 .arg("log")
