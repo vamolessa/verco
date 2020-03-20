@@ -17,6 +17,7 @@ use crate::{
     ctrlc_handler::CtrlcHandler,
     custom_commands::CustomCommand,
     input,
+    scroll_view::show_scroll_view,
     select::{select, Entry},
     version_control_actions::VersionControlActions,
 };
@@ -34,7 +35,6 @@ const ENTRY_COLOR: Color = Color::Rgb {
     b: 100,
 };
 
-// const DONE_COLOR: Color = Color::Green;
 const CANCEL_COLOR: Color = Color::Yellow;
 const ERROR_COLOR: Color = Color::Red;
 
@@ -487,10 +487,11 @@ where
 
     fn handle_result(&mut self, result: std::result::Result<String, String>) -> Result<()> {
         queue!(self.write, Print('\n'), Print('\n'))?;
-        match result {
-            Ok(output) => queue!(self.write, Print(output)),
-            Err(error) => queue!(self.write, SetForegroundColor(ERROR_COLOR), Print(error),),
-        }
+        show_scroll_view(&mut self.write, &mut self.ctrlc_handler, result)
+        // match result {
+        //     Ok(output) => queue!(self.write, Print(output)),
+        //     Err(error) => queue!(self.write, SetForegroundColor(ERROR_COLOR), Print(error),),
+        // }
     }
 
     fn show_header(&mut self) -> Result<()> {
