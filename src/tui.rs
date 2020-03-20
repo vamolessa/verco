@@ -139,11 +139,14 @@ where
                     let result = self.current_version_control_mut().status();
                     self.handle_result(result)?;
                 }
-                'l' => {
-                    self.show_action("log")?;
-                    let result = self.current_version_control_mut().log();
-                    self.handle_result(result)?;
-                }
+                'l' => match input::key_to_char(input::read_key(&mut self.ctrlc_handler)?) {
+                    'l' => {
+                        self.show_action("log")?;
+                        let result = self.current_version_control_mut().log();
+                        self.handle_result(result)?;
+                    }
+                    _ => (),
+                },
                 'd' => match input::key_to_char(input::read_key(&mut self.ctrlc_handler)?) {
                     'd' => {
                         self.show_action("revision diff")?;
@@ -480,7 +483,8 @@ where
             Print(header),
         )?;
 
-        let directory_name = self.current_version_control()
+        let directory_name = self
+            .current_version_control()
             .repository_directory()
             .to_owned();
         let width_left = w as usize - 1 - header.len() - directory_name.len();
@@ -546,7 +550,7 @@ where
         self.show_help_action("q", "quit\n")?;
 
         self.show_help_action("s", "status")?;
-        self.show_help_action("l", "log\n")?;
+        self.show_help_action("ll", "log\n")?;
 
         self.show_help_action("dd", "revision diff")?;
         self.show_help_action("dc", "revision changes\n")?;
@@ -555,7 +559,7 @@ where
         self.show_help_action("cs", "commit selected")?;
         self.show_help_action("u", "update/checkout")?;
         self.show_help_action("m", "merge")?;
-        self.show_help_action("S-ra", "revert all")?;
+        self.show_help_action("RA", "revert all")?;
         self.show_help_action("rs", "revert selected\n")?;
 
         self.show_help_action("rr", "list unresolved conflicts")?;
@@ -564,7 +568,7 @@ where
 
         self.show_help_action("f", "fetch")?;
         self.show_help_action("p", "pull")?;
-        self.show_help_action("S-p", "push\n")?;
+        self.show_help_action("P", "push\n")?;
 
         self.show_help_action("tn", "new tag\n")?;
 
