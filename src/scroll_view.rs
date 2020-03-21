@@ -51,7 +51,7 @@ where
 
     for line in content.lines().take(height) {
         if let Some((last_index, _)) = line.char_indices().take_while(|(i, _)| *i < width).last() {
-            write.queue(Print(&line[..last_index]))?;
+            write.queue(Print(&line[..last_index + 1]))?;
         }
         write.queue(Print('\n'))?;
     }
