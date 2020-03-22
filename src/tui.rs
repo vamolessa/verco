@@ -2,13 +2,12 @@ use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute, queue,
-    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+    style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{self, Clear, ClearType},
     QueueableCommand, Result,
 };
 
 use std::{
-    borrow::{Borrow, BorrowMut},
     io::{stdout, Write},
     iter,
 };
@@ -19,16 +18,10 @@ use crate::{
     input,
     scroll_view::show_scroll_view,
     select::{select, Entry},
+    tui_util::{show_header, Header, HeaderKind},
     version_control_actions::VersionControlActions,
 };
 
-const HEADER_COLOR: Color = Color::Black;
-const HEADER_BG_COLOR: Color = Color::Magenta;
-const ACTION_COLOR: Color = Color::Rgb {
-    r: 255,
-    g: 100,
-    b: 180,
-};
 const ENTRY_COLOR: Color = Color::Rgb {
     r: 255,
     g: 180,
@@ -41,12 +34,12 @@ const ERROR_COLOR: Color = Color::Red;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub fn show_tui(
-    version_controls: Vec<Box<dyn 'static + VersionControlActions>>,
+    version_control: Box<dyn 'static + VersionControlActions>,
     custom_commands: Vec<CustomCommand>,
     ctrlc_handler: CtrlcHandler,
 ) {
     Tui::new(
-        version_controls,
+        version_control,
         custom_commands,
         stdout().lock(),
         ctrlc_handler,
@@ -65,10 +58,9 @@ struct Tui<W>
 where
     W: Write,
 {
-    version_controls: Vec<Box<dyn 'static + VersionControlActions>>,
+    version_control: Box<dyn 'static + VersionControlActions>,
     custom_commands: Vec<CustomCommand>,
 
-    current_version_control_index: usize,
     current_key_chord: Vec<char>,
 
     write: W,
@@ -80,37 +72,36 @@ where
     W: Write,
 {
     fn new(
-        version_controls: Vec<Box<dyn 'static + VersionControlActions>>,
+        version_control: Box<dyn 'static + VersionControlActions>,
         custom_commands: Vec<CustomCommand>,
         write: W,
         ctrlc_handler: CtrlcHandler,
     ) -> Self {
         Tui {
-            version_controls,
+            version_control,
             custom_commands,
-            current_version_control_index: 0,
             current_key_chord: Vec::new(),
             write,
             ctrlc_handler,
         }
     }
 
-    fn current_version_control(&self) -> &(dyn 'static + VersionControlActions) {
-        self.version_controls[self.current_version_control_index].borrow()
-    }
-
-    fn current_version_control_mut(&mut self) -> &mut (dyn 'static + VersionControlActions) {
-        self.version_controls[self.current_version_control_index].borrow_mut()
+    fn ok_header<'a>(&'a self, action_name: &'a str) -> Header<'a> {
+        Header {
+            action_name,
+            directory_name: self.version_control.repository_directory(),
+            kind: HeaderKind::Ok,
+        }
     }
 
     fn show(&mut self) -> Result<()> {
         queue!(self.write, cursor::Hide)?;
-        self.show_header()?;
+        show_header(&mut self.write, &self.ok_header("help"))?;
         self.show_help()?;
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
-            cursor::MoveTo(w - 1, h - 1),
+            cursor::MoveTo(w, h),
             Clear(ClearType::CurrentLine),
         )?;
 
@@ -152,21 +143,21 @@ where
         match &self.current_key_chord[..] {
             ['q'] => Ok(HandleChordResult::Quit),
             ['h'] => {
-                self.show_action("help")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
+                let header = &self.ok_header("help");
+                show_header(&mut self.write, &header)?;
                 self.show_help()?;
                 Ok(HandleChordResult::Handled)
             }
             ['s'] => {
                 self.show_action("status")?;
-                let result = self.current_version_control_mut().status();
+                let result = self.version_control.status();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
             ['l'] => Ok(HandleChordResult::Unhandled),
             ['l', 'l'] => {
                 self.show_action("log")?;
-                let result = self.current_version_control_mut().log(20);
+                let result = self.version_control.log(20);
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
@@ -175,7 +166,7 @@ where
                 self.show_action("revision diff")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().diff(&input[..]);
+                    let result = self.version_control.diff(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
@@ -184,7 +175,7 @@ where
                 self.show_action("revision changes")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().changes(&input[..]);
+                    let result = self.version_control.changes(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
@@ -194,23 +185,23 @@ where
                 self.show_action("commit all")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().commit_all(&input[..]);
+                    let result = self.version_control.commit_all(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
             }
             ['c', 's'] => {
-                self.show_action("commit selected")?;
-                match self.current_version_control_mut().get_files_to_commit() {
+                let action = "commit selected";
+                self.show_action(action)?;
+                match self.version_control.get_files_to_commit() {
                     Ok(mut entries) => {
                         if self.show_select_ui(&mut entries)? {
                             queue!(self.write, Print('\n'), Print('\n'))?;
                             if let Some(input) =
                                 self.handle_input("commit message (ctrl+c to cancel): ")?
                             {
-                                let result = self
-                                    .current_version_control_mut()
-                                    .commit_selected(&input[..], &entries);
+                                let result =
+                                    self.version_control.commit_selected(&input[..], &entries);
                                 self.handle_result(result)?;
                             }
                         }
@@ -223,7 +214,7 @@ where
                 self.show_action("update")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().update(&input[..]);
+                    let result = self.version_control.update(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
@@ -232,7 +223,7 @@ where
                 self.show_action("merge")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().merge(&input[..]);
+                    let result = self.version_control.merge(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
@@ -240,19 +231,18 @@ where
             ['R'] => Ok(HandleChordResult::Unhandled),
             ['R', 'a'] | ['R', 'A'] => {
                 self.show_action("revert all")?;
-                let result = self.current_version_control_mut().revert_all();
+                let result = self.version_control.revert_all();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
             ['r'] => Ok(HandleChordResult::Unhandled),
             ['r', 's'] => {
                 self.show_action("revert selected")?;
-                match self.current_version_control_mut().get_files_to_commit() {
+                match self.version_control.get_files_to_commit() {
                     Ok(mut entries) => {
                         if self.show_select_ui(&mut entries)? {
                             queue!(self.write, Print('\n'), Print('\n'))?;
-                            let result =
-                                self.current_version_control_mut().revert_selected(&entries);
+                            let result = self.version_control.revert_selected(&entries);
                             self.handle_result(result)?;
                         }
                     }
@@ -262,37 +252,37 @@ where
             }
             ['r', 'r'] => {
                 self.show_action("unresolved conflicts")?;
-                let result = self.current_version_control_mut().conflicts();
+                let result = self.version_control.conflicts();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
             ['r', 'o'] => {
                 self.show_action("merge taking other")?;
-                let result = self.current_version_control_mut().take_other();
+                let result = self.version_control.take_other();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
             ['r', 'l'] => {
                 self.show_action("merge taking local")?;
-                let result = self.current_version_control_mut().take_local();
+                let result = self.version_control.take_local();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
             ['f'] => {
                 self.show_action("fetch")?;
-                let result = self.current_version_control_mut().fetch();
+                let result = self.version_control.fetch();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
             ['p'] => {
                 self.show_action("pull")?;
-                let result = self.current_version_control_mut().pull();
+                let result = self.version_control.pull();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
             ['P'] => {
                 self.show_action("push")?;
-                let result = self.current_version_control_mut().push();
+                let result = self.version_control.push();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
@@ -301,7 +291,7 @@ where
                 self.show_action("new tag")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("new tag name (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().create_tag(&input[..]);
+                    let result = self.version_control.create_tag(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
@@ -309,7 +299,7 @@ where
             ['b'] => Ok(HandleChordResult::Unhandled),
             ['b', 'b'] => {
                 self.show_action("list branches")?;
-                let result = self.current_version_control_mut().list_branches();
+                let result = self.version_control.list_branches();
                 self.handle_result(result)?;
                 Ok(HandleChordResult::Handled)
             }
@@ -317,7 +307,7 @@ where
                 self.show_action("new branch")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("new branch name (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().create_branch(&input[..]);
+                    let result = self.version_control.create_branch(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
@@ -326,7 +316,7 @@ where
                 self.show_action("delete branch")?;
                 queue!(self.write, Print('\n'), Print('\n'))?;
                 if let Some(input) = self.handle_input("branch to delete (ctrl+c to cancel): ")? {
-                    let result = self.current_version_control_mut().close_branch(&input[..]);
+                    let result = self.version_control.close_branch(&input[..]);
                     self.handle_result(result)?;
                 }
                 Ok(HandleChordResult::Handled)
@@ -366,7 +356,7 @@ where
         }
     }
 
-    fn handle_custom_command(&mut self) -> Result<()> {
+    fn handle_custom_command(&mut self, header: &Header) -> Result<()> {
         self.current_key_chord.clear();
         self.write.queue(cursor::SavePosition)?;
 
@@ -408,7 +398,7 @@ where
                                 .queue(cursor::RestorePosition)?
                                 .queue(Print('\n'))?
                                 .queue(Print('\n'))?
-                                .queue(SetForegroundColor(ACTION_COLOR))?
+                                .queue(SetForegroundColor(ENTRY_COLOR))?
                                 .queue(Print(&command.command))?
                                 .queue(ResetColor)?;
                             for arg in &command.args {
@@ -416,9 +406,9 @@ where
                             }
                             self.write.queue(Print('\n'))?.queue(Print('\n'))?;
 
-                            let result = command
-                                .execute(self.current_version_control().repository_directory());
-                            self.handle_result(result)?;
+                            let result =
+                                command.execute(self.version_control.repository_directory());
+                            self.handle_result(header, result)?;
                             return Ok(());
                         }
                     }
@@ -485,64 +475,32 @@ where
         Ok(res)
     }
 
-    fn handle_result(&mut self, result: std::result::Result<String, String>) -> Result<()> {
-        queue!(self.write, Print('\n'), Print('\n'))?;
-        show_scroll_view(&mut self.write, &mut self.ctrlc_handler, result)
-        // match result {
-        //     Ok(output) => queue!(self.write, Print(output)),
-        //     Err(error) => queue!(self.write, SetForegroundColor(ERROR_COLOR), Print(error),),
-        // }
-    }
-
-    fn show_header(&mut self) -> Result<()> {
-        let (w, _) = terminal::size()?;
-        let header = "Verco @ ";
-
-        queue!(
-            self.write,
-            Clear(ClearType::All),
-            cursor::MoveTo(0, 0),
-            SetBackgroundColor(HEADER_BG_COLOR),
-            SetForegroundColor(HEADER_COLOR),
-            Print(header),
+    fn handle_result(
+        &mut self,
+        header: &Header,
+        result: std::result::Result<String, String>,
+    ) -> Result<()> {
+        show_header(
+            &mut self.write,
+            if result.is_ok() {
+                header
+            } else {
+                &header.with_kind(HeaderKind::Error)
+            },
         )?;
-
-        let directory_name = self
-            .current_version_control()
-            .repository_directory()
-            .to_owned();
-        let width_left = w as usize - 1 - header.len() - directory_name.len();
-
-        queue!(
-            self.write,
-            Print(directory_name),
-            Print(" ".repeat(width_left)),
-            ResetColor,
-            Print('\n'),
-            Print('\n'),
-        )?;
-        Ok(())
-    }
-
-    fn show_action(&mut self, action_name: &str) -> Result<()> {
-        self.show_header()?;
-        queue!(
-            self.write,
-            SetForegroundColor(ACTION_COLOR),
-            Print(action_name),
-            ResetColor,
-        )?;
-        self.write.flush()?;
-        Ok(())
+        match result {
+            Ok(output) => show_scroll_view(&mut self.write, &mut self.ctrlc_handler, &output[..]),
+            Err(error) => show_scroll_view(&mut self.write, &mut self.ctrlc_handler, &error[..]),
+        }
     }
 
     fn show_current_key_chord(&mut self) -> Result<()> {
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
-            cursor::MoveTo(w - self.current_key_chord.len() as u16 - 2, h - 2),
+            cursor::MoveTo(w - self.current_key_chord.len() as u16, h),
             Clear(ClearType::CurrentLine),
-            SetForegroundColor(ACTION_COLOR),
+            SetForegroundColor(ENTRY_COLOR),
         )?;
         for c in &self.current_key_chord {
             self.write.queue(Print(c))?;
@@ -554,7 +512,7 @@ where
     fn show_help(&mut self) -> Result<()> {
         queue!(self.write, Print(format!("Verco {}\n\n", VERSION)))?;
 
-        match self.current_version_control_mut().version() {
+        match self.version_control.version() {
             Ok(version) => {
                 queue!(self.write, Print(version), Print('\n'), Print('\n'))?;
             }
@@ -618,9 +576,9 @@ where
         )
     }
 
-    fn show_select_ui(&mut self, entries: &mut Vec<Entry>) -> Result<bool> {
-        queue!(self.write, Print('\n'), Print('\n'))?;
-        if select(&mut self.write, &mut self.ctrlc_handler, entries)? {
+    fn show_select_ui(&mut self, header: &Header, entries: &mut Vec<Entry>) -> Result<bool> {
+        show_header(&mut self.write, header)?;
+        if select(&mut self.write, &mut self.ctrlc_handler, header, entries)? {
             Ok(true)
         } else {
             queue!(

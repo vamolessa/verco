@@ -11,44 +11,21 @@ use std::io::Write;
 
 use crate::{ctrlc_handler::CtrlcHandler, input};
 
-const HEADER_COLOR: Color = Color::White;
-const OK_BG_COLOR: Color = Color::Green;
-const ERR_BG_COLOR: Color = Color::Red;
-
 pub fn show_scroll_view<W>(
     write: &mut W,
     ctrlc_handler: &mut CtrlcHandler,
-    content: std::result::Result<String, String>,
+    content: &str,
 ) -> Result<()>
 where
     W: Write,
 {
+    write.queue(cursor::MoveTo(0, 1))?;
+
     let terminal_size = terminal::size()?;
-    execute!(
-        write,
-        Clear(ClearType::FromCursorDown),
-        SetBackgroundColor(if content.is_ok() {
-            OK_BG_COLOR
-        } else {
-            ERR_BG_COLOR
-        }),
-        SetForegroundColor(HEADER_COLOR),
-        Print(" ".repeat(terminal_size.0 as usize - 1)),
-        ResetColor,
-        Print('\n')
-    )?;
+    let width = terminal_size.0 as usize;
+    let height = terminal_size.1 as usize - 1;
 
-    let cursor_position = cursor::position()?;
-    let width = (terminal_size.0 - 1) as usize;
-    let height = (terminal_size.1 - cursor_position.1) as usize;
-
-    let content = match content {
-        Ok(text) => text,
-        Err(error) => error,
-    };
-
-    let content_height = content.chars().filter(|c| *c == '\n').count() + 1;
-
+    // let content_height = content.lines().count() + 1;
     for line in content.lines().take(height) {
         if let Some((last_index, _)) = line.char_indices().take_while(|(i, _)| *i < width).last() {
             write.queue(Print(&line[..last_index + 1]))?;
@@ -57,6 +34,5 @@ where
     }
 
     write.flush()?;
-
     Ok(())
 }

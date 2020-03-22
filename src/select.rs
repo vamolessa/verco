@@ -2,21 +2,22 @@ use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     queue,
-    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+    style::{
+        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
+    },
     terminal::{self, Clear, ClearType},
     QueueableCommand, Result,
 };
 
 use std::io::Write;
 
-use crate::{ctrlc_handler::CtrlcHandler, input};
+use crate::{
+    ctrlc_handler::CtrlcHandler,
+    input,
+    tui_util::{show_header, Header, HeaderKind},
+};
 
 const SELECTED_BG_COLOR: Color = Color::DarkGrey;
-const HELP_COLOR: Color = Color::Rgb {
-    r: 255,
-    g: 180,
-    b: 100,
-};
 const UNTRACKED_COLOR: Color = Color::Rgb {
     r: 100,
     g: 180,
@@ -105,38 +106,43 @@ pub struct Entry {
 pub fn select<W>(
     write: &mut W,
     ctrlc_handler: &mut CtrlcHandler,
+    header: &Header,
     entries: &mut Vec<Entry>,
 ) -> Result<bool>
 where
     W: Write,
 {
     if entries.len() == 0 {
+        show_header(write, &header.with_kind(HeaderKind::Canceled))?;
         return Ok(false);
     }
 
+    let header_width = show_header(write, header)?;
+
     queue!(
         write,
-        ResetColor,
-        SetForegroundColor(HELP_COLOR),
+        cursor::MoveUp(1),
+        cursor::MoveRight(header_width as u16),
+        SetAttribute(Attribute::Bold),
         Print("j/k"),
-        ResetColor,
+        SetAttribute(Attribute::Reset),
         Print(" move, "),
-        SetForegroundColor(HELP_COLOR),
+        SetAttribute(Attribute::Bold),
         Print("space"),
-        ResetColor,
+        SetAttribute(Attribute::Reset),
         Print(" (de)select, "),
-        SetForegroundColor(HELP_COLOR),
+        SetAttribute(Attribute::Bold),
         Print("ctrl+a"),
-        ResetColor,
+        SetAttribute(Attribute::Reset),
         Print(" (de)select all, "),
-        SetForegroundColor(HELP_COLOR),
+        SetAttribute(Attribute::Bold),
         Print("enter"),
-        ResetColor,
+        SetAttribute(Attribute::Reset),
         Print(" continue, "),
-        SetForegroundColor(HELP_COLOR),
+        SetAttribute(Attribute::Bold),
         Print("ctrl+c"),
-        ResetColor,
-        Print(" cancel\n\n"),
+        SetAttribute(Attribute::Reset),
+        Print(" cancel\n"),
         cursor::Hide
     )?;
 
@@ -230,6 +236,11 @@ where
         cursor::MoveDown(entries.len() as u16),
         cursor::Show
     )?;
+
+    if !selected {
+        show_header(write, &header.with_kind(HeaderKind::Canceled))?;
+    }
+
     Ok(selected)
 }
 
