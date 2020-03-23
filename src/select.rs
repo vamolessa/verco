@@ -11,11 +11,7 @@ use crossterm::{
 
 use std::io::Write;
 
-use crate::{
-    ctrlc_handler::CtrlcHandler,
-    input,
-    tui_util::{Header, HEADER_BG_OK_COLOR, HEADER_COLOR},
-};
+use crate::{ctrlc_handler::CtrlcHandler, input, tui_util::ENTRY_COLOR};
 
 const SELECTED_BG_COLOR: Color = Color::DarkGrey;
 const UNTRACKED_COLOR: Color = Color::Rgb {
@@ -106,7 +102,6 @@ pub struct Entry {
 pub fn select<W>(
     write: &mut W,
     ctrlc_handler: &mut CtrlcHandler,
-    header: &Header,
     entries: &mut Vec<Entry>,
 ) -> Result<bool>
 where
@@ -118,39 +113,31 @@ where
 
     queue!(
         write,
-        cursor::MoveUp(1),
-        cursor::MoveRight(header.length() as u16 + 1),
-        SetBackgroundColor(HEADER_BG_OK_COLOR),
-        SetForegroundColor(HEADER_COLOR),
+        SetForegroundColor(ENTRY_COLOR),
         SetAttribute(Attribute::Bold),
         Print("j/k"),
         SetAttribute(Attribute::Reset),
-        SetBackgroundColor(HEADER_BG_OK_COLOR),
-        SetForegroundColor(HEADER_COLOR),
+        SetForegroundColor(ENTRY_COLOR),
         Print(" move, "),
         SetAttribute(Attribute::Bold),
         Print("space"),
         SetAttribute(Attribute::Reset),
-        SetBackgroundColor(HEADER_BG_OK_COLOR),
-        SetForegroundColor(HEADER_COLOR),
+        SetForegroundColor(ENTRY_COLOR),
         Print(" (de)select, "),
         SetAttribute(Attribute::Bold),
         Print("ctrl+a"),
         SetAttribute(Attribute::Reset),
-        SetBackgroundColor(HEADER_BG_OK_COLOR),
-        SetForegroundColor(HEADER_COLOR),
+        SetForegroundColor(ENTRY_COLOR),
         Print(" (de)select all, "),
         SetAttribute(Attribute::Bold),
         Print("enter"),
         SetAttribute(Attribute::Reset),
-        SetBackgroundColor(HEADER_BG_OK_COLOR),
-        SetForegroundColor(HEADER_COLOR),
+        SetForegroundColor(ENTRY_COLOR),
         Print(" continue, "),
         SetAttribute(Attribute::Bold),
         Print("ctrl+c"),
         SetAttribute(Attribute::Reset),
-        SetBackgroundColor(HEADER_BG_OK_COLOR),
-        SetForegroundColor(HEADER_COLOR),
+        SetForegroundColor(ENTRY_COLOR),
         Print(" cancel\n"),
         cursor::Hide
     )?;

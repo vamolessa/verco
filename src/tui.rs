@@ -2,9 +2,9 @@ use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute, queue,
-    style::{Color, Print, ResetColor, SetForegroundColor},
+    style::{Print, ResetColor, SetForegroundColor},
     terminal::{self, Clear, ClearType},
-    QueueableCommand, Result,
+    ExecutableCommand, QueueableCommand, Result,
 };
 
 use std::{
@@ -18,18 +18,9 @@ use crate::{
     input,
     scroll_view::show_scroll_view,
     select::{select, Entry},
-    tui_util::{show_header, Header, HeaderKind},
+    tui_util::{show_header, Header, HeaderKind, ENTRY_COLOR},
     version_control_actions::VersionControlActions,
 };
-
-const ENTRY_COLOR: Color = Color::Rgb {
-    r: 255,
-    g: 180,
-    b: 100,
-};
-
-const CANCEL_COLOR: Color = Color::Yellow;
-const ERROR_COLOR: Color = Color::Red;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -90,6 +81,10 @@ where
         show_header(&mut self.write, header, kind).map(|_| ())
     }
 
+    fn show_select_ui(&mut self, entries: &mut Vec<Entry>) -> Result<bool> {
+        select(&mut self.write, &mut self.ctrlc_handler, entries)
+    }
+
     fn command_context<F>(&mut self, action_name: &str, callback: F) -> Result<HandleChordResult>
     where
         F: FnOnce(&mut Self, &Header) -> Result<()>,
@@ -104,7 +99,7 @@ where
 
     fn show(&mut self) -> Result<()> {
         queue!(self.write, cursor::Hide)?;
-        self.command_context("help", |s, _h| s.show_help())?;
+        self.command_context("help", |s, h| s.show_help(h))?;
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
@@ -149,7 +144,7 @@ where
     fn handle_command(&mut self) -> Result<HandleChordResult> {
         match &self.current_key_chord[..] {
             ['q'] => Ok(HandleChordResult::Quit),
-            ['h'] => self.command_context("help", |s, _h| s.show_help()),
+            ['h'] => self.command_context("help", |s, h| s.show_help(h)),
             ['s'] => self.command_context("status", |s, h| {
                 let result =s.version_control.status();
                 s.handle_result(h, result)
@@ -188,7 +183,8 @@ where
             ['c', 's'] => self.command_context("commit selected", |s, h| {
                 match s.version_control.get_files_to_commit() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(h, &mut entries)? {
+                        if s.show_select_ui(&mut entries)? {
+                            s.write.queue(Print('\n'))?;
                             if let Some(input) =
                                 s.handle_input("commit message (ctrl+c to cancel): ")?
                             {
@@ -229,7 +225,7 @@ where
             ['r', 's'] => self.command_context("revert selected", |s, h| {
                 match s.version_control.get_files_to_commit() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(h, &mut entries)? {
+                        if s.show_select_ui(&mut entries)? {
                             let result = s.version_control.revert_selected(&entries);
                             s.handle_result(h, result)
                         } else {
@@ -297,11 +293,9 @@ where
                 if s.custom_commands.len() > 0 {
                     for c in &s.custom_commands {
                         s.write
-                            .queue(Print('\t'))?
                             .queue(SetForegroundColor(ENTRY_COLOR))?
                             .queue(Print(&c.shortcut))?
                             .queue(ResetColor)?
-                            .queue(Print('\t'))?
                             .queue(Print('\t'))?
                             .queue(Print(&c.command))?;
                         for a in &c.args {
@@ -339,14 +333,7 @@ where
                     code: KeyCode::Char('c'),
                     modifiers: KeyModifiers::CONTROL,
                 } => {
-                    queue!(
-                        self.write,
-                        cursor::RestorePosition,
-                        SetForegroundColor(CANCEL_COLOR),
-                        Print("\n\ncanceled\n\n"),
-                        ResetColor
-                    )?;
-                    return Ok(());
+                    return self.show_header(header, HeaderKind::Canceled);
                 }
                 key_event => {
                     let c = input::key_to_char(key_event);
@@ -394,15 +381,8 @@ where
                         }
                     }
 
-                    queue!(
-                        self.write,
-                        cursor::RestorePosition,
-                        Print('\n'),
-                        Print('\n'),
-                        SetForegroundColor(CANCEL_COLOR),
-                        Print("no match found\n\n"),
-                        ResetColor
-                    )?;
+                    self.show_header(header, HeaderKind::Canceled)?;
+                    self.write.queue(Print("no match found"))?;
                     return Ok(());
                 }
             }
@@ -430,17 +410,7 @@ where
             Err(_error) => None,
         };
         self.ctrlc_handler.ignore_next();
-
-        if res.is_none() {
-            queue!(
-                self.write,
-                SetForegroundColor(CANCEL_COLOR),
-                Print("\n\ncanceled\n\n"),
-                ResetColor
-            )?;
-        }
-
-        execute!(self.write, cursor::Hide)?;
+        self.write.execute(cursor::Hide)?;
         Ok(res)
     }
 
@@ -478,7 +448,7 @@ where
         Ok(())
     }
 
-    fn show_help(&mut self) -> Result<()> {
+    fn show_help(&mut self, header: &Header) -> Result<()> {
         queue!(self.write, Print(format!("Verco {}\n\n", VERSION)))?;
 
         match self.version_control.version() {
@@ -486,12 +456,9 @@ where
                 queue!(self.write, Print(version), Print('\n'), Print('\n'))?;
             }
             Err(error) => {
-                queue!(
-                    self.write,
-                    SetForegroundColor(ERROR_COLOR),
-                    Print(error),
-                    Print("Could not find version control in system")
-                )?;
+                self.show_header(header, HeaderKind::Error)?;
+                self.write.queue(Print(error))?;
+                return Ok(());
             }
         }
 
@@ -543,19 +510,5 @@ where
             Print(action),
             Print('\n'),
         )
-    }
-
-    fn show_select_ui(&mut self, header: &Header, entries: &mut Vec<Entry>) -> Result<bool> {
-        if select(&mut self.write, &mut self.ctrlc_handler, header, entries)? {
-            Ok(true)
-        } else {
-            queue!(
-                self.write,
-                SetForegroundColor(CANCEL_COLOR),
-                Print("\n\ncanceled\n\n"),
-                ResetColor
-            )?;
-            Ok(false)
-        }
     }
 }

@@ -7,14 +7,20 @@ use crossterm::{
 
 use std::io::Write;
 
-pub const HEADER_COLOR: Color = Color::Black;
-pub const ACTION_COLOR: Color = Color::White;
-pub const HEADER_BG_OK_COLOR: Color = Color::Green;
-pub const HEADER_BG_OK_DARK_COLOR: Color = Color::DarkGreen;
-pub const HEADER_BG_ERROR_COLOR: Color = Color::Red;
-pub const HEADER_BG_ERROR_DARK_COLOR: Color = Color::DarkRed;
-pub const HEADER_BG_CANCELED_COLOR: Color = Color::Yellow;
-pub const HEADER_BG_CANCELED_DARK_COLOR: Color = Color::DarkYellow;
+pub const ENTRY_COLOR: Color = Color::Rgb {
+    r: 255,
+    g: 180,
+    b: 100,
+};
+
+const HEADER_COLOR: Color = Color::Black;
+const ACTION_COLOR: Color = Color::White;
+const HEADER_BG_OK_COLOR: Color = Color::Green;
+const HEADER_BG_OK_DARK_COLOR: Color = Color::DarkGreen;
+const HEADER_BG_ERROR_COLOR: Color = Color::Red;
+const HEADER_BG_ERROR_DARK_COLOR: Color = Color::DarkRed;
+const HEADER_BG_CANCELED_COLOR: Color = Color::Yellow;
+const HEADER_BG_CANCELED_DARK_COLOR: Color = Color::DarkYellow;
 
 const HEADER_PREFIX: &str = "Verco @ ";
 
