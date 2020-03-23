@@ -86,22 +86,29 @@ where
         }
     }
 
-    fn ok_header<'a>(&'a self, action_name: &'a str) -> Header<'a> {
-        Header {
+    fn show_header(&mut self, header: &Header, kind: HeaderKind) -> Result<()> {
+        show_header(&mut self.write, header, kind).map(|_| ())
+    }
+
+    fn command_context<F>(&mut self, action_name: &str, callback: F) -> Result<HandleChordResult>
+    where
+        F: FnOnce(&mut Self, &Header) -> Result<()>,
+    {
+        let header = Header {
             action_name,
-            directory_name: self.version_control.repository_directory(),
-            kind: HeaderKind::Ok,
-        }
+            directory_name: self.version_control.repository_directory().into(),
+        };
+        show_header(&mut self.write, &header, HeaderKind::Ok)?;
+        callback(self, &header).map(|_| HandleChordResult::Handled)
     }
 
     fn show(&mut self) -> Result<()> {
         queue!(self.write, cursor::Hide)?;
-        show_header(&mut self.write, &self.ok_header("help"))?;
-        self.show_help()?;
+        self.command_context("help", |s, _h| s.show_help())?;
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
-            cursor::MoveTo(w, h),
+            cursor::MoveTo(w, h - 2),
             Clear(ClearType::CurrentLine),
         )?;
 
@@ -142,217 +149,179 @@ where
     fn handle_command(&mut self) -> Result<HandleChordResult> {
         match &self.current_key_chord[..] {
             ['q'] => Ok(HandleChordResult::Quit),
-            ['h'] => {
-                let header = &self.ok_header("help");
-                show_header(&mut self.write, &header)?;
-                self.show_help()?;
-                Ok(HandleChordResult::Handled)
-            }
-            ['s'] => {
-                self.show_action("status")?;
-                let result = self.version_control.status();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
+            ['h'] => self.command_context("help", |s, _h| s.show_help()),
+            ['s'] => self.command_context("status", |s, h| {
+                let result =s.version_control.status();
+                s.handle_result(h, result)
+            }),
             ['l'] => Ok(HandleChordResult::Unhandled),
-            ['l', 'l'] => {
-                self.show_action("log")?;
-                let result = self.version_control.log(20);
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
+            ['l', 'l'] => self.command_context("log", |s, h| {
+                let result = s.version_control.log(20);
+                s.handle_result(h, result)
+            }),
             ['d'] => Ok(HandleChordResult::Unhandled),
-            ['d', 'd'] => {
-                self.show_action("revision diff")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("show diff from (ctrl+c to cancel): ")? {
-                    let result = self.version_control.diff(&input[..]);
-                    self.handle_result(result)?;
+            ['d', 'd'] => self.command_context("revision diff", |s, h| {
+                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
+                    let result = s.version_control.diff(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            ['d', 'c'] => {
-                self.show_action("revision changes")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("show changes from (ctrl+c to cancel): ")? {
-                    let result = self.version_control.changes(&input[..]);
-                    self.handle_result(result)?;
+            }),
+            ['d', 'c'] => self.command_context("revision changes", |s, h| {
+                if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel): ")? {
+                    let result = s.version_control.changes(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
+            }),
             ['c'] => Ok(HandleChordResult::Unhandled),
-            ['c', 'c'] => {
-                self.show_action("commit all")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("commit message (ctrl+c to cancel): ")? {
-                    let result = self.version_control.commit_all(&input[..]);
-                    self.handle_result(result)?;
+            ['c', 'c'] => self.command_context("commit all", |s, h| {
+                if let Some(input) = s.handle_input("commit message (ctrl+c to cancel): ")? {
+                    let result = s.version_control.commit_all(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            ['c', 's'] => {
-                let action = "commit selected";
-                self.show_action(action)?;
-                match self.version_control.get_files_to_commit() {
+            }),
+            ['c', 's'] => self.command_context("commit selected", |s, h| {
+                match s.version_control.get_files_to_commit() {
                     Ok(mut entries) => {
-                        if self.show_select_ui(&mut entries)? {
-                            queue!(self.write, Print('\n'), Print('\n'))?;
+                        if s.show_select_ui(h, &mut entries)? {
                             if let Some(input) =
-                                self.handle_input("commit message (ctrl+c to cancel): ")?
+                                s.handle_input("commit message (ctrl+c to cancel): ")?
                             {
-                                let result =
-                                    self.version_control.commit_selected(&input[..], &entries);
-                                self.handle_result(result)?;
+                                let result = s.version_control.commit_selected(&input[..], &entries);
+                                s.handle_result(h,result)
+                            } else {
+                                s.show_header(h, HeaderKind::Canceled)
                             }
+                        } else {
+                            s.show_header(h, HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => self.handle_result(Err(error))?,
+                    Err(error) => s.handle_result(h, Err(error)),
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            ['u'] => {
-                self.show_action("update")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("update to (ctrl+c to cancel): ")? {
-                    let result = self.version_control.update(&input[..]);
-                    self.handle_result(result)?;
+            }),
+            ['u'] => self.command_context("update", |s, h| {
+                if let Some(input) = s.handle_input("update to (ctrl+c to cancel): ")? {
+                    let result = s.version_control.update(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            ['m'] => {
-                self.show_action("merge")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("merge with (ctrl+c to cancel): ")? {
-                    let result = self.version_control.merge(&input[..]);
-                    self.handle_result(result)?;
+            }),
+            ['m'] => self.command_context("merge", |s, h| {
+                if let Some(input) = s.handle_input("merge with (ctrl+c to cancel): ")? {
+                    let result = s.version_control.merge(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
+            }),
             ['R'] => Ok(HandleChordResult::Unhandled),
-            ['R', 'a'] | ['R', 'A'] => {
-                self.show_action("revert all")?;
-                let result = self.version_control.revert_all();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
+            ['R', 'a'] | ['R', 'A'] => self.command_context("revert all", |s, h| {
+                let result = s.version_control.revert_all();
+                s.handle_result(h, result)
+            }),
             ['r'] => Ok(HandleChordResult::Unhandled),
-            ['r', 's'] => {
-                self.show_action("revert selected")?;
-                match self.version_control.get_files_to_commit() {
+            ['r', 's'] => self.command_context("revert selected", |s, h| {
+                match s.version_control.get_files_to_commit() {
                     Ok(mut entries) => {
-                        if self.show_select_ui(&mut entries)? {
-                            queue!(self.write, Print('\n'), Print('\n'))?;
-                            let result = self.version_control.revert_selected(&entries);
-                            self.handle_result(result)?;
+                        if s.show_select_ui(h, &mut entries)? {
+                            let result = s.version_control.revert_selected(&entries);
+                            s.handle_result(h, result)
+                        } else {
+                            s.show_header(h, HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => self.handle_result(Err(error))?,
+                    Err(error) => s.handle_result(h, Err(error)),
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            ['r', 'r'] => {
-                self.show_action("unresolved conflicts")?;
-                let result = self.version_control.conflicts();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
-            ['r', 'o'] => {
-                self.show_action("merge taking other")?;
-                let result = self.version_control.take_other();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
-            ['r', 'l'] => {
-                self.show_action("merge taking local")?;
-                let result = self.version_control.take_local();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
-            ['f'] => {
-                self.show_action("fetch")?;
-                let result = self.version_control.fetch();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
-            ['p'] => {
-                self.show_action("pull")?;
-                let result = self.version_control.pull();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
-            ['P'] => {
-                self.show_action("push")?;
-                let result = self.version_control.push();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
+            }),
+            ['r', 'r'] => self.command_context("unresolved conflicts", |s, h| {
+                let result = s.version_control.conflicts();
+                s.handle_result(h, result)
+            }),
+            ['r', 'o'] => self.command_context("merge taking other", |s, h| {
+                let result =s.version_control.take_other();
+                s.handle_result(h, result)
+            }),
+            ['r', 'l'] => self.command_context("merge taking local", |s, h| {
+                let result = s.version_control.take_local();
+                s.handle_result(h, result)
+            }),
+            ['f'] => self.command_context("fetch", |s, h| {
+                let result = s.version_control.fetch();
+                s.handle_result(h, result)
+            }),
+            ['p'] => self.command_context("pull", |s, h| {
+                let result = s.version_control.pull();
+                s.handle_result(h, result)
+            }),
+            ['P'] => self.command_context("push", |s, h| {
+                let result = s.version_control.push();
+                s.handle_result(h, result)
+            }),
             ['t'] => Ok(HandleChordResult::Unhandled),
-            ['t', 'n'] => {
-                self.show_action("new tag")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("new tag name (ctrl+c to cancel): ")? {
-                    let result = self.version_control.create_tag(&input[..]);
-                    self.handle_result(result)?;
+            ['t', 'n'] => self.command_context("new tag", |s, h| {
+                if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel): ")? {
+                    let result = s.version_control.create_tag(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
+            }),
             ['b'] => Ok(HandleChordResult::Unhandled),
-            ['b', 'b'] => {
-                self.show_action("list branches")?;
-                let result = self.version_control.list_branches();
-                self.handle_result(result)?;
-                Ok(HandleChordResult::Handled)
-            }
-            ['b', 'n'] => {
-                self.show_action("new branch")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("new branch name (ctrl+c to cancel): ")? {
-                    let result = self.version_control.create_branch(&input[..]);
-                    self.handle_result(result)?;
+            ['b', 'b'] => self.command_context("list branches", |s, h| {
+                let result = s.version_control.list_branches();
+                s.handle_result(h, result)
+            }),
+            ['b', 'n'] => self.command_context("new branch", |s, h| {
+                if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel): ")? {
+                    let result = s.version_control.create_branch(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            ['b', 'd'] => {
-                self.show_action("delete branch")?;
-                queue!(self.write, Print('\n'), Print('\n'))?;
-                if let Some(input) = self.handle_input("branch to delete (ctrl+c to cancel): ")? {
-                    let result = self.version_control.close_branch(&input[..]);
-                    self.handle_result(result)?;
+            }),
+            ['b', 'd'] => self.command_context("delete branch", |s, h| {
+                if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel): ")? {
+                    let result = s.version_control.close_branch(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            ['x'] => {
-                self.show_action("custom command")?;
-                if self.custom_commands.len() > 0 {
-                    queue!(self.write, ResetColor, Print("\n\navailable commands\n\n"))?;
-                    for c in &self.custom_commands {
-                        self.write
-                            .queue(SetForegroundColor(ENTRY_COLOR))?
+            }),
+            ['x'] => self.command_context("custom command", |s, h| {
+                if s.custom_commands.len() > 0 {
+                    for c in &s.custom_commands {
+                        s.write
                             .queue(Print('\t'))?
+                            .queue(SetForegroundColor(ENTRY_COLOR))?
                             .queue(Print(&c.shortcut))?
-                            .queue(Print("\t\t"))?
                             .queue(ResetColor)?
+                            .queue(Print('\t'))?
+                            .queue(Print('\t'))?
                             .queue(Print(&c.command))?;
                         for a in &c.args {
-                            self.write.queue(Print(' '))?.queue(Print(a))?;
+                            s.write.queue(Print(' '))?.queue(Print(a))?;
                         }
-                        self.write.queue(Print('\n'))?;
+                        s.write.queue(Print('\n'))?;
                     }
-                    self.handle_custom_command()?;
-                    self.current_key_chord.clear();
+                    s.handle_custom_command(h)?;
+                    s.current_key_chord.clear();
                 } else {
+                    s.show_header(h, HeaderKind::Error)?;
                     queue!(
-                        self.write,
+                        s.write,
                         ResetColor,
-                        Print("no commands available\n\n"),
-                        Print(
-                            "create commands by placing them inside './verco/custom_commands.txt'"
-                        )
+                        Print("no commands available\n\ncreate custom commands by placing them inside './verco/custom_commands.txt'"),
                     )?;
                 }
-                Ok(HandleChordResult::Handled)
-            }
-            _ => Ok(HandleChordResult::Handled),
+                Ok(())
+            }),
+            _ => Ok(HandleChordResult::Handled)
         }
     }
 
@@ -480,25 +449,25 @@ where
         header: &Header,
         result: std::result::Result<String, String>,
     ) -> Result<()> {
-        show_header(
-            &mut self.write,
-            if result.is_ok() {
-                header
-            } else {
-                &header.with_kind(HeaderKind::Error)
-            },
-        )?;
-        match result {
-            Ok(output) => show_scroll_view(&mut self.write, &mut self.ctrlc_handler, &output[..]),
-            Err(error) => show_scroll_view(&mut self.write, &mut self.ctrlc_handler, &error[..]),
-        }
+        let output = match result {
+            Ok(output) => {
+                show_header(&mut self.write, header, HeaderKind::Ok)?;
+                output
+            }
+            Err(error) => {
+                show_header(&mut self.write, header, HeaderKind::Error)?;
+                error
+            }
+        };
+
+        show_scroll_view(&mut self.write, &mut self.ctrlc_handler, &output[..])
     }
 
     fn show_current_key_chord(&mut self) -> Result<()> {
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
-            cursor::MoveTo(w - self.current_key_chord.len() as u16, h),
+            cursor::MoveTo(w - self.current_key_chord.len() as u16, h - 2),
             Clear(ClearType::CurrentLine),
             SetForegroundColor(ENTRY_COLOR),
         )?;
@@ -577,7 +546,6 @@ where
     }
 
     fn show_select_ui(&mut self, header: &Header, entries: &mut Vec<Entry>) -> Result<bool> {
-        show_header(&mut self.write, header)?;
         if select(&mut self.write, &mut self.ctrlc_handler, header, entries)? {
             Ok(true)
         } else {

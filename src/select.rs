@@ -14,7 +14,7 @@ use std::io::Write;
 use crate::{
     ctrlc_handler::CtrlcHandler,
     input,
-    tui_util::{show_header, Header, HeaderKind},
+    tui_util::{Header, HEADER_BG_OK_COLOR, HEADER_COLOR},
 };
 
 const SELECTED_BG_COLOR: Color = Color::DarkGrey;
@@ -113,35 +113,44 @@ where
     W: Write,
 {
     if entries.len() == 0 {
-        show_header(write, &header.with_kind(HeaderKind::Canceled))?;
         return Ok(false);
     }
-
-    let header_width = show_header(write, header)?;
 
     queue!(
         write,
         cursor::MoveUp(1),
-        cursor::MoveRight(header_width as u16),
+        cursor::MoveRight(header.length() as u16 + 1),
+        SetBackgroundColor(HEADER_BG_OK_COLOR),
+        SetForegroundColor(HEADER_COLOR),
         SetAttribute(Attribute::Bold),
         Print("j/k"),
         SetAttribute(Attribute::Reset),
+        SetBackgroundColor(HEADER_BG_OK_COLOR),
+        SetForegroundColor(HEADER_COLOR),
         Print(" move, "),
         SetAttribute(Attribute::Bold),
         Print("space"),
         SetAttribute(Attribute::Reset),
+        SetBackgroundColor(HEADER_BG_OK_COLOR),
+        SetForegroundColor(HEADER_COLOR),
         Print(" (de)select, "),
         SetAttribute(Attribute::Bold),
         Print("ctrl+a"),
         SetAttribute(Attribute::Reset),
+        SetBackgroundColor(HEADER_BG_OK_COLOR),
+        SetForegroundColor(HEADER_COLOR),
         Print(" (de)select all, "),
         SetAttribute(Attribute::Bold),
         Print("enter"),
         SetAttribute(Attribute::Reset),
+        SetBackgroundColor(HEADER_BG_OK_COLOR),
+        SetForegroundColor(HEADER_COLOR),
         Print(" continue, "),
         SetAttribute(Attribute::Bold),
         Print("ctrl+c"),
         SetAttribute(Attribute::Reset),
+        SetBackgroundColor(HEADER_BG_OK_COLOR),
+        SetForegroundColor(HEADER_COLOR),
         Print(" cancel\n"),
         cursor::Hide
     )?;
@@ -158,7 +167,7 @@ where
     loop {
         queue!(
             write,
-            cursor::MoveTo(terminal_size.0 - 2, terminal_size.1 - 2),
+            cursor::MoveTo(terminal_size.0, terminal_size.1 - 2),
             Clear(ClearType::CurrentLine)
         )?;
         write.flush()?;
@@ -237,10 +246,6 @@ where
         cursor::Show
     )?;
 
-    if !selected {
-        show_header(write, &header.with_kind(HeaderKind::Canceled))?;
-    }
-
     Ok(selected)
 }
 
@@ -293,7 +298,7 @@ where
     }
     let cursor_x = ITEM_NAME_COLUMN + entry.filename.len() as u16;
     write.queue(Print(&entry.filename))?;
-    for _ in cursor_x..terminal::size()?.0 - 1 {
+    for _ in cursor_x..terminal::size()?.0 {
         write.queue(Print(' '))?;
     }
     write.queue(ResetColor)?;
