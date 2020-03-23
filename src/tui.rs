@@ -16,7 +16,7 @@ use crate::{
     ctrlc_handler::CtrlcHandler,
     custom_commands::CustomCommand,
     input,
-    scroll_view::show_scroll_view,
+    scroll_view::ScrollView,
     select::{select, Entry},
     tui_util::{show_header, Header, HeaderKind, ENTRY_COLOR},
     version_control_actions::VersionControlActions,
@@ -56,6 +56,7 @@ where
 
     write: W,
     ctrlc_handler: CtrlcHandler,
+    scroll_view: ScrollView,
 }
 
 impl<W> Tui<W>
@@ -74,6 +75,7 @@ where
             current_key_chord: Vec::new(),
             write,
             ctrlc_handler,
+            scroll_view: Default::default(),
         }
     }
 
@@ -99,7 +101,10 @@ where
 
     fn show(&mut self) -> Result<()> {
         queue!(self.write, cursor::Hide)?;
-        self.command_context("help", |s, h| s.show_help(h))?;
+        self.command_context("help", |s, h| {
+            let result = s.show_help(h)?;
+            s.handle_result(h, result)
+        })?;
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
@@ -125,6 +130,10 @@ where
                     self.show_current_key_chord()?;
                 }
                 key_event => {
+                    if self.scroll_view.update(&mut self.write, &key_event)? {
+                        continue;
+                    }
+
                     let c = input::key_to_char(key_event);
                     self.current_key_chord.push(c);
                     match self.handle_command()? {
@@ -137,21 +146,30 @@ where
             }
         }
 
-        execute!(self.write, ResetColor, cursor::Show)?;
+        execute!(
+            self.write,
+            ResetColor,
+            cursor::MoveTo(0, h),
+            Clear(ClearType::CurrentLine),
+            cursor::Show
+        )?;
         Ok(())
     }
 
     fn handle_command(&mut self) -> Result<HandleChordResult> {
         match &self.current_key_chord[..] {
             ['q'] => Ok(HandleChordResult::Quit),
-            ['h'] => self.command_context("help", |s, h| s.show_help(h)),
+            ['h'] => self.command_context("help", |s, h|{
+                let result = s.show_help(h)?;
+                s.handle_result(h, result)
+            }),
             ['s'] => self.command_context("status", |s, h| {
                 let result =s.version_control.status();
                 s.handle_result(h, result)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
-            ['l', 'l'] => self.command_context("log 20", |s, h| {
-                let result = s.version_control.log(20);
+            ['l', 'l'] => self.command_context("log", |s, h| {
+                let result = s.version_control.log(50);
                 s.handle_result(h, result)
             }),
             ['l', 'c'] => self.command_context("log count", |s, h| {
@@ -444,7 +462,8 @@ where
             }
         };
 
-        show_scroll_view(&mut self.write, &mut self.ctrlc_handler, &output[..])
+        self.scroll_view.content = output;
+        self.scroll_view.show(&mut self.write)
     }
 
     fn show_current_key_chord(&mut self) -> Result<()> {
@@ -462,10 +481,11 @@ where
         Ok(())
     }
 
-    fn show_help(&mut self, header: &Header) -> Result<()> {
-        self.show_header(header, HeaderKind::Ok)?;
+    fn show_help(&mut self, header: &Header) -> Result<std::result::Result<String, String>> {
+        let mut write = Vec::with_capacity(1024);
+
         queue!(
-            self.write,
+            &mut write,
             Print("Verco "),
             Print(VERSION),
             Print('\n'),
@@ -474,71 +494,77 @@ where
 
         match self.version_control.version() {
             Ok(version) => {
-                queue!(self.write, Print(version), Print('\n'), Print('\n'))?;
+                queue!(&mut write, Print(version), Print('\n'), Print('\n'))?;
             }
             Err(error) => {
                 self.show_header(header, HeaderKind::Error)?;
-                self.write.queue(Print(error))?;
-                return Ok(());
+                write.queue(Print(error))?;
+                write.flush()?;
+                return Ok(Err(String::from_utf8(write)?));
             }
         }
 
-        queue!(self.write, Print("press a key and peform an action\n\n"))?;
+        write.queue(Print("press a key and peform an action\n\n"))?;
 
-        self.show_help_action("h", "help")?;
-        self.show_help_action("q", "quit")?;
+        Self::show_help_action(&mut write, "h", "help")?;
+        Self::show_help_action(&mut write, "q", "quit")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("s", "status")?;
-        self.show_help_action("ll", "log 20")?;
-        self.show_help_action("lc", "log count")?;
+        Self::show_help_action(&mut write, "s", "status")?;
+        Self::show_help_action(&mut write, "ll", "log")?;
+        Self::show_help_action(&mut write, "lc", "log count")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("dd", "revision diff")?;
-        self.show_help_action("dc", "revision changes")?;
+        Self::show_help_action(&mut write, "dd", "revision diff")?;
+        Self::show_help_action(&mut write, "dc", "revision changes")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("cc", "commit all")?;
-        self.show_help_action("cs", "commit selected")?;
-        self.show_help_action("u", "update/checkout")?;
-        self.show_help_action("m", "merge")?;
-        self.show_help_action("RA", "revert all")?;
-        self.show_help_action("rs", "revert selected")?;
+        Self::show_help_action(&mut write, "cc", "commit all")?;
+        Self::show_help_action(&mut write, "cs", "commit selected")?;
+        Self::show_help_action(&mut write, "u", "update/checkout")?;
+        Self::show_help_action(&mut write, "m", "merge")?;
+        Self::show_help_action(&mut write, "RA", "revert all")?;
+        Self::show_help_action(&mut write, "rs", "revert selected")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("rr", "list unresolved conflicts")?;
-        self.show_help_action("ro", "resolve taking other")?;
-        self.show_help_action("rl", "resolve taking local")?;
+        Self::show_help_action(&mut write, "rr", "list unresolved conflicts")?;
+        Self::show_help_action(&mut write, "ro", "resolve taking other")?;
+        Self::show_help_action(&mut write, "rl", "resolve taking local")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("f", "fetch")?;
-        self.show_help_action("p", "pull")?;
-        self.show_help_action("P", "push")?;
+        Self::show_help_action(&mut write, "f", "fetch")?;
+        Self::show_help_action(&mut write, "p", "pull")?;
+        Self::show_help_action(&mut write, "P", "push")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("tn", "new tag")?;
+        Self::show_help_action(&mut write, "tn", "new tag")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("bb", "list branches")?;
-        self.show_help_action("bn", "new branch")?;
-        self.show_help_action("bd", "delete branch")?;
+        Self::show_help_action(&mut write, "bb", "list branches")?;
+        Self::show_help_action(&mut write, "bn", "new branch")?;
+        Self::show_help_action(&mut write, "bd", "delete branch")?;
 
-        self.write.queue(Print('\n'))?;
+        write.queue(Print('\n'))?;
 
-        self.show_help_action("x", "custom command")?;
-        Ok(())
+        Self::show_help_action(&mut write, "x", "custom command")?;
+
+        write.flush()?;
+        Ok(Ok(String::from_utf8(write)?))
     }
 
-    fn show_help_action(&mut self, shortcut: &str, action: &str) -> Result<()> {
+    fn show_help_action<HW>(write: &mut HW, shortcut: &str, action: &str) -> Result<()>
+    where
+        HW: Write,
+    {
         queue!(
-            self.write,
+            write,
             SetForegroundColor(ENTRY_COLOR),
             Print('\t'),
             Print(shortcut),
