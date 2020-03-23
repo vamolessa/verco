@@ -93,7 +93,7 @@ where
             action_name,
             directory_name: self.version_control.repository_directory().into(),
         };
-        show_header(&mut self.write, &header, HeaderKind::Ok)?;
+        show_header(&mut self.write, &header, HeaderKind::Waiting)?;
         callback(self, &header).map(|_| HandleChordResult::Handled)
     }
 
@@ -449,6 +449,7 @@ where
     }
 
     fn show_help(&mut self, header: &Header) -> Result<()> {
+        self.show_header(header, HeaderKind::Ok)?;
         queue!(self.write, Print(format!("Verco {}\n\n", VERSION)))?;
 
         match self.version_control.version() {

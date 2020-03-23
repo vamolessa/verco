@@ -15,6 +15,8 @@ pub const ENTRY_COLOR: Color = Color::Rgb {
 
 const HEADER_COLOR: Color = Color::Black;
 const ACTION_COLOR: Color = Color::White;
+const HEADER_BG_WAITING_COLOR: Color = Color::Magenta;
+const HEADER_BG_WAITING_DARK_COLOR: Color = Color::DarkMagenta;
 const HEADER_BG_OK_COLOR: Color = Color::Green;
 const HEADER_BG_OK_DARK_COLOR: Color = Color::DarkGreen;
 const HEADER_BG_ERROR_COLOR: Color = Color::Red;
@@ -25,6 +27,7 @@ const HEADER_BG_CANCELED_DARK_COLOR: Color = Color::DarkYellow;
 const HEADER_PREFIX: &str = "Verco @ ";
 
 pub enum HeaderKind {
+    Waiting,
     Ok,
     Error,
     Canceled,
@@ -46,18 +49,21 @@ where
     W: Write,
 {
     let background_color = match kind {
+        HeaderKind::Waiting => HEADER_BG_WAITING_COLOR,
         HeaderKind::Ok => HEADER_BG_OK_COLOR,
         HeaderKind::Error => HEADER_BG_ERROR_COLOR,
         HeaderKind::Canceled => HEADER_BG_CANCELED_COLOR,
     };
 
     let background_dark_color = match kind {
+        HeaderKind::Waiting => HEADER_BG_WAITING_DARK_COLOR,
         HeaderKind::Ok => HEADER_BG_OK_DARK_COLOR,
         HeaderKind::Error => HEADER_BG_ERROR_DARK_COLOR,
         HeaderKind::Canceled => HEADER_BG_CANCELED_DARK_COLOR,
     };
 
     let status = match kind {
+        HeaderKind::Waiting => "waiting",
         HeaderKind::Ok => "ok",
         HeaderKind::Error => "error",
         HeaderKind::Canceled => "canceled",
