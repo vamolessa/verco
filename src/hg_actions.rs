@@ -74,15 +74,21 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn log(&mut self, count: u32) -> Result<String, String> {
+        let count_str = format!("{}", count);
+
         let hashes_output = handle_command(
             self.command()
                 .arg("log")
                 .arg("--template")
                 .arg("{node|short}")
                 .arg("-l")
-                .arg(format!("{}", count)),
+                .arg(&count_str),
         )?;
-        let hashes: Vec<_> = hashes_output.split_whitespace().map(String::from).collect();
+        let hashes: Vec<_> = hashes_output
+            .split_whitespace()
+            .take(RevisionShortcut::max())
+            .map(String::from)
+            .collect();
         self.revision_shortcut.update_hashes(hashes);
 
         let template = "{label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}";
@@ -93,7 +99,7 @@ impl<'a> VersionControlActions for HgActions {
                 .arg("--template")
                 .arg(template)
                 .arg("-l")
-                .arg(format!("{}", count))
+                .arg(&count_str)
                 .arg("--color")
                 .arg("always"),
         )?;

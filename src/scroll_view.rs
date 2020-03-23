@@ -23,7 +23,7 @@ where
 
     let terminal_size = terminal::size()?;
     let width = terminal_size.0 as usize;
-    let height = terminal_size.1 as usize - 1;
+    let height = terminal_size.1 as usize - 2;
 
     // let content_height = content.lines().count() + 1;
     for line in content.lines().take(height) {

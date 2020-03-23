@@ -150,9 +150,23 @@ where
                 s.handle_result(h, result)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
-            ['l', 'l'] => self.command_context("log", |s, h| {
+            ['l', 'l'] => self.command_context("log 20", |s, h| {
                 let result = s.version_control.log(20);
                 s.handle_result(h, result)
+            }),
+            ['l', 'c'] => self.command_context("log count", |s, h| {
+                if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
+                    if let Ok(count) = input.parse() {
+                        let result = s.version_control.log(count);
+                        s.handle_result(h, result)
+                    } else {
+                        s.show_header(h, HeaderKind::Error)?;
+                        queue!(s.write, Print("could not parse a number from "), Print(input))?;
+                        Ok(())
+                    }
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
+                }
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
             ['d', 'd'] => self.command_context("revision diff", |s, h| {
@@ -450,7 +464,13 @@ where
 
     fn show_help(&mut self, header: &Header) -> Result<()> {
         self.show_header(header, HeaderKind::Ok)?;
-        queue!(self.write, Print(format!("Verco {}\n\n", VERSION)))?;
+        queue!(
+            self.write,
+            Print("Verco "),
+            Print(VERSION),
+            Print('\n'),
+            Print('\n')
+        )?;
 
         match self.version_control.version() {
             Ok(version) => {
@@ -466,36 +486,53 @@ where
         queue!(self.write, Print("press a key and peform an action\n\n"))?;
 
         self.show_help_action("h", "help")?;
-        self.show_help_action("q", "quit\n")?;
+        self.show_help_action("q", "quit")?;
+
+        self.write.queue(Print('\n'))?;
 
         self.show_help_action("s", "status")?;
-        self.show_help_action("ll", "log\n")?;
+        self.show_help_action("ll", "log 20")?;
+        self.show_help_action("lc", "log count")?;
+
+        self.write.queue(Print('\n'))?;
 
         self.show_help_action("dd", "revision diff")?;
-        self.show_help_action("dc", "revision changes\n")?;
+        self.show_help_action("dc", "revision changes")?;
+
+        self.write.queue(Print('\n'))?;
 
         self.show_help_action("cc", "commit all")?;
         self.show_help_action("cs", "commit selected")?;
         self.show_help_action("u", "update/checkout")?;
         self.show_help_action("m", "merge")?;
         self.show_help_action("RA", "revert all")?;
-        self.show_help_action("rs", "revert selected\n")?;
+        self.show_help_action("rs", "revert selected")?;
+
+        self.write.queue(Print('\n'))?;
 
         self.show_help_action("rr", "list unresolved conflicts")?;
         self.show_help_action("ro", "resolve taking other")?;
-        self.show_help_action("rl", "resolve taking local\n")?;
+        self.show_help_action("rl", "resolve taking local")?;
+
+        self.write.queue(Print('\n'))?;
 
         self.show_help_action("f", "fetch")?;
         self.show_help_action("p", "pull")?;
-        self.show_help_action("P", "push\n")?;
+        self.show_help_action("P", "push")?;
 
-        self.show_help_action("tn", "new tag\n")?;
+        self.write.queue(Print('\n'))?;
+
+        self.show_help_action("tn", "new tag")?;
+
+        self.write.queue(Print('\n'))?;
 
         self.show_help_action("bb", "list branches")?;
         self.show_help_action("bn", "new branch")?;
-        self.show_help_action("bd", "delete branch\n")?;
+        self.show_help_action("bd", "delete branch")?;
 
-        self.show_help_action("x", "custom command\n")?;
+        self.write.queue(Print('\n'))?;
+
+        self.show_help_action("x", "custom command")?;
         Ok(())
     }
 

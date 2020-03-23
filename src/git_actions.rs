@@ -67,14 +67,20 @@ impl VersionControlActions for GitActions {
     }
 
     fn log(&mut self, count: u32) -> Result<String, String> {
+        let count_str = format!("-{}", count);
+
         let hashes_output = handle_command(
             self.command()
                 .arg("log")
                 .arg("--all")
                 .arg("--format=format:%h")
-                .arg(format!("-{}", count)),
+                .arg(&count_str),
         )?;
-        let hashes: Vec<_> = hashes_output.split_whitespace().map(String::from).collect();
+        let hashes: Vec<_> = hashes_output
+            .split_whitespace()
+            .take(RevisionShortcut::max())
+            .map(String::from)
+            .collect();
         self.revision_shortcut.update_hashes(hashes);
 
         let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
@@ -85,7 +91,7 @@ impl VersionControlActions for GitActions {
                 .arg("--decorate")
                 .arg("--oneline")
                 .arg("--graph")
-                .arg("-20")
+                .arg(&count_str)
                 .arg("--color")
                 .arg(template)
                 .arg("--date=short"),

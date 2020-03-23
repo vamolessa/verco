@@ -4,6 +4,10 @@ pub struct RevisionShortcut {
 }
 
 impl RevisionShortcut {
+    pub fn max() -> usize {
+        'Z' as usize - 'A' as usize
+    }
+
     pub fn update_hashes(&mut self, hashes: Vec<String>) {
         self.hashes = hashes;
     }
@@ -12,7 +16,7 @@ impl RevisionShortcut {
         let mut final_text = String::new();
         final_text.push_str(&text[..]);
 
-        for (i, h) in self.hashes.iter().enumerate() {
+        for (i, h) in self.hashes.iter().take(Self::max()).enumerate() {
             if let Some(shortcut) = std::char::from_u32('A' as u32 + i as u32) {
                 let replacement = format!("{} ({})", h, shortcut);
                 final_text = final_text.replacen(h, &replacement[..], 1);
