@@ -1,3 +1,5 @@
+![Rust](https://github.com/matheuslessarodrigues/verco/workflows/Rust/badge.svg)
+
 # verco
 A simple Git/Hg version control client based on keyboard shortcuts
 
