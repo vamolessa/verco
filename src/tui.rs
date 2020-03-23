@@ -324,7 +324,7 @@ where
                     queue!(
                         s.write,
                         ResetColor,
-                        Print("no commands available\n\ncreate custom commands by placing them inside './verco/custom_commands.txt'"),
+                        Print("no commands available\n\ncreate custom commands by placing them inside '.verco/custom_commands.txt'"),
                     )?;
                 }
                 Ok(())
