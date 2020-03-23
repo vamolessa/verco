@@ -5,7 +5,7 @@ pub struct RevisionShortcut {
 
 impl RevisionShortcut {
     pub fn max() -> usize {
-        'Z' as usize - 'A' as usize
+        'Z' as usize - 'A' as usize + 1
     }
 
     pub fn update_hashes(&mut self, hashes: Vec<String>) {
