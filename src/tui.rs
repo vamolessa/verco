@@ -96,6 +96,7 @@ where
             directory_name: self.version_control.repository_directory().into(),
         };
         show_header(&mut self.write, &header, HeaderKind::Waiting)?;
+        self.write.flush()?;
         callback(self, &header).map(|_| HandleChordResult::Handled)
     }
 
