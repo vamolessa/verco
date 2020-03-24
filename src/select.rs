@@ -99,6 +99,80 @@ pub struct Entry {
     pub state: State,
 }
 
+struct Select<'a, 'b, W>
+where
+    W: Write,
+{
+    write: &'a mut W,
+    entries: &'b mut Vec<Entry>,
+    index: usize,
+    cursor_offset: (u16, u16),
+}
+
+impl<'a, 'b, W> Select<'a, 'b, W>
+where
+    W: Write,
+{
+    pub fn move_cursor(&mut self, delta: i32) -> Result<()> {
+        let previous_cursor = self.index;
+        let len = self.entries.len() as i32;
+        self.index = ((self.index as i32 + delta + len) % len) as usize;
+        let terminal_size = terminal::size()?;
+        self.draw_entry(previous_cursor, terminal_size)?;
+        self.draw_entry(self.index, terminal_size)?;
+        Ok(())
+    }
+
+    pub fn draw_entry(&mut self, index: usize, terminal_size: (u16, u16)) -> Result<()> {
+        self.write.queue(cursor::MoveTo(
+            self.cursor_offset.0,
+            self.cursor_offset.1 + index as u16,
+        ))?;
+
+        if index == self.index {
+            self.write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
+        } else {
+            self.write.queue(ResetColor)?;
+        }
+
+        let select_char = if self.entries[index].selected {
+            '+'
+        } else {
+            ' '
+        };
+
+        let entry = &self.entries[index];
+        let state_name = format!("{:?}", entry.state);
+        self.write
+            .queue(Print(select_char))?
+            .queue(Print(' '))?
+            .queue(SetForegroundColor(entry.state.color()))?
+            .queue(Print(&state_name))?
+            .queue(ResetColor)?;
+
+        if index == self.index {
+            self.write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
+        } else {
+            self.write.queue(ResetColor)?;
+        }
+
+        let cursor_x = self.cursor_offset.0 + 2 + state_name.len() as u16;
+        for _ in cursor_x..ITEM_NAME_COLUMN {
+            self.write.queue(Print(' '))?;
+        }
+        let max_len = (entry.filename.len() as u16).min(terminal_size.0 - ITEM_NAME_COLUMN);
+        let cursor_x = ITEM_NAME_COLUMN + max_len;
+        self.write.queue(Print(
+            &entry.filename[(entry.filename.len() - max_len as usize)..],
+        ))?;
+        for _ in cursor_x..terminal_size.0 {
+            self.write.queue(Print(' '))?;
+        }
+        self.write.queue(ResetColor)?;
+        Ok(())
+    }
+}
+
 pub fn select<W>(
     write: &mut W,
     ctrlc_handler: &mut CtrlcHandler,
@@ -115,7 +189,7 @@ where
         write,
         SetForegroundColor(ENTRY_COLOR),
         SetAttribute(Attribute::Bold),
-        Print("j/k"),
+        Print("ctrl+j/ctrl+k"),
         SetAttribute(Attribute::Reset),
         SetForegroundColor(ENTRY_COLOR),
         Print(" move, "),
@@ -141,23 +215,28 @@ where
         Print(" cancel\n"),
         cursor::Hide
     )?;
+    write.flush()?;
 
-    let mut index = 0;
-    let terminal_size = terminal::size()?;
-    let cursor_position = cursor::position()?;
+    let mut select = Select {
+        entries,
+        write,
+        index: 0,
+        cursor_offset: cursor::position()?,
+    };
+
     let selected;
 
-    for i in 0..entries.len() {
-        draw_entry(write, entries, i, i == index, cursor_position)?;
+    let terminal_size = terminal::size()?;
+    for i in 0..select.entries.len() {
+        select.draw_entry(i, terminal_size)?;
     }
 
     loop {
-        queue!(
-            write,
-            cursor::MoveTo(terminal_size.0, terminal_size.1 - 2),
-            Clear(ClearType::CurrentLine)
-        )?;
-        write.flush()?;
+        select.write.queue(cursor::MoveTo(
+            select.cursor_offset.0,
+            select.cursor_offset.1,
+        ))?;
+        select.write.flush()?;
         match input::read_key(ctrlc_handler)? {
             KeyEvent {
                 code: KeyCode::Esc, ..
@@ -168,7 +247,7 @@ where
             }
             | KeyEvent {
                 code: KeyCode::Char('q'),
-                ..
+                modifiers: KeyModifiers::CONTROL,
             } => {
                 selected = false;
                 break;
@@ -177,117 +256,71 @@ where
                 code: KeyCode::Enter,
                 ..
             } => {
-                selected = entries.iter().any(|e| e.selected);
+                selected = select.entries.iter().any(|e| e.selected);
                 break;
             }
             KeyEvent {
                 code: KeyCode::Char('j'),
-                ..
+                modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
                 code: KeyCode::Down,
                 ..
             } => {
-                draw_entry(write, entries, index, false, cursor_position)?;
-                index = (index + 1) % entries.len();
-                draw_entry(write, entries, index, true, cursor_position)?;
+                select.move_cursor(1)?;
             }
             KeyEvent {
                 code: KeyCode::Char('k'),
-                ..
+                modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
                 code: KeyCode::Up, ..
             } => {
-                draw_entry(write, entries, index, false, cursor_position)?;
-                index = (index + entries.len() - 1) % entries.len();
-                draw_entry(write, entries, index, true, cursor_position)?;
+                select.move_cursor(-1)?;
+            }
+            KeyEvent {
+                code: KeyCode::Char('d'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
+                code: KeyCode::PageDown,
+                ..
+            } => {
+                select.move_cursor(1)?;
+            }
+            KeyEvent {
+                code: KeyCode::Char('u'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
+                code: KeyCode::PageUp,
+                ..
+            } => {
+                select.move_cursor(-1)?;
             }
             KeyEvent {
                 code: KeyCode::Char(' '),
                 ..
             } => {
-                entries[index].selected = !entries[index].selected;
-                draw_entry(write, entries, index, true, cursor_position)?;
+                select.entries[select.index].selected = !select.entries[select.index].selected;
+                select.draw_entry(select.index, terminal_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('a'),
                 modifiers: KeyModifiers::CONTROL,
             } => {
-                let all_selected = entries.iter().all(|e| e.selected);
-                for e in entries.iter_mut() {
+                let all_selected = select.entries.iter().all(|e| e.selected);
+                for e in select.entries.iter_mut() {
                     e.selected = !all_selected;
                 }
-                for i in 0..entries.len() {
-                    draw_entry(write, entries, i, i == index, cursor_position)?;
+                for i in 0..select.entries.len() {
+                    select.draw_entry(select.index, terminal_size)?;
                 }
             }
             _ => (),
         }
     }
 
-    queue!(
-        write,
-        cursor::MoveTo(cursor_position.0, cursor_position.1),
-        cursor::MoveDown(entries.len() as u16),
-        cursor::Show
-    )?;
-
+    select.write.queue(cursor::Show)?;
     Ok(selected)
-}
-
-fn draw_entry<W>(
-    write: &mut W,
-    entries: &Vec<Entry>,
-    index: usize,
-    cursor_on: bool,
-    cursor_offset: (u16, u16),
-) -> Result<()>
-where
-    W: Write,
-{
-    write.queue(cursor::MoveTo(
-        cursor_offset.0,
-        cursor_offset.1 + index as u16,
-    ))?;
-
-    if cursor_on {
-        write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
-    } else {
-        write.queue(ResetColor)?;
-    }
-
-    let cursor_char = if cursor_on { '>' } else { ' ' };
-    let select_char = if entries[index].selected { '+' } else { ' ' };
-
-    let entry = &entries[index];
-    let state_name = format!("{:?}", entry.state);
-    queue!(
-        write,
-        Print(cursor_char),
-        Print(' '),
-        Print(select_char),
-        Print(' '),
-        SetForegroundColor(entry.state.color()),
-        Print(&state_name),
-        ResetColor
-    )?;
-
-    if cursor_on {
-        write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
-    } else {
-        write.queue(ResetColor)?;
-    }
-
-    let cursor_x = cursor_offset.0 + 4 + state_name.len() as u16;
-    for _ in cursor_x..ITEM_NAME_COLUMN {
-        write.queue(Print(' '))?;
-    }
-    let cursor_x = ITEM_NAME_COLUMN + entry.filename.len() as u16;
-    write.queue(Print(&entry.filename))?;
-    for _ in cursor_x..terminal::size()?.0 {
-        write.queue(Print(' '))?;
-    }
-    write.queue(ResetColor)?;
-    Ok(())
 }

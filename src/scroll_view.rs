@@ -51,6 +51,14 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::Down,
                 ..
+            }
+            | KeyEvent {
+                code: KeyCode::Enter,
+                ..
+            }
+            | KeyEvent {
+                code: KeyCode::Char('\n'),
+                ..
             } => {
                 self.scroll(1);
                 self.show(write)?;
