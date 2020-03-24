@@ -257,7 +257,8 @@ where
         Print("ctrl+c"),
         SetAttribute(Attribute::Reset),
         SetForegroundColor(ENTRY_COLOR),
-        Print(" cancel\n")
+        Print(" cancel"),
+        cursor::MoveToNextLine(1),
     )?;
     write.flush()?;
 

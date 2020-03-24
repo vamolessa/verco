@@ -71,7 +71,8 @@ impl CustomCommand {
                 } else {
                     let mut out = String::new();
                     out.push_str(&String::from_utf8_lossy(&output.stdout[..]).into_owned()[..]);
-                    out.push_str("\n\n");
+                    out.push('\n');
+                    out.push('\n');
                     out.push_str(&String::from_utf8_lossy(&output.stderr[..]).into_owned()[..]);
                     Err(out)
                 }

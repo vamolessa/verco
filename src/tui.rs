@@ -110,7 +110,7 @@ where
         queue!(
             self.write,
             cursor::Hide,
-            cursor::MoveTo(w, h - 2),
+            cursor::MoveTo(w, h - 1),
             Clear(ClearType::CurrentLine),
         )?;
 
@@ -162,12 +162,12 @@ where
     fn handle_command(&mut self) -> Result<HandleChordResult> {
         match &self.current_key_chord[..] {
             ['q'] => Ok(HandleChordResult::Quit),
-            ['h'] => self.command_context("help", |s, h|{
+            ['h'] => self.command_context("help", |s, h| {
                 let result = s.show_help(h)?;
                 s.handle_result(h, result)
             }),
             ['s'] => self.command_context("status", |s, h| {
-                let result =s.version_control.status();
+                let result = s.version_control.status();
                 s.handle_result(h, result)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
@@ -182,7 +182,11 @@ where
                         s.handle_result(h, result)
                     } else {
                         s.show_header(h, HeaderKind::Error)?;
-                        queue!(s.write, Print("could not parse a number from "), Print(input))?;
+                        queue!(
+                            s.write,
+                            Print("could not parse a number from "),
+                            Print(input)
+                        )?;
                         Ok(())
                     }
                 } else {
@@ -223,8 +227,9 @@ where
                             if let Some(input) =
                                 s.handle_input("commit message (ctrl+c to cancel): ")?
                             {
-                                let result = s.version_control.commit_selected(&input[..], &entries);
-                                s.handle_result(h,result)
+                                let result =
+                                    s.version_control.commit_selected(&input[..], &entries);
+                                s.handle_result(h, result)
                             } else {
                                 s.show_header(h, HeaderKind::Canceled)
                             }
@@ -275,7 +280,7 @@ where
                 s.handle_result(h, result)
             }),
             ['r', 'o'] => self.command_context("merge taking other", |s, h| {
-                let result =s.version_control.take_other();
+                let result = s.version_control.take_other();
                 s.handle_result(h, result)
             }),
             ['r', 'l'] => self.command_context("merge taking local", |s, h| {
@@ -336,7 +341,7 @@ where
                         for a in &c.args {
                             s.write.queue(Print(' '))?.queue(Print(a))?;
                         }
-                        s.write.queue(Print('\n'))?;
+                        s.write.queue(cursor::MoveToNextLine(1))?;
                     }
                     s.handle_custom_command(h)?;
                     s.current_key_chord.clear();
@@ -345,12 +350,14 @@ where
                     queue!(
                         s.write,
                         ResetColor,
-                        Print("no commands available\n\ncreate custom commands by placing them inside '.verco/custom_commands.txt'"),
+                        Print("no commands available"),
+                        cursor::MoveToNextLine(2),
+                        Print("create custom commands by placing them inside '.verco/custom_commands.txt'"),
                     )?;
                 }
                 Ok(())
             }),
-            _ => Ok(HandleChordResult::Handled)
+            _ => Ok(HandleChordResult::Handled),
         }
     }
 
@@ -387,15 +394,14 @@ where
                         {
                             self.write
                                 .queue(cursor::RestorePosition)?
-                                .queue(Print('\n'))?
-                                .queue(Print('\n'))?
+                                .queue(cursor::MoveToNextLine(2))?
                                 .queue(SetForegroundColor(ENTRY_COLOR))?
                                 .queue(Print(&command.command))?
                                 .queue(ResetColor)?;
                             for arg in &command.args {
                                 self.write.queue(Print(' '))?.queue(Print(arg))?;
                             }
-                            self.write.queue(Print('\n'))?.queue(Print('\n'))?;
+                            self.write.queue(cursor::MoveToNextLine(2))?;
 
                             let result =
                                 command.execute(self.version_control.repository_directory());
@@ -431,7 +437,7 @@ where
             SetForegroundColor(ENTRY_COLOR),
             Print(prompt),
             ResetColor,
-            Print('\n'),
+            cursor::MoveToNextLine(1),
             cursor::Show,
         )?;
 
@@ -475,7 +481,7 @@ where
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
-            cursor::MoveTo(w - self.current_key_chord.len() as u16, h - 2),
+            cursor::MoveTo(w - self.current_key_chord.len() as u16, h - 1),
             Clear(ClearType::CurrentLine),
             SetForegroundColor(ENTRY_COLOR),
         )?;
@@ -493,13 +499,12 @@ where
             &mut write,
             Print("Verco "),
             Print(VERSION),
-            Print('\n'),
-            Print('\n')
+            cursor::MoveToNextLine(2),
         )?;
 
         match self.version_control.version() {
             Ok(version) => {
-                queue!(&mut write, Print(version), Print('\n'), Print('\n'))?;
+                queue!(&mut write, Print(version), cursor::MoveToNextLine(2))?;
             }
             Err(error) => {
                 self.show_header(header, HeaderKind::Error)?;
@@ -509,23 +514,25 @@ where
             }
         }
 
-        write.queue(Print("press a key and peform an action\n\n"))?;
+        write
+            .queue(Print("press a key and peform an action"))?
+            .queue(cursor::MoveToNextLine(2))?;
 
         Self::show_help_action(&mut write, "h", "help")?;
         Self::show_help_action(&mut write, "q", "quit")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "s", "status")?;
         Self::show_help_action(&mut write, "ll", "log")?;
         Self::show_help_action(&mut write, "lc", "log count")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "dd", "revision diff")?;
         Self::show_help_action(&mut write, "dc", "revision changes")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "cc", "commit all")?;
         Self::show_help_action(&mut write, "cs", "commit selected")?;
@@ -534,29 +541,29 @@ where
         Self::show_help_action(&mut write, "RA", "revert all")?;
         Self::show_help_action(&mut write, "rs", "revert selected")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "rr", "list unresolved conflicts")?;
         Self::show_help_action(&mut write, "ro", "resolve taking other")?;
         Self::show_help_action(&mut write, "rl", "resolve taking local")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "f", "fetch")?;
         Self::show_help_action(&mut write, "p", "pull")?;
         Self::show_help_action(&mut write, "P", "push")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "tn", "new tag")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "bb", "list branches")?;
         Self::show_help_action(&mut write, "bn", "new branch")?;
         Self::show_help_action(&mut write, "bd", "delete branch")?;
 
-        write.queue(Print('\n'))?;
+        write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "x", "custom command")?;
 
@@ -577,7 +584,7 @@ where
             Print('\t'),
             Print('\t'),
             Print(action),
-            Print('\n'),
+            cursor::MoveToNextLine(1),
         )
     }
 }

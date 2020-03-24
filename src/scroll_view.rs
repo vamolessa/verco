@@ -31,7 +31,7 @@ impl ScrollView {
                 write,
                 Clear(ClearType::CurrentLine),
                 Print(line),
-                Print('\n'),
+                cursor::MoveToNextLine(1),
             )?;
         }
         write.queue(Clear(ClearType::FromCursorDown))?;

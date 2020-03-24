@@ -92,6 +92,6 @@ where
         Print(status),
         Print(' '),
         ResetColor,
-        Print('\n'),
+        cursor::MoveToNextLine(1),
     )
 }
