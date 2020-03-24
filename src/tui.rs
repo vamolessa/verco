@@ -100,6 +100,7 @@ where
     }
 
     fn show(&mut self) -> Result<()> {
+        self.write.execute(cursor::Hide)?;
         terminal::enable_raw_mode()?;
 
         self.command_context("help", |s, h| {
@@ -109,7 +110,6 @@ where
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
-            cursor::Hide,
             cursor::MoveTo(w, h - 1),
             Clear(ClearType::CurrentLine),
         )?;
