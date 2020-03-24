@@ -100,7 +100,8 @@ where
     }
 
     fn show(&mut self) -> Result<()> {
-        queue!(self.write, cursor::Hide)?;
+        terminal::enable_raw_mode()?;
+
         self.command_context("help", |s, h| {
             let result = s.show_help(h)?;
             s.handle_result(h, result)
@@ -108,6 +109,7 @@ where
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
+            cursor::Hide,
             cursor::MoveTo(w, h - 2),
             Clear(ClearType::CurrentLine),
         )?;
@@ -153,6 +155,7 @@ where
             Clear(ClearType::CurrentLine),
             cursor::Show
         )?;
+        terminal::disable_raw_mode()?;
         Ok(())
     }
 
@@ -422,6 +425,7 @@ where
     }
 
     fn handle_input(&mut self, prompt: &str) -> Result<Option<String>> {
+        terminal::disable_raw_mode()?;
         execute!(
             self.write,
             SetForegroundColor(ENTRY_COLOR),
@@ -443,6 +447,7 @@ where
         };
         self.ctrlc_handler.ignore_next();
         self.write.execute(cursor::Hide)?;
+        terminal::enable_raw_mode()?;
         Ok(res)
     }
 
