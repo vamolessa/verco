@@ -29,8 +29,8 @@ impl ScrollView {
         {
             queue!(
                 write,
+                Clear(ClearType::CurrentLine),
                 Print(line),
-                Clear(ClearType::UntilNewLine),
                 Print('\n'),
             )?;
         }
