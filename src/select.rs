@@ -257,8 +257,7 @@ where
         Print("ctrl+c"),
         SetAttribute(Attribute::Reset),
         SetForegroundColor(ENTRY_COLOR),
-        Print(" cancel\n"),
-        cursor::Hide
+        Print(" cancel\n")
     )?;
     write.flush()?;
 
@@ -393,6 +392,5 @@ where
         }
     }
 
-    select.write.queue(cursor::Show)?;
     Ok(selected)
 }
