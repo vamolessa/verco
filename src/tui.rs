@@ -216,7 +216,7 @@ where
                 match s.version_control.get_files_to_commit() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
-                            s.write.queue(Print('\n'))?;
+                            s.show_header(h, HeaderKind::Waiting)?;
                             if let Some(input) =
                                 s.handle_input("commit message (ctrl+c to cancel): ")?
                             {

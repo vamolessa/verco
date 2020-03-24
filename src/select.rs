@@ -5,8 +5,7 @@ use crossterm::{
     style::{
         Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
     },
-    terminal::{self, Clear, ClearType},
-    QueueableCommand, Result,
+    terminal, QueueableCommand, Result,
 };
 
 use std::io::Write;
@@ -105,7 +104,8 @@ where
 {
     write: &'a mut W,
     entries: &'b mut Vec<Entry>,
-    index: usize,
+    scroll: usize,
+    cursor: usize,
     cursor_offset: (u16, u16),
 }
 
@@ -113,23 +113,68 @@ impl<'a, 'b, W> Select<'a, 'b, W>
 where
     W: Write,
 {
-    pub fn move_cursor(&mut self, delta: i32) -> Result<()> {
-        let previous_cursor = self.index;
-        let len = self.entries.len() as i32;
-        self.index = ((self.index as i32 + delta + len) % len) as usize;
-        let terminal_size = terminal::size()?;
-        self.draw_entry(previous_cursor, terminal_size)?;
-        self.draw_entry(self.index, terminal_size)?;
+    fn available_size(&self) -> (u16, u16) {
+        let size = terminal::size().unwrap_or((0, 0));
+        (
+            size.0.max(self.cursor_offset.0) - self.cursor_offset.0,
+            size.1.max(self.cursor_offset.1) - self.cursor_offset.1,
+        )
+    }
+
+    fn move_cursor(&mut self, delta: i32) -> Result<()> {
+        let previous_cursor = self.cursor;
+        let len = self.entries.len();
+        let target_cursor = self.cursor as i32 + delta;
+        self.cursor = if target_cursor < 0 {
+            if previous_cursor == 0 {
+                (target_cursor + len as i32) as usize % len
+            } else {
+                0
+            }
+        } else if target_cursor >= len as i32 {
+            if previous_cursor == len - 1 {
+                (target_cursor + len as i32) as usize % len
+            } else {
+                len - 1
+            }
+        } else {
+            target_cursor as usize
+        };
+
+        let available_size = self.available_size();
+
+        if self.cursor < self.scroll {
+            self.scroll = self.cursor;
+            self.draw_all(available_size)?;
+        } else if self.cursor >= self.scroll + available_size.1 as usize {
+            self.scroll = self.cursor - available_size.1 as usize + 1;
+            self.draw_all(available_size)?;
+        } else {
+            self.draw_entry(previous_cursor, available_size)?;
+            self.draw_entry(self.cursor, available_size)?;
+        }
+
         Ok(())
     }
 
-    pub fn draw_entry(&mut self, index: usize, terminal_size: (u16, u16)) -> Result<()> {
+    fn draw_all(&mut self, available_size: (u16, u16)) -> Result<()> {
+        let end_index = self
+            .entries
+            .len()
+            .min(self.scroll + self.available_size().1 as usize);
+        for i in self.scroll..end_index {
+            self.draw_entry(i, available_size)?;
+        }
+        Ok(())
+    }
+
+    fn draw_entry(&mut self, index: usize, available_size: (u16, u16)) -> Result<()> {
         self.write.queue(cursor::MoveTo(
             self.cursor_offset.0,
-            self.cursor_offset.1 + index as u16,
+            self.cursor_offset.1 + index as u16 - self.scroll as u16,
         ))?;
 
-        if index == self.index {
+        if index == self.cursor {
             self.write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
         } else {
             self.write.queue(ResetColor)?;
@@ -150,7 +195,7 @@ where
             .queue(Print(&state_name))?
             .queue(ResetColor)?;
 
-        if index == self.index {
+        if index == self.cursor {
             self.write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
         } else {
             self.write.queue(ResetColor)?;
@@ -160,12 +205,12 @@ where
         for _ in cursor_x..ITEM_NAME_COLUMN {
             self.write.queue(Print(' '))?;
         }
-        let max_len = (entry.filename.len() as u16).min(terminal_size.0 - ITEM_NAME_COLUMN);
+        let max_len = (entry.filename.len() as u16).min(available_size.0 - ITEM_NAME_COLUMN);
         let cursor_x = ITEM_NAME_COLUMN + max_len;
         self.write.queue(Print(
             &entry.filename[(entry.filename.len() - max_len as usize)..],
         ))?;
-        for _ in cursor_x..terminal_size.0 {
+        for _ in cursor_x..available_size.0 {
             self.write.queue(Print(' '))?;
         }
         self.write.queue(ResetColor)?;
@@ -220,16 +265,15 @@ where
     let mut select = Select {
         entries,
         write,
-        index: 0,
+        scroll: 0,
+        cursor: 0,
         cursor_offset: cursor::position()?,
     };
 
     let selected;
 
-    let terminal_size = terminal::size()?;
-    for i in 0..select.entries.len() {
-        select.draw_entry(i, terminal_size)?;
-    }
+    let available_size = select.available_size();
+    select.draw_all(available_size)?;
 
     loop {
         select.write.queue(cursor::MoveTo(
@@ -286,7 +330,8 @@ where
                 code: KeyCode::PageDown,
                 ..
             } => {
-                select.move_cursor(1)?;
+                let height = select.entries.len().min(available_size.1 as usize);
+                select.move_cursor(height as i32 / 2)?;
             }
             KeyEvent {
                 code: KeyCode::Char('u'),
@@ -296,14 +341,43 @@ where
                 code: KeyCode::PageUp,
                 ..
             } => {
-                select.move_cursor(-1)?;
+                let height = select.entries.len().min(available_size.1 as usize);
+                select.move_cursor(height as i32 / -2)?;
+            }
+            KeyEvent {
+                code: KeyCode::Char('g'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
+                code: KeyCode::Char('b'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
+                code: KeyCode::Home,
+                ..
+            } => {
+                select.scroll = 0;
+                select.cursor = 0;
+                select.draw_all(available_size)?;
+            }
+            KeyEvent {
+                code: KeyCode::Char('e'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
+                code: KeyCode::End, ..
+            } => {
+                select.scroll =
+                    0.max(select.entries.len() as i32 - select.available_size().1 as i32) as usize;
+                select.cursor = select.entries.len() - 1;
+                select.draw_all(available_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char(' '),
                 ..
             } => {
-                select.entries[select.index].selected = !select.entries[select.index].selected;
-                select.draw_entry(select.index, terminal_size)?;
+                select.entries[select.cursor].selected = !select.entries[select.cursor].selected;
+                select.draw_entry(select.cursor, available_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('a'),
@@ -313,9 +387,7 @@ where
                 for e in select.entries.iter_mut() {
                     e.selected = !all_selected;
                 }
-                for i in 0..select.entries.len() {
-                    select.draw_entry(select.index, terminal_size)?;
-                }
+                select.draw_all(available_size)?;
             }
             _ => (),
         }
