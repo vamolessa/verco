@@ -137,8 +137,9 @@ where
                         continue;
                     }
 
-                    let c = input::key_to_char(key_event);
-                    self.current_key_chord.push(c);
+                    if let Some(c) = input::key_to_char(key_event) {
+                        self.current_key_chord.push(c);
+                    }
                     match self.handle_command()? {
                         HandleChordResult::Handled => self.current_key_chord.clear(),
                         HandleChordResult::Unhandled => (),
@@ -379,8 +380,9 @@ where
                     return self.show_header(header, HeaderKind::Canceled);
                 }
                 key_event => {
-                    let c = input::key_to_char(key_event);
-                    self.current_key_chord.push(c);
+                    if let Some(c) = input::key_to_char(key_event) {
+                        self.current_key_chord.push(c);
+                    }
                     for command in &self.custom_commands {
                         if command
                             .shortcut

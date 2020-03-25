@@ -5,7 +5,8 @@ use crossterm::{
     style::{
         Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
     },
-    terminal, QueueableCommand, Result,
+    terminal::{self, Clear, ClearType},
+    QueueableCommand, Result,
 };
 
 use std::io::Write;
@@ -98,21 +99,16 @@ pub struct Entry {
     pub state: State,
 }
 
-struct Select<'a, 'b, W>
-where
-    W: Write,
-{
-    write: &'a mut W,
-    entries: &'b mut Vec<Entry>,
+struct Select<'a> {
+    entries: &'a mut Vec<Entry>,
     scroll: usize,
     cursor: usize,
     cursor_offset: (u16, u16),
+    header_position: (u16, u16),
+    filter: Vec<char>,
 }
 
-impl<'a, 'b, W> Select<'a, 'b, W>
-where
-    W: Write,
-{
+impl<'a> Select<'a> {
     fn available_size(&self) -> (u16, u16) {
         let size = terminal::size().unwrap_or((0, 0));
         (
@@ -121,9 +117,50 @@ where
         )
     }
 
-    fn move_cursor(&mut self, delta: i32) -> Result<()> {
+    fn filtered_entries(&self) -> impl Iterator<Item = &Entry> {
+        let filter = &self.filter;
+        let filter_len = filter.len();
+        self.entries.iter().filter(move |e| {
+            let mut filter_index = 0;
+            for c in e.filename.chars() {
+                if filter_index >= filter_len {
+                    break;
+                }
+
+                if filter[filter_index] == c {
+                    filter_index += 1;
+                }
+            }
+
+            filter_index >= filter_len
+        })
+    }
+
+    fn filtered_entries_mut(&mut self) -> impl Iterator<Item = &mut Entry> {
+        let filter = &self.filter;
+        let filter_len = filter.len();
+        self.entries.iter_mut().filter(move |e| {
+            let mut filter_index = 0;
+            for c in e.filename.chars() {
+                if filter_index >= filter_len {
+                    break;
+                }
+
+                if filter[filter_index] == c {
+                    filter_index += 1;
+                }
+            }
+
+            filter_index >= filter_len
+        })
+    }
+
+    fn move_cursor<W>(&mut self, write: &mut W, delta: i32) -> Result<()>
+    where
+        W: Write,
+    {
         let previous_cursor = self.cursor;
-        let len = self.entries.len();
+        let len = self.filtered_entries().count();
         let target_cursor = self.cursor as i32 + delta;
         self.cursor = if target_cursor < 0 {
             if previous_cursor == 0 {
@@ -145,50 +182,62 @@ where
 
         if self.cursor < self.scroll {
             self.scroll = self.cursor;
-            self.draw_all(available_size)?;
+            self.draw_all_entries(write, available_size)?;
         } else if self.cursor >= self.scroll + available_size.1 as usize {
             self.scroll = self.cursor - available_size.1 as usize + 1;
-            self.draw_all(available_size)?;
+            self.draw_all_entries(write, available_size)?;
         } else {
-            self.draw_entry(previous_cursor, available_size)?;
-            self.draw_entry(self.cursor, available_size)?;
+            self.draw_entry(write, previous_cursor, available_size)?;
+            self.draw_entry(write, self.cursor, available_size)?;
         }
 
         Ok(())
     }
 
-    fn draw_all(&mut self, available_size: (u16, u16)) -> Result<()> {
+    fn draw_all_entries<W>(&self, write: &mut W, available_size: (u16, u16)) -> Result<()>
+    where
+        W: Write,
+    {
+        queue!(
+            write,
+            Clear(ClearType::FromCursorDown),
+            cursor::MoveTo(self.cursor_offset.0, self.cursor_offset.1)
+        )?;
+
         let end_index = self
-            .entries
-            .len()
+            .filtered_entries()
+            .count()
             .min(self.scroll + self.available_size().1 as usize);
         for i in self.scroll..end_index {
-            self.draw_entry(i, available_size)?;
+            self.draw_entry(write, i, available_size)?;
         }
         Ok(())
     }
 
-    fn draw_entry(&mut self, index: usize, available_size: (u16, u16)) -> Result<()> {
-        self.write.queue(cursor::MoveTo(
+    fn draw_entry<W>(&self, write: &mut W, index: usize, available_size: (u16, u16)) -> Result<()>
+    where
+        W: Write,
+    {
+        write.queue(cursor::MoveTo(
             self.cursor_offset.0,
             self.cursor_offset.1 + index as u16 - self.scroll as u16,
         ))?;
 
         if index == self.cursor {
-            self.write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
+            write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
         } else {
-            self.write.queue(ResetColor)?;
+            write.queue(ResetColor)?;
         }
 
-        let select_char = if self.entries[index].selected {
-            '+'
-        } else {
-            ' '
+        let entry = match self.filtered_entries().nth(index) {
+            Some(entry) => entry,
+            None => return Ok(()),
         };
 
-        let entry = &self.entries[index];
+        let select_char = if entry.selected { '+' } else { ' ' };
         let state_name = format!("{:?}", entry.state);
-        self.write
+
+        write
             .queue(Print(select_char))?
             .queue(Print(' '))?
             .queue(SetForegroundColor(entry.state.color()))?
@@ -196,24 +245,77 @@ where
             .queue(ResetColor)?;
 
         if index == self.cursor {
-            self.write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
+            write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
         } else {
-            self.write.queue(ResetColor)?;
+            write.queue(ResetColor)?;
         }
 
         let cursor_x = self.cursor_offset.0 + 2 + state_name.len() as u16;
         for _ in cursor_x..ITEM_NAME_COLUMN {
-            self.write.queue(Print(' '))?;
+            write.queue(Print(' '))?;
         }
         let max_len = (entry.filename.len() as u16).min(available_size.0 - ITEM_NAME_COLUMN);
         let cursor_x = ITEM_NAME_COLUMN + max_len;
-        self.write.queue(Print(
+        write.queue(Print(
             &entry.filename[(entry.filename.len() - max_len as usize)..],
         ))?;
         for _ in cursor_x..available_size.0 {
-            self.write.queue(Print(' '))?;
+            write.queue(Print(' '))?;
         }
-        self.write.queue(ResetColor)?;
+        write.queue(ResetColor)?;
+        Ok(())
+    }
+
+    fn draw_header<W>(&self, write: &mut W) -> Result<()>
+    where
+        W: Write,
+    {
+        let width = terminal::size()?.0;
+        let filter_text = "filter: ";
+        let filter_len = filter_text.len() + self.filter.len();
+
+        queue!(
+            write,
+            cursor::MoveTo(self.header_position.0, self.header_position.1),
+            SetForegroundColor(ENTRY_COLOR),
+            SetAttribute(Attribute::Bold),
+            Print("ctrl+j/ctrl+k"),
+            SetAttribute(Attribute::Reset),
+            SetForegroundColor(ENTRY_COLOR),
+            Print(" move, "),
+            SetAttribute(Attribute::Bold),
+            Print("space"),
+            SetAttribute(Attribute::Reset),
+            SetForegroundColor(ENTRY_COLOR),
+            Print(" (de)select, "),
+            SetAttribute(Attribute::Bold),
+            Print("ctrl+a"),
+            SetAttribute(Attribute::Reset),
+            SetForegroundColor(ENTRY_COLOR),
+            Print(" (de)select all, "),
+            SetAttribute(Attribute::Bold),
+            Print("enter"),
+            SetAttribute(Attribute::Reset),
+            SetForegroundColor(ENTRY_COLOR),
+            Print(" continue, "),
+            SetAttribute(Attribute::Bold),
+            Print("ctrl+c"),
+            SetAttribute(Attribute::Reset),
+            SetForegroundColor(ENTRY_COLOR),
+            Print(" cancel"),
+            Clear(ClearType::UntilNewLine),
+            cursor::MoveToColumn(width - width.min(filter_len as u16)),
+        )?;
+
+        if self.filter.len() > 0 {
+            write.queue(Print(filter_text))?;
+        }
+
+        for c in &self.filter {
+            write.queue(Print(c))?;
+        }
+        queue!(write, cursor::MoveToNextLine(1), ResetColor)?;
+
         Ok(())
     }
 }
@@ -230,57 +332,31 @@ where
         return Ok(false);
     }
 
-    queue!(
-        write,
-        SetForegroundColor(ENTRY_COLOR),
-        SetAttribute(Attribute::Bold),
-        Print("ctrl+j/ctrl+k"),
-        SetAttribute(Attribute::Reset),
-        SetForegroundColor(ENTRY_COLOR),
-        Print(" move, "),
-        SetAttribute(Attribute::Bold),
-        Print("space"),
-        SetAttribute(Attribute::Reset),
-        SetForegroundColor(ENTRY_COLOR),
-        Print(" (de)select, "),
-        SetAttribute(Attribute::Bold),
-        Print("ctrl+a"),
-        SetAttribute(Attribute::Reset),
-        SetForegroundColor(ENTRY_COLOR),
-        Print(" (de)select all, "),
-        SetAttribute(Attribute::Bold),
-        Print("enter"),
-        SetAttribute(Attribute::Reset),
-        SetForegroundColor(ENTRY_COLOR),
-        Print(" continue, "),
-        SetAttribute(Attribute::Bold),
-        Print("ctrl+c"),
-        SetAttribute(Attribute::Reset),
-        SetForegroundColor(ENTRY_COLOR),
-        Print(" cancel"),
-        cursor::MoveToNextLine(1),
-    )?;
     write.flush()?;
 
     let mut select = Select {
         entries,
-        write,
         scroll: 0,
         cursor: 0,
-        cursor_offset: cursor::position()?,
+        cursor_offset: (0, 0),
+        header_position: cursor::position()?,
+        filter: Vec::new(),
     };
 
-    let selected;
+    select.draw_header(write)?;
+    write.flush()?;
+    select.cursor_offset = cursor::position()?;
 
     let available_size = select.available_size();
-    select.draw_all(available_size)?;
+    select.draw_all_entries(write, available_size)?;
 
+    let selected;
     loop {
-        select.write.queue(cursor::MoveTo(
+        write.queue(cursor::MoveTo(
             select.cursor_offset.0,
             select.cursor_offset.1,
         ))?;
-        select.write.flush()?;
+        write.flush()?;
         match input::read_key(ctrlc_handler)? {
             KeyEvent {
                 code: KeyCode::Esc, ..
@@ -293,14 +369,19 @@ where
                 code: KeyCode::Char('q'),
                 modifiers: KeyModifiers::CONTROL,
             } => {
-                selected = false;
-                break;
+                if select.filter.len() > 0 {
+                    select.filter.clear();
+                    on_filter_changed(&mut select, write, available_size)?;
+                } else {
+                    selected = false;
+                    break;
+                }
             }
             KeyEvent {
                 code: KeyCode::Enter,
                 ..
             } => {
-                selected = select.entries.iter().any(|e| e.selected);
+                selected = select.filtered_entries().any(|e| e.selected);
                 break;
             }
             KeyEvent {
@@ -311,7 +392,7 @@ where
                 code: KeyCode::Down,
                 ..
             } => {
-                select.move_cursor(1)?;
+                select.move_cursor(write, 1)?;
             }
             KeyEvent {
                 code: KeyCode::Char('k'),
@@ -320,7 +401,7 @@ where
             | KeyEvent {
                 code: KeyCode::Up, ..
             } => {
-                select.move_cursor(-1)?;
+                select.move_cursor(write, -1)?;
             }
             KeyEvent {
                 code: KeyCode::Char('d'),
@@ -330,8 +411,11 @@ where
                 code: KeyCode::PageDown,
                 ..
             } => {
-                let height = select.entries.len().min(available_size.1 as usize);
-                select.move_cursor(height as i32 / 2)?;
+                let height = select
+                    .filtered_entries()
+                    .count()
+                    .min(available_size.1 as usize);
+                select.move_cursor(write, height as i32 / 2)?;
             }
             KeyEvent {
                 code: KeyCode::Char('u'),
@@ -341,8 +425,11 @@ where
                 code: KeyCode::PageUp,
                 ..
             } => {
-                let height = select.entries.len().min(available_size.1 as usize);
-                select.move_cursor(height as i32 / -2)?;
+                let height = select
+                    .filtered_entries()
+                    .count()
+                    .min(available_size.1 as usize);
+                select.move_cursor(write, height as i32 / -2)?;
             }
             KeyEvent {
                 code: KeyCode::Char('g'),
@@ -358,7 +445,7 @@ where
             } => {
                 select.scroll = 0;
                 select.cursor = 0;
-                select.draw_all(available_size)?;
+                select.draw_all_entries(write, available_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('e'),
@@ -367,31 +454,80 @@ where
             | KeyEvent {
                 code: KeyCode::End, ..
             } => {
+                let entries_len = select.filtered_entries().count();
                 select.scroll =
-                    0.max(select.entries.len() as i32 - select.available_size().1 as i32) as usize;
-                select.cursor = select.entries.len() - 1;
-                select.draw_all(available_size)?;
+                    0.max(entries_len as i32 - select.available_size().1 as i32) as usize;
+                select.cursor = entries_len - 1;
+                select.draw_all_entries(write, available_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char(' '),
                 ..
             } => {
-                select.entries[select.cursor].selected = !select.entries[select.cursor].selected;
-                select.draw_entry(select.cursor, available_size)?;
+                let cursor = select.cursor;
+                if let Some(e) = select.filtered_entries_mut().nth(cursor) {
+                    e.selected = !e.selected;
+                }
+                select.draw_entry(write, select.cursor, available_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('a'),
                 modifiers: KeyModifiers::CONTROL,
             } => {
-                let all_selected = select.entries.iter().all(|e| e.selected);
-                for e in select.entries.iter_mut() {
+                let all_selected = select.filtered_entries().all(|e| e.selected);
+                for e in select.filtered_entries_mut() {
                     e.selected = !all_selected;
                 }
-                select.draw_all(available_size)?;
+                select.draw_all_entries(write, available_size)?;
             }
-            _ => (),
+            KeyEvent {
+                code: KeyCode::Char('h'),
+                modifiers: KeyModifiers::CONTROL,
+            } => {
+                select.filter.swap_remove(select.filter.len() - 1);
+                on_filter_changed(&mut select, write, available_size)?;
+            }
+            KeyEvent {
+                code: KeyCode::Char('w'),
+                modifiers: KeyModifiers::CONTROL,
+            } => {
+                select.filter.clear();
+                on_filter_changed(&mut select, write, available_size)?;
+            }
+            KeyEvent {
+                code: KeyCode::Backspace,
+                modifiers,
+            } => {
+                if modifiers == KeyModifiers::CONTROL {
+                    select.filter.clear();
+                } else if select.filter.len() > 0 {
+                    select.filter.swap_remove(select.filter.len() - 1);
+                }
+                on_filter_changed(&mut select, write, available_size)?;
+            }
+            key_event => {
+                if let Some(c) = input::key_to_char(key_event) {
+                    select.filter.push(c);
+                    on_filter_changed(&mut select, write, available_size)?;
+                }
+            }
         }
     }
 
     Ok(selected)
+}
+
+fn on_filter_changed<W>(
+    select: &mut Select,
+    write: &mut W,
+    available_size: (u16, u16),
+) -> Result<()>
+where
+    W: Write,
+{
+    select.cursor = 0;
+    select.scroll = 0;
+    select.draw_header(write)?;
+    select.draw_all_entries(write, available_size)?;
+    Ok(())
 }

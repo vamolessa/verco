@@ -23,19 +23,21 @@ pub fn read_key(ctrlc_handler: &mut CtrlcHandler) -> crossterm::Result<KeyEvent>
     }
 }
 
-pub fn key_to_char(key: KeyEvent) -> char {
+pub fn key_to_char(key: KeyEvent) -> Option<char> {
     match key {
         KeyEvent {
             code: KeyCode::Char(c),
             modifiers: m,
         } => {
             if m == KeyModifiers::SHIFT {
-                c.to_ascii_uppercase()
+                Some(c.to_ascii_uppercase())
+            } else if m.is_empty() {
+                Some(c)
             } else {
-                c
+                None
             }
         }
-        _ => '\0',
+        _ => None,
     }
 }
 
