@@ -1,4 +1,3 @@
-use std::env;
 use std::path::PathBuf;
 
 use crate::version_control_actions::VersionControlActions;
@@ -7,8 +6,9 @@ use crate::git_actions::GitActions;
 use crate::hg_actions::HgActions;
 use crate::revision_shortcut::RevisionShortcut;
 
-pub fn get_current_version_control() -> Option<Box<dyn VersionControlActions>> {
-    let current_dir = env::current_dir().unwrap();
+pub fn get_current_version_control(
+    current_dir: &PathBuf,
+) -> Option<Box<dyn VersionControlActions>> {
     if subdir_exists(&current_dir, ".git") {
         Some(Box::from(GitActions {
             current_dir: current_dir.to_str().unwrap().into(),
