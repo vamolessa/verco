@@ -73,7 +73,7 @@ fn generate_ssh_key(dir: &PathBuf, filename: &str) {
     c.current_dir(dir)
         .arg("-q")
         .arg("-t")
-        .arg("-rsa")
+        .arg("rsa")
         .arg("-f")
         .arg(format!("./{}", filename))
         .arg("-N")
