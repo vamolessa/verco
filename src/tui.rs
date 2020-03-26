@@ -476,7 +476,7 @@ where
             }
         };
 
-        self.scroll_view.content = output;
+        self.scroll_view.set_content(output);
         self.scroll_view.show(&mut self.write)
     }
 

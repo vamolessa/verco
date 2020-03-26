@@ -11,11 +11,16 @@ use std::io::Write;
 
 #[derive(Default)]
 pub struct ScrollView {
-    pub content: String,
+    content: String,
     scroll: usize,
 }
 
 impl ScrollView {
+    pub fn set_content(&mut self, content: String) {
+        self.scroll = 0;
+        self.content = content;
+    }
+
     pub fn show<W>(&self, write: &mut W) -> Result<()>
     where
         W: Write,
