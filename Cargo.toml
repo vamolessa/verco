@@ -1,6 +1,6 @@
 [package]
 name = "verco"
-version = "4.4.1"
+version = "4.5.0"
 authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
 edition = "2018"
 exclude = [
@@ -24,3 +24,4 @@ path = "src/main.rs"
 crossterm = "0.16"
 ctrlc = "3.1.4"
 structopt = "0.3"
+dirs = "2.0"
