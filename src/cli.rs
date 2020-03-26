@@ -1,5 +1,5 @@
 use dirs;
-use std::{fs, path::PathBuf, process::Command, thread, time};
+use std::{fs, path::PathBuf, process::Command};
 use structopt::StructOpt;
 
 use crate::version_control_actions::handle_command;
@@ -43,7 +43,6 @@ pub fn handle_cli_options() -> Result<bool, &'static str> {
                 generate_ssh_key(&dir, &filename);
                 file.set_extension("pub");
 
-                thread::sleep(time::Duration::from_millis(500));
                 let pub_key =
                     fs::read_to_string(&file).map_err(|_| "could not open ssh key public file")?;
                 println!("{}", pub_key);
