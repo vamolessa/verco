@@ -101,41 +101,50 @@ impl VersionControlActions for GitActions {
         Ok(output)
     }
 
-    fn changes(&mut self, target: &str) -> Result<String, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        if target != "." {
-            let mut parents = String::from(target);
-            parents.push_str("^@");
-
-            handle_command(
-                self.command()
-                    .arg("diff")
-                    .arg("--name-status")
-                    .arg(target)
-                    .arg(parents)
-                    .arg("--color"),
-            )
-        } else {
-            handle_command(self.command().args(&["diff", "--name-status", "--color"]))
-        }
+    fn current_diff_all(&mut self) -> Result<String, String> {
+        handle_command(self.command().args(&["diff", "--color"]))
     }
 
-    fn diff(&mut self, target: &str) -> Result<String, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        if target != "." {
-            let mut parents = String::from(target);
-            parents.push_str("^@");
+    fn current_diff_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+        let mut command = self.command();
+        command.arg("diff").arg("--color").arg("--");
 
-            handle_command(
-                self.command()
-                    .arg("diff")
-                    .arg(target)
-                    .arg(parents)
-                    .arg("--color"),
-            )
-        } else {
-            handle_command(self.command().args(&["diff", "--color"]))
+        for e in entries.iter() {
+            if e.selected {
+                command.arg(&e.filename);
+            }
         }
+
+        handle_command(&mut command)
+    }
+
+    fn revision_changes(&mut self, target: &str) -> Result<String, String> {
+        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
+        let mut parents = String::from(target);
+        parents.push_str("^@");
+
+        handle_command(
+            self.command()
+                .arg("diff")
+                .arg("--name-status")
+                .arg(target)
+                .arg(parents)
+                .arg("--color"),
+        )
+    }
+
+    fn revision_diff_all(&mut self, target: &str) -> Result<String, String> {
+        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
+        let mut parents = String::from(target);
+        parents.push_str("^@");
+
+        handle_command(
+            self.command()
+                .arg("diff")
+                .arg(target)
+                .arg(parents)
+                .arg("--color"),
+        )
     }
 
     fn commit_all(&mut self, message: &str) -> Result<String, String> {
@@ -157,7 +166,7 @@ impl VersionControlActions for GitActions {
         let mut output = String::new();
 
         output.push_str(&handle_command(self.command().args(&["reset", "--hard"]))?[..]);
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(&handle_command(self.command().args(&["clean", "-df"]))?[..]);
 
         Ok(output)
@@ -219,7 +228,6 @@ impl VersionControlActions for GitActions {
     }
 
     fn take_other(&mut self) -> Result<String, String> {
-        //git merge --strategy-option theirs
         handle_command(self.command().args(&["checkout", ".", "--theirs"]))
     }
 
@@ -256,9 +264,9 @@ impl VersionControlActions for GitActions {
         let mut output = String::new();
 
         output.push_str(&handle_command(self.command().arg("branch").arg(name))?[..]);
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(&self.update(name)?[..]);
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(
             &handle_command(
                 self.command()
@@ -276,7 +284,7 @@ impl VersionControlActions for GitActions {
         let mut output = String::new();
 
         output.push_str(&handle_command(self.command().arg("branch").arg("-d").arg(name))?[..]);
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(
             &handle_command(self.command().arg("push").arg("-d").arg("origin").arg(name))?[..],
         );

@@ -196,17 +196,35 @@ where
                 }
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
-            ['d', 'd'] => self.command_context("revision diff", |s, h| {
-                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
-                    let result = s.version_control.diff(&input[..]);
+            ['d', 'd'] => self.command_context("current diff all", |s, h| {
+                let result = s.version_control.current_diff_all();
+                s.handle_result(h, result)
+            }),
+            ['d', 's'] => self.command_context("current diff selected", |s, h| {
+                match s.version_control.get_files_to_commit() {
+                    Ok(mut entries) => {
+                        if s.show_select_ui(&mut entries)? {
+                            let result = s.version_control.current_diff_selected(&entries);
+                            s.handle_result(h, result)
+                        } else {
+                            s.show_header(h, HeaderKind::Canceled)
+                        }
+                    }
+                    Err(error) => s.handle_result(h, Err(error)),
+                }
+            }),
+            ['D'] => Ok(HandleChordResult::Unhandled),
+            ['D', 'C'] => self.command_context("revision changes", |s, h| {
+                if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel): ")? {
+                    let result = s.version_control.revision_changes(&input[..]);
                     s.handle_result(h, result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['d', 'c'] => self.command_context("revision changes", |s, h| {
-                if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel): ")? {
-                    let result = s.version_control.changes(&input[..]);
+            ['D', 'D'] => self.command_context("revision diff all", |s, h| {
+                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
+                    let result = s.version_control.revision_diff_all(&input[..]);
                     s.handle_result(h, result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
@@ -259,7 +277,7 @@ where
                 }
             }),
             ['R'] => Ok(HandleChordResult::Unhandled),
-            ['R', 'a'] | ['R', 'A'] => self.command_context("revert all", |s, h| {
+            ['R', 'A'] => self.command_context("revert all", |s, h| {
                 let result = s.version_control.revert_all();
                 s.handle_result(h, result)
             }),
@@ -532,8 +550,10 @@ where
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "dd", "revision diff")?;
-        Self::show_help_action(&mut write, "dc", "revision changes")?;
+        Self::show_help_action(&mut write, "dd", "current diff all")?;
+        Self::show_help_action(&mut write, "ds", "current diff selected")?;
+        Self::show_help_action(&mut write, "DC", "revision changes")?;
+        Self::show_help_action(&mut write, "DD", "revision diff all")?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 

@@ -12,8 +12,11 @@ pub trait VersionControlActions {
     fn status(&mut self) -> Result<String, String>;
     fn log(&mut self, count: u32) -> Result<String, String>;
 
-    fn changes(&mut self, target: &str) -> Result<String, String>;
-    fn diff(&mut self, target: &str) -> Result<String, String>;
+    fn current_diff_all(&mut self) -> Result<String, String>;
+    fn current_diff_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String>;
+
+    fn revision_changes(&mut self, target: &str) -> Result<String, String>;
+    fn revision_diff_all(&mut self, target: &str) -> Result<String, String>;
 
     fn commit_all(&mut self, message: &str) -> Result<String, String>;
     fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String>;
