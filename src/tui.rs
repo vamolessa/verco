@@ -201,7 +201,7 @@ where
                 s.handle_result(h, result)
             }),
             ['d', 's'] => self.command_context("current diff selected", |s, h| {
-                match s.version_control.get_files_to_commit() {
+                match s.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
                             let result = s.version_control.current_diff_selected(&entries);
@@ -230,6 +230,23 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
+            ['D', 'S'] => self.command_context("revision diff selected", |s, h| {
+                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
+                    match s.version_control.get_revision_changed_files(&input[..]) {
+                        Ok(mut entries) => {
+                            if s.show_select_ui(&mut entries)? {
+                                let result = s.version_control.revision_diff_selected(&input[..], &entries);
+                                s.handle_result(h, result)
+                            } else {
+                                s.show_header(h, HeaderKind::Canceled)
+                            }
+                        }
+                        Err(error) => s.handle_result(h, Err(error)),
+                    }
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
+                }
+            }),
             ['c'] => Ok(HandleChordResult::Unhandled),
             ['c', 'c'] => self.command_context("commit all", |s, h| {
                 if let Some(input) = s.handle_input("commit message (ctrl+c to cancel): ")? {
@@ -240,7 +257,7 @@ where
                 }
             }),
             ['c', 's'] => self.command_context("commit selected", |s, h| {
-                match s.version_control.get_files_to_commit() {
+                match s.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
                             s.show_header(h, HeaderKind::Waiting)?;
@@ -283,7 +300,7 @@ where
             }),
             ['r'] => Ok(HandleChordResult::Unhandled),
             ['r', 's'] => self.command_context("revert selected", |s, h| {
-                match s.version_control.get_files_to_commit() {
+                match s.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
                             let result = s.version_control.revert_selected(&entries);
@@ -554,6 +571,7 @@ where
         Self::show_help_action(&mut write, "ds", "current diff selected")?;
         Self::show_help_action(&mut write, "DC", "revision changes")?;
         Self::show_help_action(&mut write, "DD", "revision diff all")?;
+        Self::show_help_action(&mut write, "DS", "revision diff selected")?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 

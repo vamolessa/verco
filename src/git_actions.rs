@@ -35,10 +35,10 @@ impl VersionControlActions for GitActions {
         &self.current_dir[..]
     }
 
-    fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String> {
+    fn get_current_changed_files(&mut self) -> Result<Vec<Entry>, String> {
         let output = handle_command(self.command().args(&["status", "-z"]))?;
 
-        let files: Vec<_> = output
+        let files = output
             .trim()
             .split('\0')
             .map(|e| e.trim())
@@ -50,6 +50,33 @@ impl VersionControlActions for GitActions {
                     selected: false,
                     state: str_to_state(&state[..1]),
                 }
+            })
+            .collect();
+        Ok(files)
+    }
+
+    fn get_revision_changed_files(&mut self, target: &str) -> Result<Vec<Entry>, String> {
+        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
+
+        let output = handle_command(
+            self.command()
+                .arg("diff-tree")
+                .arg("--no-commit-id")
+                .arg("--name-status")
+                .arg("-z")
+                .arg("-r")
+                .arg(target),
+        )?;
+
+        let state_iter = output.split('\0').map(|e| e.trim()).step_by(2);
+        let filename_iter = output.split('\0').map(|e| e.trim()).skip(1).step_by(2);
+
+        let files = state_iter
+            .zip(filename_iter)
+            .map(|(s, f)| Entry {
+                filename: String::from(f),
+                selected: false,
+                state: str_to_state(s),
             })
             .collect();
         Ok(files)
@@ -120,15 +147,13 @@ impl VersionControlActions for GitActions {
 
     fn revision_changes(&mut self, target: &str) -> Result<String, String> {
         let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        let mut parents = String::from(target);
-        parents.push_str("^@");
-
         handle_command(
             self.command()
-                .arg("diff")
+                .arg("diff-tree")
+                .arg("--no-commit-id")
                 .arg("--name-status")
+                .arg("-r")
                 .arg(target)
-                .arg(parents)
                 .arg("--color"),
         )
     }
@@ -145,6 +170,32 @@ impl VersionControlActions for GitActions {
                 .arg(parents)
                 .arg("--color"),
         )
+    }
+
+    fn revision_diff_selected(
+        &mut self,
+        target: &str,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
+        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
+        let mut parents = String::from(target);
+        parents.push_str("^@");
+
+        let mut command = self.command();
+        command
+            .arg("diff")
+            .arg("--color")
+            .arg(target)
+            .arg(parents)
+            .arg("--");
+
+        for e in entries.iter() {
+            if e.selected {
+                command.arg(&e.filename);
+            }
+        }
+
+        handle_command(&mut command)
     }
 
     fn commit_all(&mut self, message: &str) -> Result<String, String> {

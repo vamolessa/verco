@@ -5,7 +5,8 @@ use crate::select::Entry;
 pub trait VersionControlActions {
     fn repository_directory(&self) -> &str;
 
-    fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String>;
+    fn get_current_changed_files(&mut self) -> Result<Vec<Entry>, String>;
+    fn get_revision_changed_files(&mut self, target: &str) -> Result<Vec<Entry>, String>;
 
     fn version(&mut self) -> Result<String, String>;
 
@@ -17,6 +18,11 @@ pub trait VersionControlActions {
 
     fn revision_changes(&mut self, target: &str) -> Result<String, String>;
     fn revision_diff_all(&mut self, target: &str) -> Result<String, String>;
+    fn revision_diff_selected(
+        &mut self,
+        target: &str,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String>;
 
     fn commit_all(&mut self, message: &str) -> Result<String, String>;
     fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String>;

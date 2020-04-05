@@ -37,10 +37,31 @@ impl<'a> VersionControlActions for HgActions {
         &self.current_dir[..]
     }
 
-    fn get_files_to_commit(&mut self) -> Result<Vec<Entry>, String> {
-        let output = handle_command(self.command().args(&["status"]))?;
+    fn get_current_changed_files(&mut self) -> Result<Vec<Entry>, String> {
+        let output = handle_command(self.command().arg("status"))?;
 
-        let files: Vec<_> = output
+        let files = output
+            .trim()
+            .split('\n')
+            .map(|e| e.trim())
+            .filter(|e| e.len() > 1)
+            .map(|e| {
+                let (state, filename) = e.split_at(1);
+                Entry {
+                    filename: String::from(filename.trim()),
+                    selected: false,
+                    state: str_to_state(state),
+                }
+            })
+            .collect();
+        Ok(files)
+    }
+
+    fn get_revision_changed_files(&mut self, target: &str) -> Result<Vec<Entry>, String> {
+        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
+        let output = handle_command(self.command().arg("status").arg("--change").arg(target))?;
+
+        let files = output
             .trim()
             .split('\n')
             .map(|e| e.trim())
@@ -147,6 +168,31 @@ impl<'a> VersionControlActions for HgActions {
                 .arg("--color")
                 .arg("always"),
         )
+    }
+
+    fn revision_diff_selected(
+        &mut self,
+        target: &str,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
+        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
+
+        let mut command = self.command();
+        command
+            .arg("diff")
+            .arg("--change")
+            .arg(target)
+            .arg("--color")
+            .arg("always")
+            .arg("--");
+
+        for e in entries.iter() {
+            if e.selected {
+                command.arg(&e.filename);
+            }
+        }
+
+        handle_command(&mut command)
     }
 
     fn commit_all(&mut self, message: &str) -> Result<String, String> {
