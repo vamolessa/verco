@@ -11,7 +11,7 @@ use crossterm::{
 
 use std::io::Write;
 
-use crate::{ctrlc_handler::CtrlcHandler, input, tui_util::ENTRY_COLOR};
+use crate::{input, tui_util::ENTRY_COLOR};
 
 const SELECTED_BG_COLOR: Color = Color::DarkGrey;
 const UNTRACKED_COLOR: Color = Color::Rgb {
@@ -322,7 +322,6 @@ impl<'a> Select<'a> {
 
 pub fn select<W>(
     write: &mut W,
-    ctrlc_handler: &mut CtrlcHandler,
     entries: &mut Vec<Entry>,
 ) -> Result<bool>
 where
@@ -357,7 +356,7 @@ where
             select.cursor_offset.1,
         ))?;
         write.flush()?;
-        match input::read_key(ctrlc_handler)? {
+        match input::read_key()? {
             KeyEvent {
                 code: KeyCode::Esc, ..
             }

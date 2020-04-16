@@ -13,7 +13,6 @@ use std::{
 };
 
 use crate::{
-    ctrlc_handler::CtrlcHandler,
     custom_commands::CustomCommand,
     input,
     scroll_view::ScrollView,
@@ -27,13 +26,11 @@ const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub fn show_tui(
     version_control: Box<dyn 'static + VersionControlActions>,
     custom_commands: Vec<CustomCommand>,
-    ctrlc_handler: CtrlcHandler,
 ) {
     Tui::new(
         version_control,
         custom_commands,
         stdout().lock(),
-        ctrlc_handler,
     )
     .show()
     .unwrap();
@@ -55,7 +52,6 @@ where
     current_key_chord: Vec<char>,
 
     write: W,
-    ctrlc_handler: CtrlcHandler,
     scroll_view: ScrollView,
 }
 
@@ -67,14 +63,12 @@ where
         version_control: Box<dyn 'static + VersionControlActions>,
         custom_commands: Vec<CustomCommand>,
         write: W,
-        ctrlc_handler: CtrlcHandler,
     ) -> Self {
         Tui {
             version_control,
             custom_commands,
             current_key_chord: Vec::new(),
             write,
-            ctrlc_handler,
             scroll_view: Default::default(),
         }
     }
@@ -84,7 +78,7 @@ where
     }
 
     fn show_select_ui(&mut self, entries: &mut Vec<Entry>) -> Result<bool> {
-        select(&mut self.write, &mut self.ctrlc_handler, entries)
+        select(&mut self.write, entries)
     }
 
     fn command_context<F>(&mut self, action_name: &str, callback: F) -> Result<HandleChordResult>
@@ -117,7 +111,7 @@ where
 
         loop {
             self.write.flush()?;
-            match input::read_key(&mut self.ctrlc_handler)? {
+            match input::read_key()? {
                 KeyEvent {
                     code: KeyCode::Esc, ..
                 }
@@ -404,7 +398,7 @@ where
 
         'outer: loop {
             self.write.flush()?;
-            match input::read_key(&mut self.ctrlc_handler)? {
+            match input::read_key()? {
                 KeyEvent {
                     code: KeyCode::Esc, ..
                 }
@@ -469,7 +463,6 @@ where
     }
 
     fn handle_input(&mut self, prompt: &str) -> Result<Option<String>> {
-        terminal::disable_raw_mode()?;
         execute!(
             self.write,
             SetForegroundColor(ENTRY_COLOR),
@@ -489,9 +482,7 @@ where
             }
             Err(_error) => None,
         };
-        self.ctrlc_handler.ignore_next();
         self.write.execute(cursor::Hide)?;
-        terminal::enable_raw_mode()?;
         Ok(res)
     }
 

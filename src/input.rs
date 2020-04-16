@@ -1,24 +1,13 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use rustyline::{error::ReadlineError, Editor};
 
-use crate::ctrlc_handler::CtrlcHandler;
-use std::time::Duration;
-
-pub fn read_key(ctrlc_handler: &mut CtrlcHandler) -> crossterm::Result<KeyEvent> {
+pub fn read_key() -> crossterm::Result<KeyEvent> {
     loop {
-        if ctrlc_handler.get() {
-            return Ok(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-            });
-        }
-
-        if event::poll(Duration::from_millis(10))? {
-            match event::read()? {
-                Event::Key(key_event) => {
-                    return Ok(key_event);
-                }
-                _ => (),
+        match event::read()? {
+            Event::Key(key_event) => {
+                return Ok(key_event);
             }
+            _ => (),
         }
     }
 }
@@ -41,10 +30,11 @@ pub fn key_to_char(key: KeyEvent) -> Option<char> {
     }
 }
 
-pub fn read_line() -> crossterm::Result<String> {
-    let mut line = String::new();
-    std::io::stdin().read_line(&mut line)?;
-    let len = line.trim_end_matches(&['\r', '\n'][..]).len();
-    line.truncate(len);
-    Ok(line)
+pub fn read_line() -> Result<String, ReadlineError> {
+    let mut readline = Editor::<()>::new();
+    match readline.readline("") {
+        Ok(line) => Ok(line),
+        Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => Ok("".into()),
+        Err(error) => Err(error),
+    }
 }
