@@ -15,3 +15,4 @@ Cargo.lock
 **/*.rs.bk
 
 .vscode
+session.vim
