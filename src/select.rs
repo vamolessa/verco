@@ -388,8 +388,8 @@ where
                 modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
-                code: KeyCode::Char('j'),
-                modifiers: KeyModifiers::ALT,
+                code: KeyCode::Char('n'),
+                modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
                 code: KeyCode::Down,
@@ -402,8 +402,8 @@ where
                 modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
-                code: KeyCode::Char('k'),
-                modifiers: KeyModifiers::ALT,
+                code: KeyCode::Char('p'),
+                modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
                 code: KeyCode::Up, ..

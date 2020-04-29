@@ -54,6 +54,10 @@ impl ScrollView {
                 modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
+                code: KeyCode::Char('n'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
                 code: KeyCode::Down,
                 ..
             }
@@ -71,6 +75,10 @@ impl ScrollView {
             }
             KeyEvent {
                 code: KeyCode::Char('k'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
+                code: KeyCode::Char('p'),
                 modifiers: KeyModifiers::CONTROL,
             }
             | KeyEvent {
