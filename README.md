@@ -1,71 +1,80 @@
 ![Rust](https://github.com/matheuslessarodrigues/verco/workflows/Rust/badge.svg)
 
 # verco
-A simple Git/Hg version control client based on keyboard shortcuts
+A simple tui Git/Hg client focused on keyboard shortcuts
 
 ## Platforms
 
-This project uses Cargo and pure Rust stable so Windows, Mac and Linux should work.
+This project uses Cargo and pure Rust stable so it should work on Windows, Mac and Linux.
 
 It depends on:
 - [crossterm](https://crates.io/crates/crossterm)
 - [ctrlc](https://crates.io/crates/ctrlc)
+- [rustyline](https://crates.io/crates/rustyline)
 
 ## Install
 
-First of all, install rust into your system using [rustup](https://www.rustup.rs/).
+You can either install it via `cargo` or download the binaries from github releases.
 
-Once it's installed, you can proceed to install verco using Cargo (Rust's package manager).
-Open a terminal and run these commands to clone and install verco:
+If you go the `cargo` route, you can install it using [rustup](https://www.rustup.rs/).
+In a terminal, run this command to install `verco`:
 
 ```
 cargo install verco
 ```
 
-Once you close and open again your terminal, you'll be able to use `verco` in whichever directory you need.
-You can even delete that `verco` folder if you please.
+You'll be able to open `verco` from whichever directory you in.
 
 ## Usage
 
-Open a terminal from your repository folder and type in `verco`.
-It will launch verco and you can begin to use it.
+In a terminal in a repository folder, run the `verco` command.
+It will launch `verco`'s tui and you'll be able to interface with git/hg.
 
-Use your keyboard to perform git/hg actions (also, press `h` for help).
+## Commands
 
-## Keymap
+Key Sequence | Command
+--- | ---
+h | help
+q | quit
+s | status
+ll | log
+lc | log count
+dd | current diff all
+ds | current diff selected
+DC | revision changes
+DD | revision diff all
+DS | revision diff selected
+cc | commit all
+cs | commit selected
+m | merge
+RA | revert all
+rs | revert selected
+rr | list unresolved conflicts
+ro | resolve taking other
+rl | resolve taking local
+f | fetch
+p | pull
+P | push
+tn | new tag
+bb | list branches
+bn | new branch
+bd | delete branch
+x | custom command
 
+## Custom Commands
+You can create simple custom commands to run in your repository folder by placing them in the file
+`.verco/custom_commands.txt` in your repository root.
+
+Each line in this file is treated as a different custom command. Until the first whitespace, the characters are
+treated as the keybind for the command, the next word is the command itself, and the rest are its parameters.
+
+Example:
 ```
-h               help
-
-e               explorer
-
-s               status
-l               log
-
-d               revision changes
-shift+d         revision diff
-
-c               commit all
-shift+c         commit selected
-x               revert all
-shift+x         revert selected
-u               update/checkout
-m               merge
-
-r               unresolved conflicts
-shift+r         resolve taking other
-ctrl+r          resolve taking local
-
-f               fetch
-p               pull
-shift+p         push
-
-shift+t         create tag
-
-b               list branches
-shift+b         create branch
-ctrl+b          close branch
+gv git --version
 ```
+
+With `verco` open, you can type in `xgv` (`x` is the custom command prefix) and it will print your git version
+without leaving `verco`. Use it to create build commands for example.
 
 ## Screenshots
 
