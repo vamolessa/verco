@@ -101,7 +101,7 @@ impl<'a> VersionControlActions for HgActions {
             self.command()
                 .arg("log")
                 .arg("--template")
-                .arg("{node|short}")
+                .arg("{node|short} ")
                 .arg("-l")
                 .arg(&count_str),
         )?;
