@@ -3,6 +3,13 @@
 # verco
 A simple Git/Hg tui client focused on keyboard shortcuts
 
+## Screenshots
+![log screen](.github/screenshots/log.png)
+
+![help screen](.github/screenshots/help.png)
+
+![commit selected screen](.github/screenshots/commit.png)
+
 ## Platforms
 
 This project uses Cargo and pure Rust stable so it should work on Windows, Mac and Linux.
@@ -75,13 +82,3 @@ gv git --version
 
 With `verco` open, you can type in `xgv` (`x` is the custom command prefix) and it will print your git version
 without leaving `verco`. Use it to create build commands for example.
-
-## Screenshots
-
-![verco video example](https://raw.githubusercontent.com/matheuslessarodrigues/verco/master/images/example.mp4)
-
-![help screen in verco](images/help.png)
-
-![commit screen in verco](images/commit.png)
-
-![log screen in verco](images/log.png)
