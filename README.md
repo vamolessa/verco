@@ -6,8 +6,6 @@ A simple Git/Hg tui client focused on keyboard shortcuts
 ## Screenshots
 ![log screen](.github/screenshots/log.png)
 
-![help screen](.github/screenshots/help.png)
-
 ![commit selected screen](.github/screenshots/commit.png)
 
 ## Platforms
