@@ -25,12 +25,13 @@ impl ScrollView {
     where
         W: Write,
     {
+        let available_size = Self::available_size();
         write.queue(cursor::MoveTo(0, 1))?;
         for line in self
             .content
             .lines()
             .skip(self.scroll)
-            .take(Self::available_size().1 - 1)
+            .take(available_size.1 - 1)
         {
             queue!(
                 write,
