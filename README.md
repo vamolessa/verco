@@ -1,7 +1,7 @@
 ![Rust](https://github.com/matheuslessarodrigues/verco/workflows/Rust/badge.svg)
 
 # verco
-A simple tui Git/Hg client focused on keyboard shortcuts
+A simple Git/Hg tui client focused on keyboard shortcuts
 
 ## Platforms
 
