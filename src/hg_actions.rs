@@ -32,6 +32,7 @@ impl HgActions {
     }
 
     /// Disables user customizations for internal invocations
+    #[allow(unused)]
     fn plain_command(&self) -> Command {
         let mut command = self.command();
         command.env("HGPLAIN", "");
