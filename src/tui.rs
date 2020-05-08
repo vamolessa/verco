@@ -190,6 +190,11 @@ where
                 }
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
+            ['e'] => Ok(HandleChordResult::Unhandled),
+            ['e', 'e'] => self.command_context("current full revision", |s, h| {
+                let result = s.version_control.current_export();
+                s.handle_result(h, result)
+            }),
             ['d', 'd'] => self.command_context("current diff all", |s, h| {
                 let result = s.version_control.current_diff_all();
                 s.handle_result(h, result)
@@ -558,6 +563,7 @@ where
 
         write.queue(cursor::MoveToNextLine(1))?;
 
+        Self::show_help_action(&mut write, "ee", "revision full contents")?;
         Self::show_help_action(&mut write, "dd", "current diff all")?;
         Self::show_help_action(&mut write, "ds", "current diff selected")?;
         Self::show_help_action(&mut write, "DC", "revision changes")?;
