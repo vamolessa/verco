@@ -569,7 +569,7 @@ where
         }
 
         write
-            .queue(Print("press a key and peform an action"))?
+            .queue(Print("press a key and perform an action"))?
             .queue(cursor::MoveToNextLine(2))?;
 
         Self::show_help_action(&mut write, "h", "help")?;
