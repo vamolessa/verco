@@ -30,6 +30,12 @@ impl HgActions {
         command.current_dir(&self.current_dir[..]);
         command
     }
+    /// Disables user customizations for internal invocations
+    fn plain_command(&self) -> Command {
+        let mut command = self.command();
+        command.env("HGPLAIN", "");
+        command
+    }
 }
 
 impl<'a> VersionControlActions for HgActions {
