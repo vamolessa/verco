@@ -104,7 +104,7 @@ impl<'a> VersionControlActions for HgActions {
         let count_str = format!("{}", count);
 
         let hashes_output = handle_command(
-            self.command()
+            self.plain_command()
                 .arg("log")
                 .arg("--template")
                 .arg("{node|short} ")
