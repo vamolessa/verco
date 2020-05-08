@@ -2,7 +2,23 @@ use std::process::Command;
 
 use crate::select::Entry;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum VcsType {
+    Git,
+    Hg,
+}
+
+impl std::fmt::Display for VcsType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            VcsType::Git => "git",
+            VcsType::Hg => "mercurial",
+        })
+    }
+}
+
 pub trait VersionControlActions {
+    fn get_type(&self) -> VcsType;
     /// Sets the root of the current repository
     fn set_root(&mut self) -> Result<(), String>;
     /// Get the root of the current repository

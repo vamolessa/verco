@@ -2,7 +2,7 @@ use std::process::Command;
 
 use crate::revision_shortcut::RevisionShortcut;
 use crate::select::{Entry, State};
-use crate::version_control_actions::{handle_command, VersionControlActions};
+use crate::version_control_actions::{handle_command, VersionControlActions, VcsType};
 
 fn str_to_state(s: &str) -> State {
     match s {
@@ -31,6 +31,10 @@ impl GitActions {
 }
 
 impl VersionControlActions for GitActions {
+    fn get_type(&self) -> VcsType {
+        VcsType::Git
+    }
+
     fn set_root(&mut self) -> Result<(), String> {
         let mut command = self.command();
         let dir =

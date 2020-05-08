@@ -3,7 +3,7 @@ use std::process::Command;
 use crate::{
     revision_shortcut::RevisionShortcut,
     select::{Entry, State},
-    version_control_actions::{handle_command, VersionControlActions},
+    version_control_actions::{handle_command, VersionControlActions, VcsType},
 };
 
 fn str_to_state(s: &str) -> State {
@@ -40,6 +40,10 @@ impl HgActions {
 }
 
 impl<'a> VersionControlActions for HgActions {
+    fn get_type(&self) -> VcsType {
+        VcsType::Hg
+    }
+
     fn set_root(&mut self) -> Result<(), String> {
         let mut command = self.command();
         let dir = handle_command(command.arg("root"))?;
