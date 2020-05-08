@@ -119,21 +119,7 @@ impl VersionControlActions for GitActions {
     fn log(&mut self, count: u32) -> Result<String, String> {
         let count_str = format!("-{}", count);
 
-        let hashes_output = handle_command(
-            self.command()
-                .arg("log")
-                .arg("--all")
-                .arg("--format=format:%h")
-                .arg(&count_str),
-        )?;
-        let hashes: Vec<_> = hashes_output
-            .split_whitespace()
-            .take(RevisionShortcut::max())
-            .map(String::from)
-            .collect();
-        self.revision_shortcut.update_hashes(hashes);
-
-        let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
+        let template = "--format=format:%C(auto,yellow)__VERCO_NODE__%h__VERCO_NODE__ %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
         let mut output = handle_command(
             self.command()
                 .arg("log")
@@ -147,7 +133,9 @@ impl VersionControlActions for GitActions {
                 .arg("--date=short"),
         )?;
 
-        self.revision_shortcut.replace_occurrences(&mut output);
+        let hashes = self.revision_shortcut.replace_occurrences(&mut output);
+        self.revision_shortcut.update_hashes(hashes);
+
         Ok(output)
     }
 
