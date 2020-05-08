@@ -167,6 +167,10 @@ impl<'a> VersionControlActions for HgActions {
         self.revision_shortcut.replace_occurrences(&mut output);
         Ok(output)
     }
+    /// Only works if the user has the `topic` extension enabled 
+    fn current_stack(&mut self) -> Result<String, String> {
+        handle_command(self.command().args(&["stack", "--color", "always"]))
+    }
 
     fn current_diff_all(&mut self) -> Result<String, String> {
         handle_command(self.command().arg("diff").arg("--color").arg("always"))

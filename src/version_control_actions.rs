@@ -36,6 +36,10 @@ pub trait VersionControlActions {
     /// Shows the header and all diffs for the current revision
     fn current_export(&mut self) -> Result<String, String>;
     fn log(&mut self, count: u32) -> Result<String, String>;
+    /// Shows the linear stack of revisions
+    fn current_stack(&mut self) -> Result<String, String> {
+        Ok(format!("Unsupported command for {}", self.get_type()))
+    }
 
     fn current_diff_all(&mut self) -> Result<String, String>;
     fn current_diff_selected(

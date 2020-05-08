@@ -20,7 +20,7 @@ use crate::{
     scroll_view::ScrollView,
     select::{select, Entry},
     tui_util::{show_header, Header, HeaderKind, ENTRY_COLOR},
-    version_control_actions::VersionControlActions,
+    version_control_actions::{VcsType, VersionControlActions},
 };
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -350,6 +350,15 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
+            ['t', 's'] => {
+                if let VcsType::Git = self.version_control.get_type() {
+                    return Ok(HandleChordResult::Unhandled)
+                }
+                self.command_context("topic stack", |s, h| {
+                    let result = s.version_control.current_stack();
+                    s.handle_result(h, result)
+                })
+            },
             ['b'] => Ok(HandleChordResult::Unhandled),
             ['b', 'b'] => self.command_context("list branches", |s, h| {
                 let result = s.version_control.list_branches();
@@ -571,6 +580,11 @@ where
         Self::show_help_action(&mut write, "s", "status")?;
         Self::show_help_action(&mut write, "ll", "log")?;
         Self::show_help_action(&mut write, "lc", "log count")?;
+
+        if let VcsType::Hg = self.version_control.get_type() {
+            Self::show_help_action(&mut write, "ts", "show topic stack (hg only)")?;
+            write.queue(cursor::MoveToNextLine(1))?;
+        }
 
         write.queue(cursor::MoveToNextLine(1))?;
 
