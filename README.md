@@ -6,7 +6,7 @@ A simple Git/Hg tui client focused on keyboard shortcuts
 ## Screenshots
 ![log screen](.github/screenshots/log.png)
 
-![commit selected screen](.github/screenshots/commit-selected.png)
+![verco workflow](.github/screenshots/workflow.gif)
 
 ## Platforms
 
@@ -69,16 +69,6 @@ x | custom command
 Key Sequence | Command
 --- | ---
 ctrl+j, ctrl+n, arrow down | move down one line
-ctrl+k, ctrl+p, arrow up | move up one line
-ctrl+d, page down | move down half page
-ctrl+u, page up | move up half page
-ctrl+e | go to end
-ctrl+b, ctrl+g | go to beginning
-space | select entry (on selection mode)
-ctrl+c, esc | cancel
-
-When reading a line, it uses ![`rustyline`](https://github.com/kkawakam/rustyline#emacs-mode-default-mode)
-default keybinds.
 
 ## Custom Commands
 You can create simple custom commands to run in your repository folder by placing them in the file
@@ -94,22 +84,3 @@ gv git --version
 
 With `verco` open, you can type in `xgv` (`x` is the custom command prefix) and it will print your git version
 without leaving `verco`. Use it to create build commands for example.
-
-## Hash Shortcuts
-After running a log command at least once, you will notice some letters by its hash side.
-These are hash shortcuts. Say you want to quickly checkout some previous commit to see some changes.
-Instead of having to type its hash (or worse, using the mouse to select and copy text), you can just type its
-associated shortcut.
-
-Example from `verco`'s history log:
-```
-* 2d76b45 (A) 2020-05-08 Matheus ..  (HEAD -> master, origin/master, origin/HEAD) other keybinds in readme
-* 7af4f7f (B) 2020-05-07 Matheus ..  fix mercurial hash shortcuts
-* 52019da (C) 2020-05-07 Matheus ..  commit selected screenshot typo
-* 2c17265 (D) 2020-05-07 Matheus ..  remove help screenshot (it's more "future proof")
-* 7f622dc (E) 2020-05-07 Matheus ..  readme update with screenshots
-```
-
-Say we want to go back to `fix mercurial hash shortcuts`, instead of typing `u7af4f7f<Enter>` (`u` for
-update/checkout command), we can just type `uB<Enter>`. What `verco` does is a simple string replace, so,
-for git/hg, it's as if you just had typed the full hash.
