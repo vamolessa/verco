@@ -11,6 +11,8 @@ pub trait VersionControlActions {
     fn version(&mut self) -> Result<String, String>;
 
     fn status(&mut self) -> Result<String, String>;
+    /// Shows the header and all diffs for the current revision
+    fn current_export(&mut self) -> Result<String, String>;
     fn log(&mut self, count: u32) -> Result<String, String>;
 
     fn current_diff_all(&mut self) -> Result<String, String>;

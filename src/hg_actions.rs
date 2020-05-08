@@ -100,6 +100,10 @@ impl<'a> VersionControlActions for HgActions {
         Ok(output)
     }
 
+    fn current_export(&mut self) -> Result<String, String> {
+        handle_command(self.command().args(&["export", "--color", "always"]))
+    }
+
     fn log(&mut self, count: u32) -> Result<String, String> {
         let count_str = format!("{}", count);
 

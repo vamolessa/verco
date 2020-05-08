@@ -92,6 +92,13 @@ impl VersionControlActions for GitActions {
                 .args(&["-c", "color.status=always", "status"]),
         )
     }
+    
+    fn current_export(&mut self) -> Result<String, String> {
+        handle_command(
+            self.command()
+                .args(&["show", "--color"]),
+        )
+    }
 
     fn log(&mut self, count: u32) -> Result<String, String> {
         let count_str = format!("-{}", count);
