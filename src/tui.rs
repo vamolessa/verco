@@ -3,7 +3,7 @@ use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute, queue,
     style::{Print, ResetColor, SetForegroundColor},
-    terminal::{self, Clear, ClearType},
+    terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand, QueueableCommand, Result,
 };
 
@@ -95,6 +95,7 @@ where
     }
 
     fn show(&mut self) -> Result<()> {
+        self.write.execute(EnterAlternateScreen)?;
         self.write.execute(cursor::Hide)?;
         terminal::enable_raw_mode()?;
 
@@ -152,6 +153,7 @@ where
             cursor::Show
         )?;
         terminal::disable_raw_mode()?;
+        self.write.execute(LeaveAlternateScreen)?;
         Ok(())
     }
 
