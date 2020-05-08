@@ -151,6 +151,8 @@ impl<'a> VersionControlActions for HgActions {
         let mut output = handle_command(
             self.command()
                 .arg("log")
+                .arg("--config")
+                .arg("experimental.graphshorten=True")
                 .arg("--graph")
                 .arg("--template")
                 .arg(template)
