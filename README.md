@@ -36,7 +36,6 @@ In a terminal in a repository folder, run the `verco` command.
 It will launch `verco`'s tui and you'll be able to interface with git/hg.
 
 ## Commands
-
 Key Sequence | Command
 --- | ---
 h | help
@@ -65,6 +64,21 @@ bb | list branches
 bn | new branch
 bd | delete branch
 x | custom command
+
+## Other Keybindings
+Key Sequence | Command
+--- | ---
+ctrl+j, ctrl+n, arrow down | move down one line
+ctrl+k, ctrl+p, arrow up | move up one line
+ctrl+d, page down | move down half page
+ctrl+u, page up | move up half page
+ctrl+e | go to end
+ctrl+b, ctrl+g | go to beginning
+space | select entry (on selection mode)
+ctrl+c, esc | cancel
+
+When reading a line, it uses ![`rustyline`](https://github.com/kkawakam/rustyline#emacs-mode-default-mode)
+default keybinds.
 
 ## Custom Commands
 You can create simple custom commands to run in your repository folder by placing them in the file
