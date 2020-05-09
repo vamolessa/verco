@@ -49,7 +49,7 @@ impl<'a> VersionControlActions for HgActions {
         Ok(())
     }
 
-    fn repository_directory(&self) -> &str {
+    fn get_root(&self) -> &str {
         &self.current_dir[..]
     }
 

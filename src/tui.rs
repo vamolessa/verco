@@ -87,7 +87,7 @@ where
     {
         let header = Header {
             action_name,
-            directory_name: self.version_control.repository_directory().into(),
+            directory_name: self.version_control.get_root().into(),
         };
         show_header(&mut self.write, &header, HeaderKind::Waiting)?;
         self.write.flush()?;
@@ -441,7 +441,7 @@ where
                             self.write.queue(cursor::MoveToNextLine(2))?;
 
                             let result =
-                                command.execute(self.version_control.repository_directory());
+                                command.execute(self.version_control.get_root());
                             self.handle_result(header, result)?;
                             return Ok(());
                         }
