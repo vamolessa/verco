@@ -183,8 +183,8 @@ impl VersionControlActions for GitActions {
         handle_command(
             self.command()
                 .arg("diff")
-                .arg(target)
                 .arg(parents)
+                .arg(target)
                 .arg("--color"),
         )
     }
@@ -202,8 +202,8 @@ impl VersionControlActions for GitActions {
         command
             .arg("diff")
             .arg("--color")
-            .arg(target)
             .arg(parents)
+            .arg(target)
             .arg("--");
 
         for e in entries.iter() {
