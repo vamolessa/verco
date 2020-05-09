@@ -10,10 +10,14 @@ pub enum VcsType {
 
 impl std::fmt::Display for VcsType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            VcsType::Git => "git",
-            VcsType::Hg => "mercurial",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                VcsType::Git => "git",
+                VcsType::Hg => "mercurial",
+            }
+        )
     }
 }
 

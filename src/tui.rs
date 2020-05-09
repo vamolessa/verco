@@ -582,7 +582,11 @@ where
         Self::show_help_action(&mut write, "lc", "log count")?;
 
         if let VcsType::Hg = self.version_control.get_type() {
-            Self::show_help_action(&mut write, "ts", "show topic stack (hg only)")?;
+            Self::show_help_action(
+                &mut write,
+                "ts",
+                "show topic stack (hg only)",
+            )?;
             write.queue(cursor::MoveToNextLine(1))?;
         }
 

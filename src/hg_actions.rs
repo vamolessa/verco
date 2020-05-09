@@ -3,7 +3,7 @@ use std::process::Command;
 use crate::{
     revision_shortcut::RevisionShortcut,
     select::{Entry, State},
-    version_control_actions::{handle_command, VersionControlActions, VcsType},
+    version_control_actions::{handle_command, VcsType, VersionControlActions},
 };
 
 fn str_to_state(s: &str) -> State {
@@ -167,7 +167,7 @@ impl<'a> VersionControlActions for HgActions {
         self.revision_shortcut.replace_occurrences(&mut output);
         Ok(output)
     }
-    /// Only works if the user has the `topic` extension enabled 
+    /// Only works if the user has the `topic` extension enabled
     fn current_stack(&mut self) -> Result<String, String> {
         handle_command(self.command().args(&["stack", "--color", "always"]))
     }
