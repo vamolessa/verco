@@ -27,13 +27,9 @@ pub fn show_tui(
     version_control: Box<dyn 'static + VersionControlActions>,
     custom_commands: Vec<CustomCommand>,
 ) {
-    Tui::new(
-        version_control,
-        custom_commands,
-        stdout().lock(),
-    )
-    .show()
-    .unwrap();
+    Tui::new(version_control, custom_commands, stdout().lock())
+        .show()
+        .unwrap();
 }
 
 enum HandleChordResult {
@@ -442,8 +438,7 @@ where
                             }
                             self.write.queue(cursor::MoveToNextLine(2))?;
 
-                            let result =
-                                command.execute(self.version_control.get_root());
+                            let result = command.execute(self.version_control.get_root());
                             self.handle_result(header, result)?;
                             return Ok(());
                         }

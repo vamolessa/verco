@@ -34,10 +34,13 @@ impl VersionControlActions for GitActions {
     fn set_root(&mut self) -> Result<(), String> {
         let mut command = self.command();
         let dir = handle_command(command.args(&["rev-parse", "--show-toplevel"]))?;
-        
-        let dir = dir.lines().next().expect("Root directory is an empty string");
+
+        let dir = dir
+            .lines()
+            .next()
+            .expect("Root directory is an empty string");
         self.current_dir = dir.to_owned();
-        
+
         Ok(())
     }
 
@@ -102,12 +105,9 @@ impl VersionControlActions for GitActions {
                 .args(&["-c", "color.status=always", "status"]),
         )
     }
-    
+
     fn current_export(&mut self) -> Result<String, String> {
-        handle_command(
-            self.command()
-                .args(&["show", "--color"]),
-        )
+        handle_command(self.command().args(&["show", "--color"]))
     }
 
     fn log(&mut self, count: u32) -> Result<String, String> {

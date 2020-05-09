@@ -24,8 +24,8 @@ pub fn get_current_version_control() -> Option<Box<dyn VersionControlActions>> {
     });
 
     if git_actions.set_root().is_ok() {
-        return Some(git_actions)
-    } 
+        return Some(git_actions);
+    }
 
     // Otherwise try Mercurial
     let mut hg_actions = Box::from(HgActions {

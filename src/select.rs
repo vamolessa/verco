@@ -320,10 +320,7 @@ impl<'a> Select<'a> {
     }
 }
 
-pub fn select<W>(
-    write: &mut W,
-    entries: &mut Vec<Entry>,
-) -> Result<bool>
+pub fn select<W>(write: &mut W, entries: &mut Vec<Entry>) -> Result<bool>
 where
     W: Write,
 {
