@@ -28,13 +28,9 @@ impl ToString for SettingsError {
         match self {
             Self::ConfigNotFound => {
                 format!("Config file {} not found", get_config_path().display())
-            },
-            Self::Io(e) => {
-                e.to_string()
-            },
-            Self::InvalidConfig(e) => {
-                e.to_owned()
             }
+            Self::Io(e) => e.to_string(),
+            Self::InvalidConfig(e) => e.to_owned(),
         }
     }
 }
@@ -43,10 +39,11 @@ impl Settings {
     pub fn new() -> Result<Self, SettingsError> {
         let config_path = get_config_path();
 
-        let mut config_file = File::open(config_path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => SettingsError::ConfigNotFound,
-            _ => SettingsError::Io(e),
-        })?;
+        let mut config_file =
+            File::open(config_path).map_err(|e| match e.kind() {
+                std::io::ErrorKind::NotFound => SettingsError::ConfigNotFound,
+                _ => SettingsError::Io(e),
+            })?;
 
         let mut config_string = String::new();
         config_file
@@ -64,6 +61,6 @@ fn get_config_path() -> PathBuf {
     let r = ProjectDirs::from("com", "Verco", "Verco");
     let project_dirs = r.expect("no valid home directory path");
     let config_dir = project_dirs.config_dir();
-    
+
     config_dir.join("verco.toml")
 }

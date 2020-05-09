@@ -79,7 +79,7 @@ where
                         eprintln!("{}", e.to_string());
                         std::process::exit(1)
                     }
-                }
+                },
             },
         }
     }
@@ -208,7 +208,9 @@ where
                 s.handle_result(h, result)
             }),
             ['l', 'c'] => self.command_context("log count", |s, h| {
-                if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
+                if let Some(input) =
+                    s.handle_input("logs to show (ctrl+c to cancel)")?
+                {
                     if let Ok(count) = input.parse() {
                         let result = s.version_control.log(count);
                         s.handle_result(h, result)
@@ -226,51 +228,24 @@ where
                 }
             }),
             ['e'] => Ok(HandleChordResult::Unhandled),
-            ['e', 'e'] => self.command_context("current full revision", |s, h| {
-                let result = s.version_control.current_export();
-                s.handle_result(h, result)
-            }),
-            ['d'] => Ok(HandleChordResult::Unhandled),
+            ['e', 'e'] => {
+                self.command_context("current full revision", |s, h| {
+                    let result = s.version_control.current_export();
+                    s.handle_result(h, result)
+                })
+            }
             ['d', 'd'] => self.command_context("current diff all", |s, h| {
                 let result = s.version_control.current_diff_all();
                 s.handle_result(h, result)
             }),
-            ['d', 's'] => self.command_context("current diff selected", |s, h| {
-                match s.version_control.get_current_changed_files() {
-                    Ok(mut entries) => {
-                        if s.show_select_ui(&mut entries)? {
-                            let result = s.version_control.current_diff_selected(&entries);
-                            s.handle_result(h, result)
-                        } else {
-                            s.show_header(h, HeaderKind::Canceled)
-                        }
-                    }
-                    Err(error) => s.handle_result(h, Err(error)),
-                }
-            }),
-            ['D'] => Ok(HandleChordResult::Unhandled),
-            ['D', 'C'] => self.command_context("revision changes", |s, h| {
-                if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel): ")? {
-                    let result = s.version_control.revision_changes(&input[..]);
-                    s.handle_result(h, result)
-                } else {
-                    s.show_header(h, HeaderKind::Canceled)
-                }
-            }),
-            ['D', 'D'] => self.command_context("revision diff all", |s, h| {
-                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
-                    let result = s.version_control.revision_diff_all(&input[..]);
-                    s.handle_result(h, result)
-                } else {
-                    s.show_header(h, HeaderKind::Canceled)
-                }
-            }),
-            ['D', 'S'] => self.command_context("revision diff selected", |s, h| {
-                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
-                    match s.version_control.get_revision_changed_files(&input[..]) {
+            ['d', 's'] => {
+                self.command_context("current diff selected", |s, h| {
+                    match s.version_control.get_current_changed_files() {
                         Ok(mut entries) => {
                             if s.show_select_ui(&mut entries)? {
-                                let result = s.version_control.revision_diff_selected(&input[..], &entries);
+                                let result = s
+                                    .version_control
+                                    .current_diff_selected(&entries);
                                 s.handle_result(h, result)
                             } else {
                                 s.show_header(h, HeaderKind::Canceled)
@@ -278,14 +253,65 @@ where
                         }
                         Err(error) => s.handle_result(h, Err(error)),
                     }
+                })
+            }
+            ['D'] => Ok(HandleChordResult::Unhandled),
+            ['D', 'C'] => self.command_context("revision changes", |s, h| {
+                if let Some(input) =
+                    s.handle_input("show changes from (ctrl+c to cancel): ")?
+                {
+                    let result = s.version_control.revision_changes(&input[..]);
+                    s.handle_result(h, result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['r', 'r'] => self.command_context("unresolved conflicts", |s, h| {
-                let result = s.version_control.conflicts();
-                s.handle_result(h, result)
+            ['D', 'D'] => self.command_context("revision diff all", |s, h| {
+                if let Some(input) =
+                    s.handle_input("show diff from (ctrl+c to cancel): ")?
+                {
+                    let result =
+                        s.version_control.revision_diff_all(&input[..]);
+                    s.handle_result(h, result)
+                } else {
+                    s.show_header(h, HeaderKind::Canceled)
+                }
             }),
+            ['D', 'S'] => {
+                self.command_context("revision diff selected", |s, h| {
+                    if let Some(input) =
+                        s.handle_input("show diff from (ctrl+c to cancel): ")?
+                    {
+                        match s
+                            .version_control
+                            .get_revision_changed_files(&input[..])
+                        {
+                            Ok(mut entries) => {
+                                if s.show_select_ui(&mut entries)? {
+                                    let result = s
+                                        .version_control
+                                        .revision_diff_selected(
+                                            &input[..],
+                                            &entries,
+                                        );
+                                    s.handle_result(h, result)
+                                } else {
+                                    s.show_header(h, HeaderKind::Canceled)
+                                }
+                            }
+                            Err(error) => s.handle_result(h, Err(error)),
+                        }
+                    } else {
+                        s.show_header(h, HeaderKind::Canceled)
+                    }
+                })
+            }
+            ['r', 'r'] => {
+                self.command_context("unresolved conflicts", |s, h| {
+                    let result = s.version_control.conflicts();
+                    s.handle_result(h, result)
+                })
+            }
             ['b'] => Ok(HandleChordResult::Unhandled),
             ['b', 'b'] => self.command_context("list branches", |s, h| {
                 let result = s.version_control.list_branches();
