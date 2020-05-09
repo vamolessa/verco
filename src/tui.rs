@@ -14,6 +14,7 @@ use std::{
     iter,
 };
 
+use crate::settings::{Settings, SettingsError};
 use crate::{
     custom_commands::CustomCommand,
     input,
@@ -51,6 +52,7 @@ where
 
     write: W,
     scroll_view: ScrollView,
+    settings: Settings,
 }
 
 impl<W> Tui<W>
@@ -68,6 +70,17 @@ where
             current_key_chord: Vec::new(),
             write,
             scroll_view: Default::default(),
+            // TODO don't panic, but show an error and use default config
+            settings: match Settings::new() {
+                Ok(s) => s,
+                Err(e) => match e {
+                    SettingsError::ConfigNotFound => Settings::default(),
+                    _ => {
+                        eprintln!("{}", e.to_string());
+                        std::process::exit(1)
+                    }
+                }
+            },
         }
     }
 
@@ -97,7 +110,9 @@ where
     }
 
     fn show(&mut self) -> Result<()> {
-        self.write.execute(EnterAlternateScreen)?;
+        if !self.settings.no_alternate_screen {
+            self.write.execute(EnterAlternateScreen)?;
+        }
         self.write.execute(cursor::Hide)?;
         terminal::enable_raw_mode()?;
 
@@ -157,7 +172,10 @@ where
             cursor::Show
         )?;
         terminal::disable_raw_mode()?;
-        self.write.execute(LeaveAlternateScreen)?;
+        if !self.settings.no_alternate_screen {
+            self.write.execute(LeaveAlternateScreen)?;
+        }
+
         Ok(())
     }
 

@@ -8,6 +8,7 @@ mod repositories;
 mod revision_shortcut;
 mod scroll_view;
 mod select;
+mod settings;
 mod tui;
 mod tui_util;
 mod version_control_actions;
