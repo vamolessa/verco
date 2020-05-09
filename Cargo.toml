@@ -21,6 +21,9 @@ name = "verco"
 path = "src/main.rs"
 
 [dependencies]
+directories = "2.0.2"
 crossterm = "0.17.1"
 ctrlc = "3.1.4"
 rustyline = "6.1.1"
+toml = "0.5.6"
+serde = { version = "1.0", features = ["derive"] }
