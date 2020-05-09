@@ -16,7 +16,7 @@ impl RevisionShortcut {
         let mut final_text = String::new();
         final_text.push_str(&text[..]);
         let mut hashes = Vec::with_capacity(26);
-        
+
         // This pattern is weird enough to never appear anywhere in the log.
         let pattern = r"(__VERCO_NODE__([0-9a-fA-F]+)__VERCO_NODE__)";
         let re = regex::Regex::new(pattern).unwrap();
@@ -27,11 +27,11 @@ impl RevisionShortcut {
 
             if i < Self::max() {
                 hashes.push(hash.to_owned());
-                let shortcut = std::char::from_u32('A' as u32 + i as u32).unwrap();
+                let shortcut =
+                    std::char::from_u32('A' as u32 + i as u32).unwrap();
                 let replacement = format!("{} ({})", hash, shortcut);
                 final_text = final_text.replacen(occurrence, &replacement, 1);
-            }
-             else {
+            } else {
                 final_text = final_text.replacen(occurrence, hash, 1);
             }
         }
