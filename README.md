@@ -35,6 +35,24 @@ You'll be able to open `verco` from whichever directory you in.
 In a terminal in a repository folder, run the `verco` command.
 It will launch `verco`'s tui and you'll be able to interface with git/hg.
 
+
+## Configuration
+
+You can configure certain aspects of `verco` by adding a `verco.toml` in the right folder:
+
+- Linux: `$XDG_CONFIG_HOME/verco` or `$HOME/.config/verco`
+- Windows: `{FOLDERID_RoamingAppData}/verco/config`
+- MacOS: `$HOME/Library/Preferences/verco`
+
+Here is an example of a config file (more options will be added in the future):
+
+```toml
+# Disable all write actions (e.g pull, merge)
+read_only=true
+# Don't use an alternate screen for printing to the terminal
+no_alternate_screen=true
+```
+
 ## Commands
 Key Sequence | Command
 --- | ---
