@@ -31,6 +31,16 @@ impl GitActions {
 }
 
 impl VersionControlActions for GitActions {
+    fn set_root(&mut self) -> Result<(), String> {
+        let mut command = self.command();
+        let dir = handle_command(command.args(&["rev-parse", "--show-toplevel"]))?;
+        
+        let dir = dir.lines().next().expect("Root directory is an empty string");
+        self.current_dir = dir.to_owned();
+        
+        Ok(())
+    }
+
     fn repository_directory(&self) -> &str {
         &self.current_dir[..]
     }

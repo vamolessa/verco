@@ -3,6 +3,8 @@ use std::process::Command;
 use crate::select::Entry;
 
 pub trait VersionControlActions {
+    /// Sets the root of the current repository
+    fn set_root(&mut self) -> Result<(), String>;
     fn repository_directory(&self) -> &str;
 
     fn get_current_changed_files(&mut self) -> Result<Vec<Entry>, String>;
