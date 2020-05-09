@@ -187,12 +187,12 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['d'] => Ok(HandleChordResult::Unhandled),
             ['e'] => Ok(HandleChordResult::Unhandled),
             ['e', 'e'] => self.command_context("current full revision", |s, h| {
                 let result = s.version_control.current_export();
                 s.handle_result(h, result)
             }),
+            ['d'] => Ok(HandleChordResult::Unhandled),
             ['d', 'd'] => self.command_context("current diff all", |s, h| {
                 let result = s.version_control.current_diff_all();
                 s.handle_result(h, result)
