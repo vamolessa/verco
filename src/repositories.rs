@@ -1,4 +1,4 @@
-use std::{env, path::{Path, PathBuf}};
+use std::{env, path::Path};
 
 use crate::git_actions::GitActions;
 use crate::hg_actions::HgActions;
@@ -14,23 +14,31 @@ pub fn get_current_version_control() -> Option<Box<dyn VersionControlActions>> {
 
     let current_dir = env::current_dir().expect("could not get current directory");
 
-    if subdir_exists(&current_dir, ".git") {
-        Some(Box::from(GitActions {
-            current_dir: current_dir.to_str().expect("current directory is not valid utf8").into(),
-            revision_shortcut: Default::default(),
-        }))
-    } else if subdir_exists(&current_dir, ".hg") {
-        Some(Box::from(HgActions {
-            current_dir: current_dir.to_str().expect("current directory is not valid utf8").into(),
-            revision_shortcut: Default::default(),
-        }))
+    // First try Git because it's the most common and also responds the fastest
+    let mut git_actions = Box::from(GitActions {
+        current_dir: current_dir
+            .to_str()
+            .expect("current directory is not valid utf8")
+            .into(),
+        revision_shortcut: Default::default(),
+    });
+
+    if git_actions.set_root().is_ok() {
+        return Some(git_actions)
+    } 
+
+    // Otherwise try Mercurial
+    let mut hg_actions = Box::from(HgActions {
+        current_dir: current_dir
+            .to_str()
+            .expect("current directory is not valid utf8")
+            .into(),
+        revision_shortcut: Default::default(),
+    });
+
+    if hg_actions.set_root().is_ok() {
+        Some(hg_actions)
     } else {
         None
     }
-}
-
-fn subdir_exists(basedir: &PathBuf, subdir: &str) -> bool {
-    let mut path = basedir.clone();
-    path.push(subdir);
-    path.exists()
 }

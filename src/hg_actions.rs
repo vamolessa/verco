@@ -39,7 +39,17 @@ impl HgActions {
 }
 
 impl<'a> VersionControlActions for HgActions {
-    fn repository_directory(&self) -> &str {
+    fn set_root(&mut self) -> Result<(), String> {
+        let mut command = self.command();
+        let dir = handle_command(command.arg("root"))?;
+
+        let dir = dir.lines().next().expect("Root directory is an empty string");
+        self.current_dir = dir.to_owned();
+
+        Ok(())
+    }
+
+    fn get_root(&self) -> &str {
         &self.current_dir[..]
     }
 
