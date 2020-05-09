@@ -34,7 +34,9 @@ pub fn read_line() -> Result<String, ReadlineError> {
     let mut readline = Editor::<()>::new();
     match readline.readline("") {
         Ok(line) => Ok(line),
-        Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => Ok("".into()),
+        Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+            Ok("".into())
+        }
         Err(error) => Err(error),
     }
 }

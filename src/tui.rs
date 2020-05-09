@@ -3,7 +3,9 @@ use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute, queue,
     style::{Print, ResetColor, SetForegroundColor},
-    terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen,
+    },
     ExecutableCommand, QueueableCommand, Result,
 };
 
@@ -77,7 +79,11 @@ where
         select(&mut self.write, entries)
     }
 
-    fn command_context<F>(&mut self, action_name: &str, callback: F) -> Result<HandleChordResult>
+    fn command_context<F>(
+        &mut self,
+        action_name: &str,
+        callback: F,
+    ) -> Result<HandleChordResult>
     where
         F: FnOnce(&mut Self, &Header) -> Result<()>,
     {
@@ -132,7 +138,9 @@ where
                         self.current_key_chord.push(c);
                     }
                     match self.handle_command()? {
-                        HandleChordResult::Handled => self.current_key_chord.clear(),
+                        HandleChordResult::Handled => {
+                            self.current_key_chord.clear()
+                        }
                         HandleChordResult::Unhandled => (),
                         HandleChordResult::Quit => break,
                     }
@@ -434,11 +442,14 @@ where
                                 .queue(Print(&command.command))?
                                 .queue(ResetColor)?;
                             for arg in &command.args {
-                                self.write.queue(Print(' '))?.queue(Print(arg))?;
+                                self.write
+                                    .queue(Print(' '))?
+                                    .queue(Print(arg))?;
                             }
                             self.write.queue(cursor::MoveToNextLine(2))?;
 
-                            let result = command.execute(self.version_control.get_root());
+                            let result = command
+                                .execute(self.version_control.get_root());
                             self.handle_result(header, result)?;
                             return Ok(());
                         }
@@ -523,7 +534,10 @@ where
         Ok(())
     }
 
-    fn show_help(&mut self, header: &Header) -> Result<std::result::Result<String, String>> {
+    fn show_help(
+        &mut self,
+        header: &Header,
+    ) -> Result<std::result::Result<String, String>> {
         let mut write = Vec::with_capacity(1024);
 
         queue!(
@@ -606,7 +620,11 @@ where
         Ok(Ok(String::from_utf8(write)?))
     }
 
-    fn show_help_action<HW>(write: &mut HW, shortcut: &str, action: &str) -> Result<()>
+    fn show_help_action<HW>(
+        write: &mut HW,
+        shortcut: &str,
+        action: &str,
+    ) -> Result<()>
     where
         HW: Write,
     {
