@@ -45,7 +45,11 @@ impl ScrollView {
         Ok(())
     }
 
-    pub fn update<W>(&mut self, write: &mut W, key_event: &KeyEvent) -> Result<bool>
+    pub fn update<W>(
+        &mut self,
+        write: &mut W,
+        key_event: &KeyEvent,
+    ) -> Result<bool>
     where
         W: Write,
     {
@@ -140,8 +144,10 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::End, ..
             } => {
-                self.scroll =
-                    0.max(self.content_height() as i32 - Self::available_size().1 as i32) as usize;
+                self.scroll = 0.max(
+                    self.content_height() as i32
+                        - Self::available_size().1 as i32,
+                ) as usize;
                 self.show(write)?;
                 Ok(true)
             }

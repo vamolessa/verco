@@ -3,7 +3,8 @@ use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     queue,
     style::{
-        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
+        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor,
+        SetForegroundColor,
     },
     terminal::{self, Clear, ClearType},
     QueueableCommand, Result,
@@ -194,7 +195,11 @@ impl<'a> Select<'a> {
         Ok(())
     }
 
-    fn draw_all_entries<W>(&self, write: &mut W, available_size: (u16, u16)) -> Result<()>
+    fn draw_all_entries<W>(
+        &self,
+        write: &mut W,
+        available_size: (u16, u16),
+    ) -> Result<()>
     where
         W: Write,
     {
@@ -214,7 +219,12 @@ impl<'a> Select<'a> {
         Ok(())
     }
 
-    fn draw_entry<W>(&self, write: &mut W, index: usize, available_size: (u16, u16)) -> Result<()>
+    fn draw_entry<W>(
+        &self,
+        write: &mut W,
+        index: usize,
+        available_size: (u16, u16),
+    ) -> Result<()>
     where
         W: Write,
     {
@@ -254,7 +264,8 @@ impl<'a> Select<'a> {
         for _ in cursor_x..ITEM_NAME_COLUMN {
             write.queue(Print(' '))?;
         }
-        let max_len = (entry.filename.len() as u16).min(available_size.0 - ITEM_NAME_COLUMN);
+        let max_len = (entry.filename.len() as u16)
+            .min(available_size.0 - ITEM_NAME_COLUMN);
         let cursor_x = ITEM_NAME_COLUMN + max_len;
         write.queue(Print(
             &entry.filename[(entry.filename.len() - max_len as usize)..],
@@ -459,8 +470,9 @@ where
                 code: KeyCode::End, ..
             } => {
                 let entries_len = select.filtered_entries().count();
-                select.scroll =
-                    0.max(entries_len as i32 - select.available_size().1 as i32) as usize;
+                select.scroll = 0
+                    .max(entries_len as i32 - select.available_size().1 as i32)
+                    as usize;
                 select.cursor = entries_len - 1;
                 select.draw_all_entries(write, available_size)?;
             }
@@ -478,7 +490,8 @@ where
                 code: KeyCode::Char('a'),
                 modifiers: KeyModifiers::CONTROL,
             } => {
-                let all_selected = select.filtered_entries().all(|e| e.selected);
+                let all_selected =
+                    select.filtered_entries().all(|e| e.selected);
                 for e in select.filtered_entries_mut() {
                     e.selected = !all_selected;
                 }

@@ -40,11 +40,18 @@ pub struct Header<'a> {
 
 impl<'a> Header<'a> {
     pub fn length(&self) -> usize {
-        HEADER_PREFIX.len() + self.directory_name.len() + 3 + self.action_name.len()
+        HEADER_PREFIX.len()
+            + self.directory_name.len()
+            + 3
+            + self.action_name.len()
     }
 }
 
-pub fn show_header<W>(write: &mut W, header: &Header, kind: HeaderKind) -> Result<()>
+pub fn show_header<W>(
+    write: &mut W,
+    header: &Header,
+    kind: HeaderKind,
+) -> Result<()>
 where
     W: Write,
 {
@@ -85,7 +92,9 @@ where
         Print(' '),
         SetBackgroundColor(background_color),
         SetForegroundColor(HEADER_COLOR),
-        Print(" ".repeat(terminal::size()?.0 as usize - header.length() - status.len() - 2)),
+        Print(" ".repeat(
+            terminal::size()?.0 as usize - header.length() - status.len() - 2
+        )),
         SetBackgroundColor(background_dark_color),
         SetForegroundColor(ACTION_COLOR),
         Print(' '),

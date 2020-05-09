@@ -77,9 +77,14 @@ impl<'a> VersionControlActions for HgActions {
         Ok(files)
     }
 
-    fn get_revision_changed_files(&mut self, target: &str) -> Result<Vec<Entry>, String> {
+    fn get_revision_changed_files(
+        &mut self,
+        target: &str,
+    ) -> Result<Vec<Entry>, String> {
         let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        let output = handle_command(self.command().arg("status").arg("--change").arg(target))?;
+        let output = handle_command(
+            self.command().arg("status").arg("--change").arg(target),
+        )?;
 
         let files = output
             .trim()
@@ -105,11 +110,17 @@ impl<'a> VersionControlActions for HgActions {
     fn status(&mut self) -> Result<String, String> {
         let mut output = String::new();
 
-        output
-            .push_str(&handle_command(self.command().args(&["summary", "--color", "always"]))?[..]);
+        output.push_str(
+            &handle_command(
+                self.command().args(&["summary", "--color", "always"]),
+            )?[..],
+        );
         output.push_str("\n");
-        output
-            .push_str(&handle_command(self.command().args(&["status", "--color", "always"]))?[..]);
+        output.push_str(
+            &handle_command(
+                self.command().args(&["status", "--color", "always"]),
+            )?[..],
+        );
 
         Ok(output)
     }
@@ -157,7 +168,10 @@ impl<'a> VersionControlActions for HgActions {
         handle_command(self.command().arg("diff").arg("--color").arg("always"))
     }
 
-    fn current_diff_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+    fn current_diff_selected(
+        &mut self,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
         let mut command = self.command();
         command.arg("diff").arg("--color").arg("always").arg("--");
 
@@ -231,7 +245,11 @@ impl<'a> VersionControlActions for HgActions {
         )
     }
 
-    fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
+    fn commit_selected(
+        &mut self,
+        message: &str,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
         let mut cmd = self.command();
         cmd.arg("commit");
 
@@ -239,10 +257,14 @@ impl<'a> VersionControlActions for HgActions {
             if e.selected {
                 match e.state {
                     State::Missing | State::Deleted => {
-                        handle_command(self.command().arg("remove").arg(&e.filename))?;
+                        handle_command(
+                            self.command().arg("remove").arg(&e.filename),
+                        )?;
                     }
                     State::Untracked => {
-                        handle_command(self.command().arg("add").arg(&e.filename))?;
+                        handle_command(
+                            self.command().arg("add").arg(&e.filename),
+                        )?;
                     }
                     _ => (),
                 }
@@ -264,7 +286,10 @@ impl<'a> VersionControlActions for HgActions {
         Ok(output)
     }
 
-    fn revert_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+    fn revert_selected(
+        &mut self,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
         let mut output = String::new();
 
         let mut cmd = self.command();
@@ -280,7 +305,9 @@ impl<'a> VersionControlActions for HgActions {
             match e.state {
                 State::Untracked => {
                     output.push_str(
-                        &handle_command(self.command().arg("purge").arg(&e.filename))?[..],
+                        &handle_command(
+                            self.command().arg("purge").arg(&e.filename),
+                        )?[..],
                     );
                 }
                 _ => {
@@ -308,21 +335,27 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn conflicts(&mut self) -> Result<String, String> {
-        handle_command(self.command().args(&["resolve", "-l", "--color", "always"]))
+        handle_command(
+            self.command().args(&["resolve", "-l", "--color", "always"]),
+        )
     }
 
     fn take_other(&mut self) -> Result<String, String> {
-        handle_command(
-            self.command()
-                .args(&["resolve", "-a", "-t", "internal:other"]),
-        )
+        handle_command(self.command().args(&[
+            "resolve",
+            "-a",
+            "-t",
+            "internal:other",
+        ]))
     }
 
     fn take_local(&mut self) -> Result<String, String> {
-        handle_command(
-            self.command()
-                .args(&["resolve", "-a", "-t", "internal:local"]),
-        )
+        handle_command(self.command().args(&[
+            "resolve",
+            "-a",
+            "-t",
+            "internal:local",
+        ]))
     }
 
     fn fetch(&mut self) -> Result<String, String> {
@@ -350,7 +383,8 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn close_branch(&mut self, name: &str) -> Result<String, String> {
-        let changeset = handle_command(self.command().args(&["identify", "--num"]))?;
+        let changeset =
+            handle_command(self.command().args(&["identify", "--num"]))?;
         self.update(name)?;
 
         let mut output = String::new();

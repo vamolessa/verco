@@ -9,7 +9,10 @@ pub trait VersionControlActions {
     fn get_root(&self) -> &str;
 
     fn get_current_changed_files(&mut self) -> Result<Vec<Entry>, String>;
-    fn get_revision_changed_files(&mut self, target: &str) -> Result<Vec<Entry>, String>;
+    fn get_revision_changed_files(
+        &mut self,
+        target: &str,
+    ) -> Result<Vec<Entry>, String>;
 
     fn version(&mut self) -> Result<String, String>;
 
@@ -19,7 +22,10 @@ pub trait VersionControlActions {
     fn log(&mut self, count: u32) -> Result<String, String>;
 
     fn current_diff_all(&mut self) -> Result<String, String>;
-    fn current_diff_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String>;
+    fn current_diff_selected(
+        &mut self,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String>;
 
     fn revision_changes(&mut self, target: &str) -> Result<String, String>;
     fn revision_diff_all(&mut self, target: &str) -> Result<String, String>;
@@ -30,9 +36,16 @@ pub trait VersionControlActions {
     ) -> Result<String, String>;
 
     fn commit_all(&mut self, message: &str) -> Result<String, String>;
-    fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String>;
+    fn commit_selected(
+        &mut self,
+        message: &str,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String>;
     fn revert_all(&mut self) -> Result<String, String>;
-    fn revert_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String>;
+    fn revert_selected(
+        &mut self,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String>;
     fn update(&mut self, target: &str) -> Result<String, String>;
     fn merge(&mut self, target: &str) -> Result<String, String>;
 

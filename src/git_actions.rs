@@ -33,7 +33,8 @@ impl GitActions {
 impl VersionControlActions for GitActions {
     fn set_root(&mut self) -> Result<(), String> {
         let mut command = self.command();
-        let dir = handle_command(command.args(&["rev-parse", "--show-toplevel"]))?;
+        let dir =
+            handle_command(command.args(&["rev-parse", "--show-toplevel"]))?;
 
         let dir = dir
             .lines()
@@ -68,7 +69,10 @@ impl VersionControlActions for GitActions {
         Ok(files)
     }
 
-    fn get_revision_changed_files(&mut self, target: &str) -> Result<Vec<Entry>, String> {
+    fn get_revision_changed_files(
+        &mut self,
+        target: &str,
+    ) -> Result<Vec<Entry>, String> {
         let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
 
         let output = handle_command(
@@ -82,7 +86,8 @@ impl VersionControlActions for GitActions {
         )?;
 
         let state_iter = output.split('\0').map(|e| e.trim()).step_by(2);
-        let filename_iter = output.split('\0').map(|e| e.trim()).skip(1).step_by(2);
+        let filename_iter =
+            output.split('\0').map(|e| e.trim()).skip(1).step_by(2);
 
         let files = state_iter
             .zip(filename_iter)
@@ -100,10 +105,11 @@ impl VersionControlActions for GitActions {
     }
 
     fn status(&mut self) -> Result<String, String> {
-        handle_command(
-            self.command()
-                .args(&["-c", "color.status=always", "status"]),
-        )
+        handle_command(self.command().args(&[
+            "-c",
+            "color.status=always",
+            "status",
+        ]))
     }
 
     fn current_export(&mut self) -> Result<String, String> {
@@ -149,7 +155,10 @@ impl VersionControlActions for GitActions {
         handle_command(self.command().args(&["diff", "--color"]))
     }
 
-    fn current_diff_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+    fn current_diff_selected(
+        &mut self,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
         let mut command = self.command();
         command.arg("diff").arg("--color").arg("--");
 
@@ -220,10 +229,16 @@ impl VersionControlActions for GitActions {
         handle_command(self.command().arg("commit").arg("-m").arg(message))
     }
 
-    fn commit_selected(&mut self, message: &str, entries: &Vec<Entry>) -> Result<String, String> {
+    fn commit_selected(
+        &mut self,
+        message: &str,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
         for e in entries.iter() {
             if e.selected {
-                handle_command(self.command().arg("add").arg("--").arg(&e.filename))?;
+                handle_command(
+                    self.command().arg("add").arg("--").arg(&e.filename),
+                )?;
             }
         }
 
@@ -233,14 +248,21 @@ impl VersionControlActions for GitActions {
     fn revert_all(&mut self) -> Result<String, String> {
         let mut output = String::new();
 
-        output.push_str(&handle_command(self.command().args(&["reset", "--hard"]))?[..]);
+        output.push_str(
+            &handle_command(self.command().args(&["reset", "--hard"]))?[..],
+        );
         output.push('\n');
-        output.push_str(&handle_command(self.command().args(&["clean", "-df"]))?[..]);
+        output.push_str(
+            &handle_command(self.command().args(&["clean", "-df"]))?[..],
+        );
 
         Ok(output)
     }
 
-    fn revert_selected(&mut self, entries: &Vec<Entry>) -> Result<String, String> {
+    fn revert_selected(
+        &mut self,
+        entries: &Vec<Entry>,
+    ) -> Result<String, String> {
         let mut output = String::new();
 
         for e in entries.iter() {
@@ -268,8 +290,12 @@ impl VersionControlActions for GitActions {
                     )?;
                 }
                 _ => {
-                    let o =
-                        handle_command(self.command().arg("checkout").arg("--").arg(&e.filename))?;
+                    let o = handle_command(
+                        self.command()
+                            .arg("checkout")
+                            .arg("--")
+                            .arg(&e.filename),
+                    )?;
                     output.push_str(&o[..]);
                 }
             }
@@ -289,10 +315,11 @@ impl VersionControlActions for GitActions {
     }
 
     fn conflicts(&mut self) -> Result<String, String> {
-        handle_command(
-            self.command()
-                .args(&["diff", "--name-only", "--diff-filter=U"]),
-        )
+        handle_command(self.command().args(&[
+            "diff",
+            "--name-only",
+            "--diff-filter=U",
+        ]))
     }
 
     fn take_other(&mut self) -> Result<String, String> {
@@ -318,8 +345,14 @@ impl VersionControlActions for GitActions {
     fn create_tag(&mut self, name: &str) -> Result<String, String> {
         let mut output = String::new();
 
-        output.push_str(&handle_command(self.command().arg("tag").arg(name).arg("-f"))?[..]);
-        output.push_str(&handle_command(self.command().arg("push").arg("origin").arg(name))?[..]);
+        output.push_str(
+            &handle_command(self.command().arg("tag").arg(name).arg("-f"))?[..],
+        );
+        output.push_str(
+            &handle_command(
+                self.command().arg("push").arg("origin").arg(name),
+            )?[..],
+        );
 
         Ok(output)
     }
@@ -331,7 +364,9 @@ impl VersionControlActions for GitActions {
     fn create_branch(&mut self, name: &str) -> Result<String, String> {
         let mut output = String::new();
 
-        output.push_str(&handle_command(self.command().arg("branch").arg(name))?[..]);
+        output.push_str(
+            &handle_command(self.command().arg("branch").arg(name))?[..],
+        );
         output.push('\n');
         output.push_str(&self.update(name)?[..]);
         output.push('\n');
@@ -351,10 +386,15 @@ impl VersionControlActions for GitActions {
     fn close_branch(&mut self, name: &str) -> Result<String, String> {
         let mut output = String::new();
 
-        output.push_str(&handle_command(self.command().arg("branch").arg("-d").arg(name))?[..]);
+        output.push_str(
+            &handle_command(self.command().arg("branch").arg("-d").arg(name))?
+                [..],
+        );
         output.push('\n');
         output.push_str(
-            &handle_command(self.command().arg("push").arg("-d").arg("origin").arg(name))?[..],
+            &handle_command(
+                self.command().arg("push").arg("-d").arg("origin").arg(name),
+            )?[..],
         );
 
         Ok(output)
