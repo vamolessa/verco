@@ -13,7 +13,7 @@ pub trait Task {
     fn cancel(&mut self);
 }
 
-struct ChildTask {
+pub struct ChildTask {
     child: Child,
 }
 

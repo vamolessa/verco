@@ -1,4 +1,5 @@
 use crossterm::tty::IsTty;
+use worker::Task;
 
 mod custom_actions;
 mod git_actions;
@@ -14,6 +15,25 @@ mod version_control_actions;
 mod worker;
 
 fn main() {
+    let mut command = std::process::Command::new("echo");
+    command.arg("asdasdasd");
+    let mut task = worker::ChildTask::from_command(command).unwrap();
+
+    loop {
+        match task.poll() {
+            std::task::Poll::Ready(Ok(output)) => {
+                println!("output: {}", output);
+                break;
+            }
+            std::task::Poll::Ready(Err(error)) => {
+                println!("error: {}", error);
+                break;
+            }
+            std::task::Poll::Pending => std::thread::sleep_ms(10),
+        }
+    }
+    return;
+
     if !std::io::stdin().is_tty() {
         eprintln!("not tty");
         return;
