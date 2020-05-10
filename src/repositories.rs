@@ -1,8 +1,9 @@
 use std::{env, path::Path};
 
-use crate::git_actions::GitActions;
-use crate::hg_actions::HgActions;
-use crate::version_control_actions::VersionControlActions;
+use crate::{
+    git_actions::GitActions, hg_actions::HgActions,
+    version_control_actions::VersionControlActions,
+};
 
 pub fn get_current_version_control() -> Option<Box<dyn VersionControlActions>> {
     let mut args = env::args();
@@ -38,8 +39,8 @@ pub fn get_current_version_control() -> Option<Box<dyn VersionControlActions>> {
     });
 
     if hg_actions.set_root().is_ok() {
-        Some(hg_actions)
-    } else {
-        None
+        return Some(hg_actions);
     }
+
+    None
 }
