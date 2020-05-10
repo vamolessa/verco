@@ -448,8 +448,8 @@ where
                             }
                             self.write.queue(cursor::MoveToNextLine(2))?;
 
-                            let result = action
-                                .execute(self.version_control.get_root());
+                            let result =
+                                action.execute(self.version_control.get_root());
                             self.handle_result(header, result)?;
                             return Ok(());
                         }
