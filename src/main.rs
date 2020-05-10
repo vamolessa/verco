@@ -1,6 +1,5 @@
 use crossterm::tty::IsTty;
 
-mod worker;
 mod custom_commands;
 mod git_actions;
 mod hg_actions;
@@ -12,6 +11,7 @@ mod select;
 mod tui;
 mod tui_util;
 mod version_control_actions;
+mod worker;
 
 fn main() {
     if !std::io::stdin().is_tty() {
