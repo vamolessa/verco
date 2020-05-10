@@ -15,7 +15,7 @@ use std::{
 };
 
 use crate::{
-    custom_commands::CustomCommand,
+    custom_actions::CustomAction,
     input,
     scroll_view::ScrollView,
     select::{select, Entry},
@@ -27,9 +27,9 @@ const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub fn show_tui(
     version_control: Box<dyn 'static + VersionControlActions>,
-    custom_commands: Vec<CustomCommand>,
+    custom_actions: Vec<CustomAction>,
 ) {
-    Tui::new(version_control, custom_commands, stdout().lock())
+    Tui::new(version_control, custom_actions, stdout().lock())
         .show()
         .unwrap();
 }
@@ -45,7 +45,7 @@ where
     W: Write,
 {
     version_control: Box<dyn 'static + VersionControlActions>,
-    custom_commands: Vec<CustomCommand>,
+    custom_actions: Vec<CustomAction>,
 
     current_key_chord: Vec<char>,
 
@@ -59,12 +59,12 @@ where
 {
     fn new(
         version_control: Box<dyn 'static + VersionControlActions>,
-        custom_commands: Vec<CustomCommand>,
+        custom_actions: Vec<CustomAction>,
         write: W,
     ) -> Self {
         Tui {
             version_control,
-            custom_commands,
+            custom_actions,
             current_key_chord: Vec::new(),
             write,
             scroll_view: Default::default(),
@@ -79,7 +79,7 @@ where
         select(&mut self.write, entries)
     }
 
-    fn command_context<F>(
+    fn action_context<F>(
         &mut self,
         action_name: &str,
         callback: F,
@@ -101,7 +101,7 @@ where
         self.write.execute(cursor::Hide)?;
         terminal::enable_raw_mode()?;
 
-        self.command_context("help", |s, h| {
+        self.action_context("help", |s, h| {
             let result = s.show_help(h)?;
             s.handle_result(h, result)
         })?;
@@ -137,7 +137,7 @@ where
                     if let Some(c) = input::key_to_char(key_event) {
                         self.current_key_chord.push(c);
                     }
-                    match self.handle_command()? {
+                    match self.handle_action()? {
                         HandleChordResult::Handled => {
                             self.current_key_chord.clear()
                         }
@@ -161,23 +161,23 @@ where
         Ok(())
     }
 
-    fn handle_command(&mut self) -> Result<HandleChordResult> {
+    fn handle_action(&mut self) -> Result<HandleChordResult> {
         match &self.current_key_chord[..] {
             ['q'] => Ok(HandleChordResult::Quit),
-            ['h'] => self.command_context("help", |s, h| {
+            ['h'] => self.action_context("help", |s, h| {
                 let result = s.show_help(h)?;
                 s.handle_result(h, result)
             }),
-            ['s'] => self.command_context("status", |s, h| {
+            ['s'] => self.action_context("status", |s, h| {
                 let result = s.version_control.status();
                 s.handle_result(h, result)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
-            ['l', 'l'] => self.command_context("log", |s, h| {
+            ['l', 'l'] => self.action_context("log", |s, h| {
                 let result = s.version_control.log(50);
                 s.handle_result(h, result)
             }),
-            ['l', 'c'] => self.command_context("log count", |s, h| {
+            ['l', 'c'] => self.action_context("log count", |s, h| {
                 if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
                     if let Ok(count) = input.parse() {
                         let result = s.version_control.log(count);
@@ -196,16 +196,16 @@ where
                 }
             }),
             ['e'] => Ok(HandleChordResult::Unhandled),
-            ['e', 'e'] => self.command_context("current full revision", |s, h| {
+            ['e', 'e'] => self.action_context("current full revision", |s, h| {
                 let result = s.version_control.current_export();
                 s.handle_result(h, result)
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
-            ['d', 'd'] => self.command_context("current diff all", |s, h| {
+            ['d', 'd'] => self.action_context("current diff all", |s, h| {
                 let result = s.version_control.current_diff_all();
                 s.handle_result(h, result)
             }),
-            ['d', 's'] => self.command_context("current diff selected", |s, h| {
+            ['d', 's'] => self.action_context("current diff selected", |s, h| {
                 match s.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
@@ -219,7 +219,7 @@ where
                 }
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
-            ['D', 'C'] => self.command_context("revision changes", |s, h| {
+            ['D', 'C'] => self.action_context("revision changes", |s, h| {
                 if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel): ")? {
                     let result = s.version_control.revision_changes(&input[..]);
                     s.handle_result(h, result)
@@ -227,7 +227,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['D', 'D'] => self.command_context("revision diff all", |s, h| {
+            ['D', 'D'] => self.action_context("revision diff all", |s, h| {
                 if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
                     let result = s.version_control.revision_diff_all(&input[..]);
                     s.handle_result(h, result)
@@ -235,7 +235,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['D', 'S'] => self.command_context("revision diff selected", |s, h| {
+            ['D', 'S'] => self.action_context("revision diff selected", |s, h| {
                 if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
                     match s.version_control.get_revision_changed_files(&input[..]) {
                         Ok(mut entries) => {
@@ -253,7 +253,7 @@ where
                 }
             }),
             ['c'] => Ok(HandleChordResult::Unhandled),
-            ['c', 'c'] => self.command_context("commit all", |s, h| {
+            ['c', 'c'] => self.action_context("commit all", |s, h| {
                 if let Some(input) = s.handle_input("commit message (ctrl+c to cancel): ")? {
                     let result = s.version_control.commit_all(&input[..]);
                     s.handle_result(h, result)
@@ -261,7 +261,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['c', 's'] => self.command_context("commit selected", |s, h| {
+            ['c', 's'] => self.action_context("commit selected", |s, h| {
                 match s.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
@@ -282,7 +282,7 @@ where
                     Err(error) => s.handle_result(h, Err(error)),
                 }
             }),
-            ['u'] => self.command_context("update", |s, h| {
+            ['u'] => self.action_context("update", |s, h| {
                 if let Some(input) = s.handle_input("update to (ctrl+c to cancel): ")? {
                     let result = s.version_control.update(&input[..]);
                     s.handle_result(h, result)
@@ -290,7 +290,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['m'] => self.command_context("merge", |s, h| {
+            ['m'] => self.action_context("merge", |s, h| {
                 if let Some(input) = s.handle_input("merge with (ctrl+c to cancel): ")? {
                     let result = s.version_control.merge(&input[..]);
                     s.handle_result(h, result)
@@ -299,12 +299,12 @@ where
                 }
             }),
             ['R'] => Ok(HandleChordResult::Unhandled),
-            ['R', 'A'] => self.command_context("revert all", |s, h| {
+            ['R', 'A'] => self.action_context("revert all", |s, h| {
                 let result = s.version_control.revert_all();
                 s.handle_result(h, result)
             }),
             ['r'] => Ok(HandleChordResult::Unhandled),
-            ['r', 's'] => self.command_context("revert selected", |s, h| {
+            ['r', 's'] => self.action_context("revert selected", |s, h| {
                 match s.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
@@ -317,32 +317,32 @@ where
                     Err(error) => s.handle_result(h, Err(error)),
                 }
             }),
-            ['r', 'r'] => self.command_context("unresolved conflicts", |s, h| {
+            ['r', 'r'] => self.action_context("unresolved conflicts", |s, h| {
                 let result = s.version_control.conflicts();
                 s.handle_result(h, result)
             }),
-            ['r', 'o'] => self.command_context("merge taking other", |s, h| {
+            ['r', 'o'] => self.action_context("merge taking other", |s, h| {
                 let result = s.version_control.take_other();
                 s.handle_result(h, result)
             }),
-            ['r', 'l'] => self.command_context("merge taking local", |s, h| {
+            ['r', 'l'] => self.action_context("merge taking local", |s, h| {
                 let result = s.version_control.take_local();
                 s.handle_result(h, result)
             }),
-            ['f'] => self.command_context("fetch", |s, h| {
+            ['f'] => self.action_context("fetch", |s, h| {
                 let result = s.version_control.fetch();
                 s.handle_result(h, result)
             }),
-            ['p'] => self.command_context("pull", |s, h| {
+            ['p'] => self.action_context("pull", |s, h| {
                 let result = s.version_control.pull();
                 s.handle_result(h, result)
             }),
-            ['P'] => self.command_context("push", |s, h| {
+            ['P'] => self.action_context("push", |s, h| {
                 let result = s.version_control.push();
                 s.handle_result(h, result)
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
-            ['t', 'n'] => self.command_context("new tag", |s, h| {
+            ['t', 'n'] => self.action_context("new tag", |s, h| {
                 if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel): ")? {
                     let result = s.version_control.create_tag(&input[..]);
                     s.handle_result(h, result)
@@ -351,11 +351,11 @@ where
                 }
             }),
             ['b'] => Ok(HandleChordResult::Unhandled),
-            ['b', 'b'] => self.command_context("list branches", |s, h| {
+            ['b', 'b'] => self.action_context("list branches", |s, h| {
                 let result = s.version_control.list_branches();
                 s.handle_result(h, result)
             }),
-            ['b', 'n'] => self.command_context("new branch", |s, h| {
+            ['b', 'n'] => self.action_context("new branch", |s, h| {
                 if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel): ")? {
                     let result = s.version_control.create_branch(&input[..]);
                     s.handle_result(h, result)
@@ -363,7 +363,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['b', 'd'] => self.command_context("delete branch", |s, h| {
+            ['b', 'd'] => self.action_context("delete branch", |s, h| {
                 if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel): ")? {
                     let result = s.version_control.close_branch(&input[..]);
                     s.handle_result(h, result)
@@ -371,9 +371,9 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['x'] => self.command_context("custom command", |s, h| {
-                if s.custom_commands.len() > 0 {
-                    for c in &s.custom_commands {
+            ['x'] => self.action_context("custom action", |s, h| {
+                if s.custom_actions.len() > 0 {
+                    for c in &s.custom_actions {
                         s.write
                             .queue(SetForegroundColor(ENTRY_COLOR))?
                             .queue(Print(&c.shortcut))?
@@ -385,7 +385,7 @@ where
                         }
                         s.write.queue(cursor::MoveToNextLine(1))?;
                     }
-                    s.handle_custom_command(h)?;
+                    s.handle_custom_action(h)?;
                     s.current_key_chord.clear();
                 } else {
                     s.show_header(h, HeaderKind::Error)?;
@@ -394,7 +394,7 @@ where
                         ResetColor,
                         Print("no commands available"),
                         cursor::MoveToNextLine(2),
-                        Print("create custom commands by placing them inside '.verco/custom_commands.txt'"),
+                        Print("create custom actions by placing them inside '.verco/custom_actions.txt'"),
                     )?;
                 }
                 Ok(())
@@ -403,7 +403,7 @@ where
         }
     }
 
-    fn handle_custom_command(&mut self, header: &Header) -> Result<()> {
+    fn handle_custom_action(&mut self, header: &Header) -> Result<()> {
         self.current_key_chord.clear();
         self.write.queue(cursor::SavePosition)?;
 
@@ -423,8 +423,8 @@ where
                     if let Some(c) = input::key_to_char(key_event) {
                         self.current_key_chord.push(c);
                     }
-                    for command in &self.custom_commands {
-                        if command
+                    for action in &self.custom_actions {
+                        if action
                             .shortcut
                             .chars()
                             .zip(
@@ -439,16 +439,16 @@ where
                                 .queue(cursor::RestorePosition)?
                                 .queue(cursor::MoveToNextLine(2))?
                                 .queue(SetForegroundColor(ENTRY_COLOR))?
-                                .queue(Print(&command.command))?
+                                .queue(Print(&action.command))?
                                 .queue(ResetColor)?;
-                            for arg in &command.args {
+                            for arg in &action.args {
                                 self.write
                                     .queue(Print(' '))?
                                     .queue(Print(arg))?;
                             }
                             self.write.queue(cursor::MoveToNextLine(2))?;
 
-                            let result = command
+                            let result = action
                                 .execute(self.version_control.get_root());
                             self.handle_result(header, result)?;
                             return Ok(());
@@ -456,8 +456,8 @@ where
                     }
                     self.show_current_key_chord()?;
 
-                    for command in &self.custom_commands {
-                        if command
+                    for action in &self.custom_actions {
+                        if action
                             .shortcut
                             .chars()
                             .zip(&self.current_key_chord)
@@ -614,7 +614,7 @@ where
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "x", "custom command")?;
+        Self::show_help_action(&mut write, "x", "custom action")?;
 
         write.flush()?;
         Ok(Ok(String::from_utf8(write)?))

@@ -35,8 +35,8 @@ You'll be able to open `verco` from whichever directory you in.
 In a terminal in a repository folder, run the `verco` command.
 It will launch `verco`'s tui and you'll be able to interface with git/hg.
 
-## Commands
-Key Sequence | Command
+## Actions
+Key Sequence | Action
 --- | ---
 h | help
 q | quit
@@ -63,24 +63,24 @@ tn | new tag
 bb | list branches
 bn | new branch
 bd | delete branch
-x | custom command
+x | custom action
 
 ## Other Keybindings
-Key Sequence | Command
+Key Sequence | Action
 --- | ---
 ctrl+j, ctrl+n, arrow down | move down one line
 
-## Custom Commands
-You can create simple custom commands to run in your repository folder by placing them in the file
-`.verco/custom_commands.txt` in your repository root.
+## Custom Actions
+You can create simple custom actions to run in your repository folder by placing them in the file
+`.verco/custom_actions.txt` in your repository root.
 
-Each line in this file is treated as a different custom command. Until the first whitespace, the characters are
-treated as the keybind for the command, the next word is the command itself, and the rest are its parameters.
+Each line in this file is treated as a different custom action. Until the first whitespace, the characters are
+treated as the keybind for the action, the next word is the command to be executed itself, and the rest are its parameters.
 
 Example:
 ```
 gv git --version
 ```
 
-With `verco` open, you can type in `xgv` (`x` is the custom command prefix) and it will print your git version
-without leaving `verco`. Use it to create build commands for example.
+With `verco` open, you can type in `xgv` (`x` is the custom action prefix) and it will print your git version
+without leaving `verco`. Use it to create build tasks for example.

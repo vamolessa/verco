@@ -5,20 +5,20 @@ use std::{
     process::Command,
 };
 
-pub struct CustomCommand {
+pub struct CustomAction {
     pub shortcut: String,
     pub command: String,
     pub args: Vec<String>,
 }
 
-impl CustomCommand {
-    pub fn load_custom_commands() -> Vec<CustomCommand> {
-        Self::try_load_custom_commands().unwrap_or(Vec::new())
+impl CustomAction {
+    pub fn load_custom_actions() -> Vec<CustomAction> {
+        Self::try_load_custom_actions().unwrap_or(Vec::new())
     }
 
-    fn try_load_custom_commands() -> io::Result<Vec<CustomCommand>> {
+    fn try_load_custom_actions() -> io::Result<Vec<CustomAction>> {
         let mut path = env::current_dir()?;
-        path.push(".verco/custom_commands.txt");
+        path.push(".verco/custom_actions.txt");
         if !path.exists() {
             return Ok(Vec::new());
         }
@@ -26,7 +26,7 @@ impl CustomCommand {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
-        let mut commands = Vec::new();
+        let mut actions = Vec::new();
         let mut line = String::new();
         while next_line(&mut reader, &mut line) {
             let line = line.trim();
@@ -46,15 +46,15 @@ impl CustomCommand {
                 continue;
             }
 
-            let command = CustomCommand {
+            let command = CustomAction {
                 shortcut: shortcut.unwrap().into(),
                 command: command.unwrap().into(),
                 args: it.map(|s| s.into()).collect(),
             };
-            commands.push(command);
+            actions.push(command);
         }
 
-        Ok(commands)
+        Ok(actions)
     }
 
     pub fn execute(&self, current_dir: &str) -> Result<String, String> {
