@@ -1,5 +1,6 @@
 use crossterm::tty::IsTty;
 
+mod worker;
 mod custom_commands;
 mod git_actions;
 mod hg_actions;

@@ -2,7 +2,7 @@ use std::process::Command;
 
 use crate::select::Entry;
 
-pub trait VersionControlActions {
+pub trait VersionControlActions : Send {
     /// Sets the root of the current repository
     fn set_root(&mut self) -> Result<(), String>;
     /// Get the root of the current repository
