@@ -1,3 +1,5 @@
+use crossterm::tty::IsTty;
+
 mod custom_commands;
 mod git_actions;
 mod hg_actions;
@@ -11,6 +13,11 @@ mod tui_util;
 mod version_control_actions;
 
 fn main() {
+    if !std::io::stdin().is_tty() {
+        eprintln!("not tty");
+        return;
+    }
+
     ctrlc::set_handler(|| {}).unwrap();
     if let Some(version_control) = repositories::get_current_version_control() {
         let custom_commands =
