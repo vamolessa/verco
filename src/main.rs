@@ -1,6 +1,6 @@
 use crossterm::tty::IsTty;
 
-mod custom_commands;
+mod custom_actions;
 mod git_actions;
 mod hg_actions;
 mod input;
@@ -20,9 +20,9 @@ fn main() {
 
     ctrlc::set_handler(|| {}).unwrap();
     if let Some(version_control) = repositories::get_current_version_control() {
-        let custom_commands =
-            custom_commands::CustomCommand::load_custom_commands();
-        tui::show_tui(version_control, custom_commands);
+        let custom_actions =
+            custom_actions::CustomAction::load_custom_actions();
+        tui::show_tui(version_control, custom_actions);
     } else {
         eprintln!("no repository found");
     }
