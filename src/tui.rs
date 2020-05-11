@@ -101,8 +101,7 @@ where
     }
 
     fn show(&mut self) -> Result<()> {
-        self.write.execute(EnterAlternateScreen)?;
-        self.write.execute(cursor::Hide)?;
+        execute!(self.write, EnterAlternateScreen, cursor::Hide)?;
         terminal::enable_raw_mode()?;
 
         self.action_context("help", |s, h| {
