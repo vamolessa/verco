@@ -1,5 +1,3 @@
-use crossterm::tty::IsTty;
-
 mod custom_actions;
 mod git_actions;
 mod hg_actions;
@@ -13,7 +11,7 @@ mod tui_util;
 mod version_control_actions;
 
 fn main() {
-    if !std::io::stdin().is_tty() {
+    if !crossterm::tty::IsTty::is_tty(&std::io::stdin()) {
         eprintln!("not tty");
         return;
     }
