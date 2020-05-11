@@ -11,7 +11,121 @@ pub trait Task {
 
     fn poll(&mut self) -> Poll<Self::Output>;
     fn cancel(&mut self);
+
+    fn and_also(
+        self,
+        other: Box<dyn Task<Output = Self::Output>>,
+        aggregator: fn(Self::Output, Self::Output) -> Self::Output,
+    ) -> Box<dyn Task<Output = Self::Output>>
+    where
+        Self: 'static + Sized,
+    {
+        Box::new(ParallelTaskPair {
+            first: Box::new(self),
+            second: other,
+            first_result: None,
+            second_result: None,
+            aggregator,
+        })
+    }
+
+    fn and_then(
+        self,
+        other: Box<dyn Task<Output = Self::Output>>,
+        aggregator: fn(Self::Output, Self::Output) -> Self::Output,
+    ) -> Box<dyn Task<Output = Self::Output>>
+    where
+        Self: 'static + Sized,
+    {
+        Box::new(SerialTaskPair {
+            first: Box::new(self),
+            second: other,
+            first_result: None,
+            aggregator,
+        })
+    }
 }
+
+struct ParallelTaskPair<T> {
+    first: Box<dyn Task<Output = T>>,
+    second: Box<dyn Task<Output = T>>,
+    first_result: Option<T>,
+    second_result: Option<T>,
+    aggregator: fn(T, T) -> T,
+}
+
+impl<T> Task for ParallelTaskPair<T> {
+    type Output = T;
+
+    fn poll(&mut self) -> Poll<Self::Output> {
+        self.first_result = match self.first.poll() {
+            Poll::Ready(result) => Some(result),
+            Poll::Pending => None,
+        };
+        self.second_result = match self.second.poll() {
+            Poll::Ready(result) => Some(result),
+            Poll::Pending => None,
+        };
+
+        let mut first = None;
+        std::mem::swap(&mut self.first_result, &mut first);
+        let mut second = None;
+        std::mem::swap(&mut self.second_result, &mut second);
+        if let (Some(a), Some(b)) = (first, second) {
+            Poll::Ready((self.aggregator)(a, b))
+        } else {
+            Poll::Pending
+        }
+    }
+
+    fn cancel(&mut self) {
+        if self.first_result.is_none() {
+            self.first.cancel();
+        }
+        if self.second_result.is_none() {
+            self.second.cancel();
+        }
+    }
+}
+
+struct SerialTaskPair<T> {
+    first: Box<dyn Task<Output = T>>,
+    second: Box<dyn Task<Output = T>>,
+    first_result: Option<T>,
+    aggregator: fn(T, T) -> T,
+}
+
+impl<T> Task for SerialTaskPair<T> {
+    type Output = T;
+
+    fn poll(&mut self) -> Poll<Self::Output> {
+        if self.first_result.is_some() {
+            match self.second.poll() {
+                Poll::Ready(result) => {
+                    let mut first = None;
+                    std::mem::swap(&mut self.first_result, &mut first);
+                    Poll::Ready((self.aggregator)(first.unwrap(), result))
+                }
+                Poll::Pending => Poll::Pending,
+            }
+        } else {
+            self.first_result = match self.first.poll() {
+                Poll::Ready(result) => Some(result),
+                Poll::Pending => None,
+            };
+            Poll::Pending
+        }
+    }
+
+    fn cancel(&mut self) {
+        if self.first_result.is_none() {
+            self.first.cancel();
+        }
+        self.second.cancel();
+    }
+}
+
+type ChildResult = Result<String, String>;
 
 pub struct ChildTask {
     child: Child,
@@ -25,14 +139,14 @@ impl ChildTask {
             .stderr(Stdio::piped())
             .spawn()
         {
-            Ok(child) => Ok(Self { child: child }),
+            Ok(child) => Ok(Self { child }),
             Err(e) => Err(e.to_string()),
         }
     }
 }
 
 impl Task for ChildTask {
-    type Output = Result<String, String>;
+    type Output = ChildResult;
 
     fn poll(&mut self) -> Poll<Self::Output> {
         match self.child.try_wait() {
@@ -65,6 +179,31 @@ impl Task for ChildTask {
     fn cancel(&mut self) {
         match self.child.kill() {
             _ => (),
+        }
+    }
+}
+
+pub fn child_aggragator(a: ChildResult, b: ChildResult) -> ChildResult {
+    match (a, b) {
+        (Ok(mut a), Ok(b)) => {
+            a.push('\n');
+            a.push_str(&b[..]);
+            Ok(a)
+        }
+        (Ok(mut a), Err(b)) => {
+            a.push('\n');
+            a.push_str(&b[..]);
+            Err(a)
+        }
+        (Err(mut a), Ok(b)) => {
+            a.push('\n');
+            a.push_str(&b[..]);
+            Err(a)
+        }
+        (Err(mut a), Err(b)) => {
+            a.push('\n');
+            a.push_str(&b[..]);
+            Err(a)
         }
     }
 }

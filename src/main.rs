@@ -15,9 +15,13 @@ mod version_control_actions;
 mod worker;
 
 fn main() {
+    let mut command = std::process::Command::new("less");
+    command.arg("asdsadasd");
+    let task1 = worker::ChildTask::from_command(command).unwrap();
     let mut command = std::process::Command::new("echo");
-    command.arg("asdasdasd");
-    let mut task = worker::ChildTask::from_command(command).unwrap();
+    command.arg("asdsadasd");
+    let task2 = worker::ChildTask::from_command(command).unwrap();
+    let mut task = task1.and_also(Box::new(task2), worker::child_aggragator);
 
     loop {
         match task.poll() {
