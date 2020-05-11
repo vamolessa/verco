@@ -1,12 +1,14 @@
 use std::{
     io::Read,
+    mem,
     process::{Child, Command, Stdio},
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     task::Poll,
-    thread::spawn,
+    thread,
+    time::Duration,
 };
 
-pub trait Task {
+pub trait Task : Send {
     type Output;
 
     fn poll(&mut self) -> Poll<Self::Output>;
@@ -18,7 +20,7 @@ pub fn parallel<T>(
     aggregator: fn(&mut T, &T),
 ) -> Box<dyn Task<Output = T>>
 where
-    T: 'static,
+    T: 'static + Send,
 {
     let cached_results = tasks.iter().map(|_| None).collect();
     Box::new(ParallelTasks {
@@ -33,7 +35,7 @@ pub fn serial<T>(
     aggregator: fn(&mut T, &T),
 ) -> Box<dyn Task<Output = T>>
 where
-    T: 'static,
+    T: 'static + Send,
 {
     Box::new(SerialTasks {
         tasks,
@@ -48,7 +50,7 @@ struct ParallelTasks<T> {
     aggregator: fn(&mut T, &T),
 }
 
-impl<T> Task for ParallelTasks<T> {
+impl<T> Task for ParallelTasks<T> where T : Send {
     type Output = T;
 
     fn poll(&mut self) -> Poll<Self::Output> {
@@ -94,7 +96,7 @@ struct SerialTasks<T> {
     aggregator: fn(&mut T, &T),
 }
 
-impl<T> Task for SerialTasks<T> {
+impl<T> Task for SerialTasks<T> where T : Send{
     type Output = T;
 
     fn poll(&mut self) -> Poll<Self::Output> {
@@ -182,7 +184,7 @@ impl Task for ChildTask {
 
 pub fn child_aggragator(first: &mut ChildResult, second: &ChildResult) {
     let mut temp = Err(String::new());
-    std::mem::swap(first, &mut temp);
+    mem::swap(first, &mut temp);
     let ok;
     let mut text = match temp {
         Ok(text) => {
@@ -219,57 +221,64 @@ pub fn child_aggragator(first: &mut ChildResult, second: &ChildResult) {
     };
 }
 
-pub struct Worker<C, T>
+pub struct Worker<T>
 where
-    C: 'static + Send,
-    T: 'static + Send,
+    T: 'static ,
 {
-    task_sender: Sender<Box<dyn Send + FnOnce(&C) -> T>>,
-    output_receiver: Receiver<T>,
+    task_sender: Sender<Box<dyn Task<Output = T>>>,
+    result_receiver: Receiver<T>,
 }
 
-impl<C, T> Worker<C, T>
+impl<T> Worker<T>
 where
-    C: 'static + Send,
     T: 'static + Send,
 {
-    pub fn new(context: C) -> Self {
+    pub fn new() -> Self {
         let (task_sender, task_receiver) = channel();
-        let (output_sender, output_receiver) = channel();
+        let (output_sender, result_receiver) = channel();
 
-        spawn(move || {
-            run_worker(context, task_receiver, output_sender);
+        thread::spawn(move || {
+            run_worker(task_receiver, output_sender);
         });
 
         Self {
             task_sender,
-            output_receiver,
+            result_receiver,
         }
     }
 
-    pub fn send_task(&self, task: Box<dyn Send + FnOnce(&C) -> T>) {
+    pub fn send_task(&self, task: Box<dyn Task<Output = T>>) {
         self.task_sender.send(task).unwrap();
     }
 
-    pub fn receive_output(&self) -> T {
-        self.output_receiver.recv().unwrap()
+    pub fn receive_result(&self) -> T {
+        self.result_receiver.recv().unwrap()
     }
 }
 
-fn run_worker<C, T>(
-    context: C,
-    task_receiver: Receiver<Box<dyn Send + FnOnce(&C) -> T>>,
+fn run_worker<T>(
+    task_receiver: Receiver<Box<dyn Task<Output = T>>>,
     output_sender: Sender<T>,
 ) {
-    loop {
-        let task = match task_receiver.recv() {
-            Ok(task) => task,
-            Err(_) => break,
-        };
+    let mut pending_tasks = Vec::new();
 
-        match output_sender.send(task(&context)) {
-            Ok(()) => (),
-            Err(_) => break,
+    loop {
+        match task_receiver.try_recv() {
+            Ok(task) => pending_tasks.push(task),
+            Err(TryRecvError::Empty) => (),
+            Err(TryRecvError::Disconnected) => return,
         }
+
+        for i in (0..pending_tasks.len()).rev() {
+            if let Poll::Ready(result) = pending_tasks[i].poll() {
+                match output_sender.send(result) {
+                    Ok(()) => (),
+                    Err(_) => return,
+                }
+                pending_tasks.swap_remove(i);
+            }
+        }
+
+        thread::sleep(Duration::from_millis(20));
     }
 }

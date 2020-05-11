@@ -25,23 +25,35 @@ fn main() {
     let task1: Box<dyn Task<Output = _>> = Box::new(task1);
     let task2: Box<dyn Task<Output = _>> = Box::new(task2);
     let task3: Box<dyn Task<Output = _>> = Box::new(task3);
-    let tasks = vec![task1, task2, task3];
-    let mut task = worker::serial(tasks, worker::child_aggragator);
+    let mut tasks = vec![task1, task2, task3];
+    //let mut task = worker::serial(tasks, worker::child_aggragator);
     //let mut task = task1;
 
-    loop {
-        match task.poll() {
-            std::task::Poll::Ready(Ok(output)) => {
-                println!("output: {}", output);
-                break;
-            }
-            std::task::Poll::Ready(Err(error)) => {
-                println!("error: {}", error);
-                break;
-            }
-            std::task::Poll::Pending => std::thread::sleep_ms(10),
+    let wk = worker::Worker::new();
+    let task_count = tasks.len();
+    for task in tasks.drain(..) {
+        wk.send_task(task);
+    }
+    for _ in 0..task_count {
+        match wk.receive_result() {
+            Ok(output) => println!("ok: {}", output),
+            Err(error) => println!("error: {}", error),
         }
     }
+
+    //loop {
+    //    match task.poll() {
+    //        std::task::Poll::Ready(Ok(output)) => {
+    //            println!("output: {}", output);
+    //            break;
+    //        }
+    //        std::task::Poll::Ready(Err(error)) => {
+    //            println!("error: {}", error);
+    //            break;
+    //        }
+    //        std::task::Poll::Pending => std::thread::sleep_ms(10),
+    //    }
+    //}
     return;
 
     if crossterm::tty::IsTty::is_tty(&std::io::stdin()) {
