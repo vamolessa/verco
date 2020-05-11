@@ -1,6 +1,3 @@
-use crossterm::tty::IsTty;
-use worker::Task;
-
 mod custom_actions;
 mod git_actions;
 mod hg_actions;
@@ -15,13 +12,22 @@ mod version_control_actions;
 mod worker;
 
 fn main() {
+    use worker::Task;
     let mut command = std::process::Command::new("less");
     command.arg("asdsadasd");
     let task1 = worker::ChildTask::from_command(command).unwrap();
     let mut command = std::process::Command::new("echo");
     command.arg("asdsadasd");
     let task2 = worker::ChildTask::from_command(command).unwrap();
-    let mut task = task1.and_also(Box::new(task2), worker::child_aggragator);
+    let mut command = std::process::Command::new("echo");
+    command.arg("matheus");
+    let task3 = worker::ChildTask::from_command(command).unwrap();
+    let task1: Box<dyn Task<Output = _>> = Box::new(task1);
+    let task2: Box<dyn Task<Output = _>> = Box::new(task2);
+    let task3: Box<dyn Task<Output = _>> = Box::new(task3);
+    let tasks = vec![task1, task2, task3];
+    let mut task = worker::serial(tasks, worker::child_aggragator);
+    //let mut task = task1;
 
     loop {
         match task.poll() {
@@ -38,7 +44,7 @@ fn main() {
     }
     return;
 
-    if !std::io::stdin().is_tty() {
+    if crossterm::tty::IsTty::is_tty(&std::io::stdin()) {
         eprintln!("not tty");
         return;
     }

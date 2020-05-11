@@ -11,117 +11,114 @@ pub trait Task {
 
     fn poll(&mut self) -> Poll<Self::Output>;
     fn cancel(&mut self);
-
-    fn and_also(
-        self,
-        other: Box<dyn Task<Output = Self::Output>>,
-        aggregator: fn(Self::Output, Self::Output) -> Self::Output,
-    ) -> Box<dyn Task<Output = Self::Output>>
-    where
-        Self: 'static + Sized,
-    {
-        Box::new(ParallelTaskPair {
-            first: Box::new(self),
-            second: other,
-            first_result: None,
-            second_result: None,
-            aggregator,
-        })
-    }
-
-    fn and_then(
-        self,
-        other: Box<dyn Task<Output = Self::Output>>,
-        aggregator: fn(Self::Output, Self::Output) -> Self::Output,
-    ) -> Box<dyn Task<Output = Self::Output>>
-    where
-        Self: 'static + Sized,
-    {
-        Box::new(SerialTaskPair {
-            first: Box::new(self),
-            second: other,
-            first_result: None,
-            aggregator,
-        })
-    }
 }
 
-struct ParallelTaskPair<T> {
-    first: Box<dyn Task<Output = T>>,
-    second: Box<dyn Task<Output = T>>,
-    first_result: Option<T>,
-    second_result: Option<T>,
-    aggregator: fn(T, T) -> T,
+pub fn parallel<T>(
+    tasks: Vec<Box<dyn Task<Output = T>>>,
+    aggregator: fn(&mut T, &T),
+) -> Box<dyn Task<Output = T>>
+where
+    T: 'static,
+{
+    let cached_results = tasks.iter().map(|_| None).collect();
+    Box::new(ParallelTasks {
+        tasks,
+        cached_results,
+        aggregator,
+    })
 }
 
-impl<T> Task for ParallelTaskPair<T> {
+pub fn serial<T>(
+    tasks: Vec<Box<dyn Task<Output = T>>>,
+    aggregator: fn(&mut T, &T),
+) -> Box<dyn Task<Output = T>>
+where
+    T: 'static,
+{
+    Box::new(SerialTasks {
+        tasks,
+        cached_results: Vec::new(),
+        aggregator,
+    })
+}
+
+struct ParallelTasks<T> {
+    tasks: Vec<Box<dyn Task<Output = T>>>,
+    cached_results: Vec<Option<T>>,
+    aggregator: fn(&mut T, &T),
+}
+
+impl<T> Task for ParallelTasks<T> {
     type Output = T;
 
     fn poll(&mut self) -> Poll<Self::Output> {
-        self.first_result = match self.first.poll() {
-            Poll::Ready(result) => Some(result),
-            Poll::Pending => None,
-        };
-        self.second_result = match self.second.poll() {
-            Poll::Ready(result) => Some(result),
-            Poll::Pending => None,
-        };
-
-        let mut first = None;
-        std::mem::swap(&mut self.first_result, &mut first);
-        let mut second = None;
-        std::mem::swap(&mut self.second_result, &mut second);
-        if let (Some(a), Some(b)) = (first, second) {
-            Poll::Ready((self.aggregator)(a, b))
-        } else {
-            Poll::Pending
-        }
-    }
-
-    fn cancel(&mut self) {
-        if self.first_result.is_none() {
-            self.first.cancel();
-        }
-        if self.second_result.is_none() {
-            self.second.cancel();
-        }
-    }
-}
-
-struct SerialTaskPair<T> {
-    first: Box<dyn Task<Output = T>>,
-    second: Box<dyn Task<Output = T>>,
-    first_result: Option<T>,
-    aggregator: fn(T, T) -> T,
-}
-
-impl<T> Task for SerialTaskPair<T> {
-    type Output = T;
-
-    fn poll(&mut self) -> Poll<Self::Output> {
-        if self.first_result.is_some() {
-            match self.second.poll() {
-                Poll::Ready(result) => {
-                    let mut first = None;
-                    std::mem::swap(&mut self.first_result, &mut first);
-                    Poll::Ready((self.aggregator)(first.unwrap(), result))
+        let mut all_ready = true;
+        for (task, cached_result) in
+            self.tasks.iter_mut().zip(self.cached_results.iter_mut())
+        {
+            if cached_result.is_none() {
+                all_ready = false;
+                match task.poll() {
+                    Poll::Ready(result) => *cached_result = Some(result),
+                    Poll::Pending => (),
                 }
-                Poll::Pending => Poll::Pending,
             }
+        }
+
+        if all_ready {
+            let mut iter = self.cached_results.drain(..);
+            let mut aggregated = iter.next().unwrap().unwrap();
+            for result in iter {
+                (self.aggregator)(&mut aggregated, &result.unwrap());
+            }
+            Poll::Ready(aggregated)
         } else {
-            self.first_result = match self.first.poll() {
-                Poll::Ready(result) => Some(result),
-                Poll::Pending => None,
-            };
             Poll::Pending
         }
     }
 
     fn cancel(&mut self) {
-        if self.first_result.is_none() {
-            self.first.cancel();
+        for (task, cached_result) in
+            self.tasks.iter_mut().zip(self.cached_results.iter())
+        {
+            if cached_result.is_none() {
+                task.cancel();
+            }
         }
-        self.second.cancel();
+    }
+}
+
+struct SerialTasks<T> {
+    tasks: Vec<Box<dyn Task<Output = T>>>,
+    cached_results: Vec<T>,
+    aggregator: fn(&mut T, &T),
+}
+
+impl<T> Task for SerialTasks<T> {
+    type Output = T;
+
+    fn poll(&mut self) -> Poll<Self::Output> {
+        match self.tasks[self.cached_results.len()].poll() {
+            Poll::Ready(result) => self.cached_results.push(result),
+            Poll::Pending => return Poll::Pending,
+        }
+
+        if self.cached_results.len() == self.tasks.len() {
+            let mut iter = self.cached_results.drain(..);
+            let mut aggregated = iter.next().unwrap();
+            for result in iter {
+                (self.aggregator)(&mut aggregated, &result);
+            }
+            Poll::Ready(aggregated)
+        } else {
+            Poll::Pending
+        }
+    }
+
+    fn cancel(&mut self) {
+        for task in self.tasks.iter_mut().skip(self.cached_results.len()) {
+            task.cancel();
+        }
     }
 }
 
@@ -183,29 +180,43 @@ impl Task for ChildTask {
     }
 }
 
-pub fn child_aggragator(a: ChildResult, b: ChildResult) -> ChildResult {
-    match (a, b) {
-        (Ok(mut a), Ok(b)) => {
-            a.push('\n');
-            a.push_str(&b[..]);
-            Ok(a)
+pub fn child_aggragator(first: &mut ChildResult, second: &ChildResult) {
+    let mut temp = Err(String::new());
+    std::mem::swap(first, &mut temp);
+    let ok;
+    let mut text = match temp {
+        Ok(text) => {
+            ok = true;
+            text
         }
-        (Ok(mut a), Err(b)) => {
-            a.push('\n');
-            a.push_str(&b[..]);
-            Err(a)
+        Err(text) => {
+            ok = false;
+            text
         }
-        (Err(mut a), Ok(b)) => {
-            a.push('\n');
-            a.push_str(&b[..]);
-            Err(a)
+    };
+
+    *first = match (ok, second) {
+        (true, Ok(b)) => {
+            text.push('\n');
+            text.push_str(&b[..]);
+            Ok(text)
         }
-        (Err(mut a), Err(b)) => {
-            a.push('\n');
-            a.push_str(&b[..]);
-            Err(a)
+        (true, Err(b)) => {
+            text.push('\n');
+            text.push_str(&b[..]);
+            Err(text)
         }
-    }
+        (false, Ok(b)) => {
+            text.push('\n');
+            text.push_str(&b[..]);
+            Err(text)
+        }
+        (false, Err(b)) => {
+            text.push('\n');
+            text.push_str(&b[..]);
+            Err(text)
+        }
+    };
 }
 
 pub struct Worker<C, T>
