@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-pub trait Task : Send {
+pub trait Task: Send {
     type Output;
 
     fn poll(&mut self) -> Poll<Self::Output>;
@@ -50,7 +50,10 @@ struct ParallelTasks<T> {
     aggregator: fn(&mut T, &T),
 }
 
-impl<T> Task for ParallelTasks<T> where T : Send {
+impl<T> Task for ParallelTasks<T>
+where
+    T: Send,
+{
     type Output = T;
 
     fn poll(&mut self) -> Poll<Self::Output> {
@@ -96,7 +99,10 @@ struct SerialTasks<T> {
     aggregator: fn(&mut T, &T),
 }
 
-impl<T> Task for SerialTasks<T> where T : Send{
+impl<T> Task for SerialTasks<T>
+where
+    T: Send,
+{
     type Output = T;
 
     fn poll(&mut self) -> Poll<Self::Output> {
@@ -223,7 +229,7 @@ pub fn child_aggragator(first: &mut ChildResult, second: &ChildResult) {
 
 pub struct Worker<T>
 where
-    T: 'static ,
+    T: 'static,
 {
     task_sender: Sender<Box<dyn Task<Output = T>>>,
     result_receiver: Receiver<T>,
