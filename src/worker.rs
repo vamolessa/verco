@@ -134,7 +134,7 @@ where
     }
 }
 
-type CommandTaskResult = Result<String, String>;
+pub type CommandTaskResult = Result<String, String>;
 
 pub enum CommandTask {
     Waiting(Command),

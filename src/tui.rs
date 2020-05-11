@@ -21,6 +21,7 @@ use crate::{
     select::{select, Entry},
     tui_util::{show_header, Header, HeaderKind, ENTRY_COLOR},
     version_control_actions::VersionControlActions,
+    worker::{Worker, CommandTaskResult},
 };
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -51,6 +52,8 @@ where
 
     write: W,
     scroll_view: ScrollView,
+
+    worker: Worker<CommandTaskResult>
 }
 
 impl<W> Tui<W>
@@ -68,6 +71,7 @@ where
             current_key_chord: Vec::new(),
             write,
             scroll_view: Default::default(),
+            worker: Worker::new(),
         }
     }
 

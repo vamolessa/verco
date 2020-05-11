@@ -12,6 +12,7 @@ mod version_control_actions;
 mod worker;
 
 fn main() {
+    /*
     use worker::Task;
     let mut command = std::process::Command::new("less");
     command.arg("asdsadasd");
@@ -61,8 +62,9 @@ fn main() {
     //    }
     //}
     return;
+    */
 
-    if crossterm::tty::IsTty::is_tty(&std::io::stdin()) {
+    if !crossterm::tty::IsTty::is_tty(&std::io::stdin()) {
         eprintln!("not tty");
         return;
     }
