@@ -15,31 +15,37 @@ fn main() {
     use worker::Task;
     let mut command = std::process::Command::new("less");
     command.arg("asdsadasd");
-    let task1 = worker::ChildTask::from_command(command).unwrap();
+    let task1 = worker::CommandTask::Waiting(command);
     let mut command = std::process::Command::new("echo");
     command.arg("asdsadasd");
-    let task2 = worker::ChildTask::from_command(command).unwrap();
+    let task2 = worker::CommandTask::Waiting(command);
     let mut command = std::process::Command::new("echo");
     command.arg("matheus");
-    let task3 = worker::ChildTask::from_command(command).unwrap();
-    let task1: Box<dyn Task<Output = _>> = Box::new(task1);
-    let task2: Box<dyn Task<Output = _>> = Box::new(task2);
-    let task3: Box<dyn Task<Output = _>> = Box::new(task3);
-    let mut tasks = vec![task1, task2, task3];
-    //let mut task = worker::serial(tasks, worker::child_aggragator);
-    //let mut task = task1;
+    let task3 = worker::CommandTask::Waiting(command);
+
+    let mut tasks = worker::task_vec();
+    tasks.push(Box::new(task1));
+    tasks.push(Box::new(task2));
+    tasks.push(Box::new(task3));
+
+    let aggregated = worker::parallel(tasks, worker::child_aggragator);
 
     let wk = worker::Worker::new();
-    let task_count = tasks.len();
-    for task in tasks.drain(..) {
-        wk.send_task(task);
+    wk.send_task(aggregated);
+    match wk.receive_result() {
+        Ok(output) => println!("ok: {}", output),
+        Err(error) => println!("error: {}", error),
     }
-    for _ in 0..task_count {
-        match wk.receive_result() {
-            Ok(output) => println!("ok: {}", output),
-            Err(error) => println!("error: {}", error),
-        }
-    }
+    //let task_count = tasks.len();
+    //for task in tasks.drain(..) {
+    //    wk.send_task(task);
+    //}
+    //for _ in 0..task_count {
+    //    match wk.receive_result() {
+    //        Ok(output) => println!("ok: {}", output),
+    //        Err(error) => println!("error: {}", error),
+    //    }
+    //}
 
     //loop {
     //    match task.poll() {

@@ -15,6 +15,10 @@ pub trait Task: Send {
     fn cancel(&mut self);
 }
 
+pub fn task_vec<T>() -> Vec<Box<dyn Task<Output = T>>> {
+    Vec::new()
+}
+
 pub fn parallel<T>(
     tasks: Vec<Box<dyn Task<Output = T>>>,
     aggregator: fn(&mut T, &T),
@@ -130,65 +134,72 @@ where
     }
 }
 
-type ChildResult = Result<String, String>;
+type CommandTaskResult = Result<String, String>;
 
-pub struct ChildTask {
-    child: Child,
+pub enum CommandTask {
+    Waiting(Command),
+    Running(Child),
 }
 
-impl ChildTask {
-    pub fn from_command(mut command: Command) -> Result<Self, String> {
-        match command
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
-            Ok(child) => Ok(Self { child }),
-            Err(e) => Err(e.to_string()),
-        }
-    }
-}
-
-impl Task for ChildTask {
-    type Output = ChildResult;
+impl Task for CommandTask {
+    type Output = CommandTaskResult;
 
     fn poll(&mut self) -> Poll<Self::Output> {
-        match self.child.try_wait() {
-            Ok(Some(status)) => Poll::Ready(if status.success() {
-                if let Some(stdout) = &mut self.child.stdout {
-                    let mut output = String::new();
-                    match stdout.read_to_string(&mut output) {
-                        Ok(_) => Ok(output),
-                        Err(e) => Err(e.to_string()),
+        match self {
+            CommandTask::Waiting(command) => match command
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+            {
+                Ok(child) => {
+                    *self = CommandTask::Running(child);
+                    Poll::Pending
+                }
+                Err(e) => Poll::Ready(Err(e.to_string())),
+            },
+            CommandTask::Running(child) => match child.try_wait() {
+                Ok(Some(status)) => Poll::Ready(if status.success() {
+                    if let Some(stdout) = &mut child.stdout {
+                        let mut output = String::new();
+                        match stdout.read_to_string(&mut output) {
+                            Ok(_) => Ok(output),
+                            Err(e) => Err(e.to_string()),
+                        }
+                    } else {
+                        Ok(String::new())
                     }
                 } else {
-                    Ok(String::new())
-                }
-            } else {
-                if let Some(stderr) = &mut self.child.stderr {
-                    let mut error = String::new();
-                    match stderr.read_to_string(&mut error) {
-                        Ok(_) => Err(error),
-                        Err(e) => Err(e.to_string()),
+                    if let Some(stderr) = &mut child.stderr {
+                        let mut error = String::new();
+                        match stderr.read_to_string(&mut error) {
+                            Ok(_) => Err(error),
+                            Err(e) => Err(e.to_string()),
+                        }
+                    } else {
+                        Err(String::new())
                     }
-                } else {
-                    Err(String::new())
-                }
-            }),
-            Ok(None) => Poll::Pending,
-            Err(e) => Poll::Ready(Err(e.to_string())),
+                }),
+                Ok(None) => Poll::Pending,
+                Err(e) => Poll::Ready(Err(e.to_string())),
+            },
         }
     }
 
     fn cancel(&mut self) {
-        match self.child.kill() {
-            _ => (),
+        match self {
+            CommandTask::Waiting(_) => (),
+            CommandTask::Running(child) => match child.kill() {
+                _ => (),
+            },
         }
     }
 }
 
-pub fn child_aggragator(first: &mut ChildResult, second: &ChildResult) {
+pub fn child_aggragator(
+    first: &mut CommandTaskResult,
+    second: &CommandTaskResult,
+) {
     let mut temp = Err(String::new());
     mem::swap(first, &mut temp);
     let ok;
