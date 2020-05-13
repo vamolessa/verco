@@ -41,6 +41,10 @@ enum HandleChordResult {
     Quit,
 }
 
+enum CommandId {
+    SomeCommandId,
+}
+
 struct Tui<W>
 where
     W: Write,
@@ -53,7 +57,7 @@ where
     write: W,
     scroll_view: ScrollView,
 
-    worker: Worker<CommandTaskResult>
+    worker: Worker<CommandId, CommandTaskResult>
 }
 
 impl<W> Tui<W>
@@ -117,6 +121,10 @@ where
 
         loop {
             self.write.flush()?;
+
+            if let Some((command_id, result)) = self.worker.receive_result() {
+            }
+
             match input::read_key()? {
                 KeyEvent {
                     code: KeyCode::Esc, ..

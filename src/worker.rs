@@ -238,16 +238,18 @@ pub fn child_aggragator(
     };
 }
 
-pub struct Worker<T>
+pub struct Worker<I, T>
 where
+    I: 'static,
     T: 'static,
 {
-    task_sender: Sender<Box<dyn Task<Output = T>>>,
-    result_receiver: Receiver<T>,
+    task_sender: Sender<(I, Box<dyn Task<Output = T>>)>,
+    result_receiver: Receiver<(I, T)>,
 }
 
-impl<T> Worker<T>
+impl<I, T> Worker<I, T>
 where
+    I: 'static + Send,
     T: 'static + Send,
 {
     pub fn new() -> Self {
@@ -264,18 +266,22 @@ where
         }
     }
 
-    pub fn send_task(&self, task: Box<dyn Task<Output = T>>) {
-        self.task_sender.send(task).unwrap();
+    pub fn send_task(&self, id: I, task: Box<dyn Task<Output = T>>) {
+        self.task_sender.send((id, task)).unwrap();
     }
 
-    pub fn receive_result(&self) -> T {
-        self.result_receiver.recv().unwrap()
+    pub fn receive_result(&self) -> Option<(I, T)> {
+        match self.result_receiver.try_recv() {
+            Ok(result) => Some(result),
+            Err(TryRecvError::Empty) => None,
+            Err(TryRecvError::Disconnected) => panic!("could not receive result. channel disconnected"),
+        }
     }
 }
 
-fn run_worker<T>(
-    task_receiver: Receiver<Box<dyn Task<Output = T>>>,
-    output_sender: Sender<T>,
+fn run_worker<I, T>(
+    task_receiver: Receiver<(I, Box<dyn Task<Output = T>>)>,
+    output_sender: Sender<(I, T)>,
 ) {
     let mut pending_tasks = Vec::new();
 
@@ -287,12 +293,12 @@ fn run_worker<T>(
         }
 
         for i in (0..pending_tasks.len()).rev() {
-            if let Poll::Ready(result) = pending_tasks[i].poll() {
-                match output_sender.send(result) {
+            if let Poll::Ready(result) = pending_tasks[i].1.poll() {
+                let (task_id, _task) = pending_tasks.swap_remove(i);
+                match output_sender.send((task_id, result)) {
                     Ok(()) => (),
                     Err(_) => return,
                 }
-                pending_tasks.swap_remove(i);
             }
         }
 
