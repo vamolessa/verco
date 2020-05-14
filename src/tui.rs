@@ -15,34 +15,23 @@ use std::{
 };
 
 use crate::{
-    custom_actions::CustomAction,
+    application::{Action, Application},
     input,
     scroll_view::ScrollView,
     select::{select, Entry},
     tui_util::{show_header, Header, HeaderKind, ENTRY_COLOR},
-    version_control_actions::VersionControlActions,
-    worker::{Worker, CommandTaskResult},
-    application::Application,
 };
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
-pub fn show_tui(
-    application: Application,
-) {
-    Tui::new(application, stdout().lock())
-        .show()
-        .unwrap();
+pub fn show_tui(application: Application) {
+    Tui::new(application, stdout().lock()).show().unwrap();
 }
 
 enum HandleChordResult {
     Handled,
     Unhandled,
     Quit,
-}
-
-enum CommandId {
-    SomeCommandId,
 }
 
 struct Tui<W>
@@ -59,10 +48,7 @@ impl<W> Tui<W>
 where
     W: Write,
 {
-    fn new(
-        application: Application,
-        write: W,
-    ) -> Self {
+    fn new(application: Application, write: W) -> Self {
         Tui {
             application,
             write,
@@ -80,14 +66,14 @@ where
 
     fn action_context<F>(
         &mut self,
-        action_name: &str,
+        action: Action,
         callback: F,
     ) -> Result<HandleChordResult>
     where
         F: FnOnce(&mut Self, &Header) -> Result<()>,
     {
         let header = Header {
-            action_name,
+            action_name: action.name(),
             directory_name: self.application.version_control.get_root().into(),
         };
         show_header(&mut self.write, &header, HeaderKind::Waiting)?;
@@ -99,7 +85,7 @@ where
         execute!(self.write, EnterAlternateScreen, cursor::Hide)?;
         terminal::enable_raw_mode()?;
 
-        self.action_context("help", |s, h| {
+        self.action_context(Action::Help, |s, h| {
             let result = s.show_help(h)?;
             s.handle_result(h, result)
         })?;
@@ -164,20 +150,20 @@ where
     fn handle_action(&mut self) -> Result<HandleChordResult> {
         match &self.application.current_key_chord[..] {
             ['q'] => Ok(HandleChordResult::Quit),
-            ['h'] => self.action_context("help", |s, h| {
+            ['h'] => self.action_context(Action::Help, |s, h| {
                 let result = s.show_help(h)?;
                 s.handle_result(h, result)
             }),
-            ['s'] => self.action_context("status", |s, h| {
+            ['s'] => self.action_context(Action::Status, |s, h| {
                 let result = s.application.version_control.status();
                 s.handle_result(h, result)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
-            ['l', 'l'] => self.action_context("log", |s, h| {
+            ['l', 'l'] => self.action_context(Action::Log, |s, h| {
                 let result = s.application.version_control.log(50);
                 s.handle_result(h, result)
             }),
-            ['l', 'c'] => self.action_context("log count", |s, h| {
+            ['l', 'c'] => self.action_context(Action::LogCount, |s, h| {
                 if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
                     if let Ok(count) = input.parse() {
                         let result = s.application.version_control.log(count);
@@ -196,16 +182,16 @@ where
                 }
             }),
             ['e'] => Ok(HandleChordResult::Unhandled),
-            ['e', 'e'] => self.action_context("current full revision", |s, h| {
+            ['e', 'e'] => self.action_context(Action::CurrentFullRevision, |s, h| {
                 let result = s.application.version_control.current_export();
                 s.handle_result(h, result)
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
-            ['d', 'd'] => self.action_context("current diff all", |s, h| {
+            ['d', 'd'] => self.action_context(Action::CurrentDiffAll, |s, h| {
                 let result = s.application.version_control.current_diff_all();
                 s.handle_result(h, result)
             }),
-            ['d', 's'] => self.action_context("current diff selected", |s, h| {
+            ['d', 's'] => self.action_context(Action::CurrentDiffSelected, |s, h| {
                 match s.application.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
@@ -219,7 +205,7 @@ where
                 }
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
-            ['D', 'C'] => self.action_context("revision changes", |s, h| {
+            ['D', 'C'] => self.action_context(Action::RevisionChanges, |s, h| {
                 if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.revision_changes(&input[..]);
                     s.handle_result(h, result)
@@ -227,7 +213,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['D', 'D'] => self.action_context("revision diff all", |s, h| {
+            ['D', 'D'] => self.action_context(Action::RevisionDiffAll, |s, h| {
                 if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.revision_diff_all(&input[..]);
                     s.handle_result(h, result)
@@ -235,7 +221,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['D', 'S'] => self.action_context("revision diff selected", |s, h| {
+            ['D', 'S'] => self.action_context(Action::RevisionDiffSelected, |s, h| {
                 if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
                     match s.application.version_control.get_revision_changed_files(&input[..]) {
                         Ok(mut entries) => {
@@ -253,7 +239,7 @@ where
                 }
             }),
             ['c'] => Ok(HandleChordResult::Unhandled),
-            ['c', 'c'] => self.action_context("commit all", |s, h| {
+            ['c', 'c'] => self.action_context(Action::CommitAll, |s, h| {
                 if let Some(input) = s.handle_input("commit message (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.commit_all(&input[..]);
                     s.handle_result(h, result)
@@ -261,7 +247,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['c', 's'] => self.action_context("commit selected", |s, h| {
+            ['c', 's'] => self.action_context(Action::CommitSelected, |s, h| {
                 match s.application.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
@@ -282,7 +268,7 @@ where
                     Err(error) => s.handle_result(h, Err(error)),
                 }
             }),
-            ['u'] => self.action_context("update", |s, h| {
+            ['u'] => self.action_context(Action::Update, |s, h| {
                 if let Some(input) = s.handle_input("update to (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.update(&input[..]);
                     s.handle_result(h, result)
@@ -290,7 +276,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['m'] => self.action_context("merge", |s, h| {
+            ['m'] => self.action_context(Action::Merge, |s, h| {
                 if let Some(input) = s.handle_input("merge with (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.merge(&input[..]);
                     s.handle_result(h, result)
@@ -299,12 +285,12 @@ where
                 }
             }),
             ['R'] => Ok(HandleChordResult::Unhandled),
-            ['R', 'A'] => self.action_context("revert all", |s, h| {
+            ['R', 'A'] => self.action_context(Action::RevertAll, |s, h| {
                 let result = s.application.version_control.revert_all();
                 s.handle_result(h, result)
             }),
             ['r'] => Ok(HandleChordResult::Unhandled),
-            ['r', 's'] => self.action_context("revert selected", |s, h| {
+            ['r', 's'] => self.action_context(Action::RevertSelected, |s, h| {
                 match s.application.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
@@ -317,32 +303,32 @@ where
                     Err(error) => s.handle_result(h, Err(error)),
                 }
             }),
-            ['r', 'r'] => self.action_context("unresolved conflicts", |s, h| {
+            ['r', 'r'] => self.action_context(Action::UnresolvedConflicts, |s, h| {
                 let result = s.application.version_control.conflicts();
                 s.handle_result(h, result)
             }),
-            ['r', 'o'] => self.action_context("merge taking other", |s, h| {
+            ['r', 'o'] => self.action_context(Action::MergeTakingOther, |s, h| {
                 let result = s.application.version_control.take_other();
                 s.handle_result(h, result)
             }),
-            ['r', 'l'] => self.action_context("merge taking local", |s, h| {
+            ['r', 'l'] => self.action_context(Action::MergeTakingLocal, |s, h| {
                 let result = s.application.version_control.take_local();
                 s.handle_result(h, result)
             }),
-            ['f'] => self.action_context("fetch", |s, h| {
+            ['f'] => self.action_context(Action::Fetch, |s, h| {
                 let result = s.application.version_control.fetch();
                 s.handle_result(h, result)
             }),
-            ['p'] => self.action_context("pull", |s, h| {
+            ['p'] => self.action_context(Action::Pull, |s, h| {
                 let result = s.application.version_control.pull();
                 s.handle_result(h, result)
             }),
-            ['P'] => self.action_context("push", |s, h| {
+            ['P'] => self.action_context(Action::Push, |s, h| {
                 let result = s.application.version_control.push();
                 s.handle_result(h, result)
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
-            ['t', 'n'] => self.action_context("new tag", |s, h| {
+            ['t', 'n'] => self.action_context(Action::NewTag, |s, h| {
                 if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.create_tag(&input[..]);
                     s.handle_result(h, result)
@@ -351,11 +337,11 @@ where
                 }
             }),
             ['b'] => Ok(HandleChordResult::Unhandled),
-            ['b', 'b'] => self.action_context("list branches", |s, h| {
+            ['b', 'b'] => self.action_context(Action::ListBranches, |s, h| {
                 let result = s.application.version_control.list_branches();
                 s.handle_result(h, result)
             }),
-            ['b', 'n'] => self.action_context("new branch", |s, h| {
+            ['b', 'n'] => self.action_context(Action::NewBranch, |s, h| {
                 if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.create_branch(&input[..]);
                     s.handle_result(h, result)
@@ -363,7 +349,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['b', 'd'] => self.action_context("delete branch", |s, h| {
+            ['b', 'd'] => self.action_context(Action::DeleteBranch, |s, h| {
                 if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel): ")? {
                     let result = s.application.version_control.close_branch(&input[..]);
                     s.handle_result(h, result)
@@ -371,7 +357,7 @@ where
                     s.show_header(h, HeaderKind::Canceled)
                 }
             }),
-            ['x'] => self.action_context("custom action", |s, h| {
+            ['x'] => self.action_context(Action::CustomAction, |s, h| {
                 if s.application.custom_actions.len() > 0 {
                     for c in &s.application.custom_actions {
                         s.write
@@ -428,7 +414,8 @@ where
                             .shortcut
                             .chars()
                             .zip(
-                                self.application.current_key_chord
+                                self.application
+                                    .current_key_chord
                                     .iter()
                                     .map(|c| *c)
                                     .chain(iter::repeat('\0')),
@@ -448,8 +435,9 @@ where
                             }
                             self.write.queue(cursor::MoveToNextLine(2))?;
 
-                            let result =
-                                action.execute(self.application.version_control.get_root());
+                            let result = action.execute(
+                                self.application.version_control.get_root(),
+                            );
                             self.handle_result(header, result)?;
                             return Ok(());
                         }
@@ -523,7 +511,10 @@ where
         let (w, h) = terminal::size()?;
         queue!(
             self.write,
-            cursor::MoveTo(w - self.application.current_key_chord.len() as u16, h - 1),
+            cursor::MoveTo(
+                w - self.application.current_key_chord.len() as u16,
+                h - 1
+            ),
             Clear(ClearType::CurrentLine),
             SetForegroundColor(ENTRY_COLOR),
         )?;
@@ -563,58 +554,56 @@ where
             .queue(Print("press a key and peform an action"))?
             .queue(cursor::MoveToNextLine(2))?;
 
-        Self::show_help_action(&mut write, "h", "help")?;
-        Self::show_help_action(&mut write, "q", "quit")?;
+        Self::show_help_action(&mut write, "h", Action::Help)?;
+        Self::show_help_action(&mut write, "q", Action::Quit)?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "s", "status")?;
-        Self::show_help_action(&mut write, "ll", "log")?;
-        Self::show_help_action(&mut write, "lc", "log count")?;
+        Self::show_help_action(&mut write, "s", Action::Status)?;
+        Self::show_help_action(&mut write, "ll", Action::Log)?;
+        Self::show_help_action(&mut write, "lc", Action::LogCount)?;
+
+        Self::show_help_action(&mut write, "ee", Action::CurrentFullRevision)?;
+        Self::show_help_action(&mut write, "dd", Action::CurrentDiffAll)?;
+        Self::show_help_action(&mut write, "ds", Action::CurrentDiffSelected)?;
+        Self::show_help_action(&mut write, "DC", Action::RevisionChanges)?;
+        Self::show_help_action(&mut write, "DD", Action::RevisionDiffAll)?;
+        Self::show_help_action(&mut write, "DS", Action::RevisionDiffSelected)?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "ee", "revision full contents")?;
-        Self::show_help_action(&mut write, "dd", "current diff all")?;
-        Self::show_help_action(&mut write, "ds", "current diff selected")?;
-        Self::show_help_action(&mut write, "DC", "revision changes")?;
-        Self::show_help_action(&mut write, "DD", "revision diff all")?;
-        Self::show_help_action(&mut write, "DS", "revision diff selected")?;
+        Self::show_help_action(&mut write, "cc", Action::CommitAll)?;
+        Self::show_help_action(&mut write, "cs", Action::CommitSelected)?;
+        Self::show_help_action(&mut write, "u", Action::Update)?;
+        Self::show_help_action(&mut write, "m", Action::Merge)?;
+        Self::show_help_action(&mut write, "RA", Action::RevertAll)?;
+        Self::show_help_action(&mut write, "rs", Action::RevertSelected)?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "cc", "commit all")?;
-        Self::show_help_action(&mut write, "cs", "commit selected")?;
-        Self::show_help_action(&mut write, "u", "update/checkout")?;
-        Self::show_help_action(&mut write, "m", "merge")?;
-        Self::show_help_action(&mut write, "RA", "revert all")?;
-        Self::show_help_action(&mut write, "rs", "revert selected")?;
+        Self::show_help_action(&mut write, "rr", Action::UnresolvedConflicts)?;
+        Self::show_help_action(&mut write, "ro", Action::MergeTakingOther)?;
+        Self::show_help_action(&mut write, "rl", Action::MergeTakingLocal)?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "rr", "list unresolved conflicts")?;
-        Self::show_help_action(&mut write, "ro", "resolve taking other")?;
-        Self::show_help_action(&mut write, "rl", "resolve taking local")?;
+        Self::show_help_action(&mut write, "f", Action::Fetch)?;
+        Self::show_help_action(&mut write, "p", Action::Pull)?;
+        Self::show_help_action(&mut write, "P", Action::Push)?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "f", "fetch")?;
-        Self::show_help_action(&mut write, "p", "pull")?;
-        Self::show_help_action(&mut write, "P", "push")?;
+        Self::show_help_action(&mut write, "tn", Action::NewTag)?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "tn", "new tag")?;
+        Self::show_help_action(&mut write, "bb", Action::ListBranches)?;
+        Self::show_help_action(&mut write, "bn", Action::NewBranch)?;
+        Self::show_help_action(&mut write, "bd", Action::DeleteBranch)?;
 
         write.queue(cursor::MoveToNextLine(1))?;
 
-        Self::show_help_action(&mut write, "bb", "list branches")?;
-        Self::show_help_action(&mut write, "bn", "new branch")?;
-        Self::show_help_action(&mut write, "bd", "delete branch")?;
-
-        write.queue(cursor::MoveToNextLine(1))?;
-
-        Self::show_help_action(&mut write, "x", "custom action")?;
+        Self::show_help_action(&mut write, "x", Action::CustomAction)?;
 
         write.flush()?;
         Ok(Ok(String::from_utf8(write)?))
@@ -623,7 +612,7 @@ where
     fn show_help_action<HW>(
         write: &mut HW,
         shortcut: &str,
-        action: &str,
+        action: Action,
     ) -> Result<()>
     where
         HW: Write,
@@ -636,7 +625,7 @@ where
             ResetColor,
             Print('\t'),
             Print('\t'),
-            Print(action),
+            Print(action.name()),
             cursor::MoveToNextLine(1),
         )
     }

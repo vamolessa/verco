@@ -134,31 +134,31 @@ where
     }
 }
 
-pub type CommandTaskResult = Result<String, String>;
+pub type ActionTaskResult = Result<String, String>;
 
-pub enum CommandTask {
+pub enum ActionTask {
     Waiting(Command),
     Running(Child),
 }
 
-impl Task for CommandTask {
-    type Output = CommandTaskResult;
+impl Task for ActionTask {
+    type Output = ActionTaskResult;
 
     fn poll(&mut self) -> Poll<Self::Output> {
         match self {
-            CommandTask::Waiting(command) => match command
+            ActionTask::Waiting(command) => match command
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
             {
                 Ok(child) => {
-                    *self = CommandTask::Running(child);
+                    *self = ActionTask::Running(child);
                     Poll::Pending
                 }
                 Err(e) => Poll::Ready(Err(e.to_string())),
             },
-            CommandTask::Running(child) => match child.try_wait() {
+            ActionTask::Running(child) => match child.try_wait() {
                 Ok(Some(status)) => Poll::Ready(if status.success() {
                     if let Some(stdout) = &mut child.stdout {
                         let mut output = String::new();
@@ -188,8 +188,8 @@ impl Task for CommandTask {
 
     fn cancel(&mut self) {
         match self {
-            CommandTask::Waiting(_) => (),
-            CommandTask::Running(child) => match child.kill() {
+            ActionTask::Waiting(_) => (),
+            ActionTask::Running(child) => match child.kill() {
                 _ => (),
             },
         }
@@ -197,8 +197,8 @@ impl Task for CommandTask {
 }
 
 pub fn child_aggragator(
-    first: &mut CommandTaskResult,
-    second: &CommandTaskResult,
+    first: &mut ActionTaskResult,
+    second: &ActionTaskResult,
 ) {
     let mut temp = Err(String::new());
     mem::swap(first, &mut temp);
