@@ -1,3 +1,4 @@
+mod application;
 mod custom_actions;
 mod git_actions;
 mod hg_actions;
@@ -38,9 +39,11 @@ fn main() {
 
     ctrlc::set_handler(|| {}).unwrap();
     if let Some(version_control) = repositories::get_current_version_control() {
-        let custom_actions =
-            custom_actions::CustomAction::load_custom_actions();
-        tui::show_tui(version_control, custom_actions);
+        let application = application::Application::new(
+            version_control,
+            custom_actions::CustomAction::load_custom_actions(),
+        );
+        tui::show_tui(application);
     } else {
         eprintln!("no repository found");
     }
