@@ -89,7 +89,7 @@ where
 
         self.action_context(Action::Help, |s, h| {
             let result = s.show_help(h)?;
-            s.handle_result(h, result)
+            s.handle_result(h, &result)
         })?;
         let (w, h) = terminal::size()?;
         queue!(
@@ -109,7 +109,7 @@ where
                             .get_root()
                             .into(),
                     };
-                    self.handle_result(&header, result.output)?;
+                    self.handle_result(&header, &result.output)?;
                 }
             }
 
@@ -166,22 +166,22 @@ where
             ['q'] => Ok(HandleChordResult::Quit),
             ['h'] => self.action_context(Action::Help, |s, h| {
                 let result = s.show_help(h)?;
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['s'] => self.action_context(Action::Status, |s, h| {
                 let result = s.application.version_control.status();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
             ['l', 'l'] => self.action_context(Action::Log, |s, h| {
                 let result = s.application.version_control.log(50);
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['l', 'c'] => self.action_context(Action::LogCount, |s, h| {
                 if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
                     if let Ok(count) = input.parse() {
                         let result = s.application.version_control.log(count);
-                        s.handle_result(h, result)
+                        s.handle_result(h, &result)
                     } else {
                         s.show_header(h, HeaderKind::Error)?;
                         queue!(
@@ -198,31 +198,31 @@ where
             ['e'] => Ok(HandleChordResult::Unhandled),
             ['e', 'e'] => self.action_context(Action::CurrentFullRevision, |s, h| {
                 let result = s.application.version_control.current_export();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
             ['d', 'd'] => self.action_context(Action::CurrentDiffAll, |s, h| {
                 let result = s.application.version_control.current_diff_all();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['d', 's'] => self.action_context(Action::CurrentDiffSelected, |s, h| {
                 match s.application.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
                             let result = s.application.version_control.current_diff_selected(&entries);
-                            s.handle_result(h, result)
+                            s.handle_result(h, &result)
                         } else {
                             s.show_header(h, HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.handle_result(h, Err(error)),
+                    Err(error) => s.handle_result(h, &Err(error)),
                 }
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
             ['D', 'C'] => self.action_context(Action::RevisionChanges, |s, h| {
                 if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel)")? {
                     let result = s.application.version_control.revision_changes(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -230,7 +230,7 @@ where
             ['D', 'D'] => self.action_context(Action::RevisionDiffAll, |s, h| {
                 if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel)")? {
                     let result = s.application.version_control.revision_diff_all(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -241,12 +241,12 @@ where
                         Ok(mut entries) => {
                             if s.show_select_ui(&mut entries)? {
                                 let result = s.application.version_control.revision_diff_selected(&input[..], &entries);
-                                s.handle_result(h, result)
+                                s.handle_result(h, &result)
                             } else {
                                 s.show_header(h, HeaderKind::Canceled)
                             }
                         }
-                        Err(error) => s.handle_result(h, Err(error)),
+                        Err(error) => s.handle_result(h, &Err(error)),
                     }
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
@@ -256,7 +256,7 @@ where
             ['c', 'c'] => self.action_context(Action::CommitAll, |s, h| {
                 if let Some(input) = s.handle_input("commit message (ctrl+c to cancel)")? {
                     let result = s.application.version_control.commit_all(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -271,7 +271,7 @@ where
                             {
                                 let result =
                                     s.application.version_control.commit_selected(&input[..], &entries);
-                                s.handle_result(h, result)
+                                s.handle_result(h, &result)
                             } else {
                                 s.show_header(h, HeaderKind::Canceled)
                             }
@@ -279,13 +279,13 @@ where
                             s.show_header(h, HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.handle_result(h, Err(error)),
+                    Err(error) => s.handle_result(h, &Err(error)),
                 }
             }),
             ['u'] => self.action_context(Action::Update, |s, h| {
                 if let Some(input) = s.handle_input("update to (ctrl+c to cancel)")? {
                     let result = s.application.version_control.update(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -293,7 +293,7 @@ where
             ['m'] => self.action_context(Action::Merge, |s, h| {
                 if let Some(input) = s.handle_input("merge with (ctrl+c to cancel)")? {
                     let result = s.application.version_control.merge(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -301,7 +301,7 @@ where
             ['R'] => Ok(HandleChordResult::Unhandled),
             ['R', 'A'] => self.action_context(Action::RevertAll, |s, h| {
                 let result = s.application.version_control.revert_all();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['r'] => Ok(HandleChordResult::Unhandled),
             ['r', 's'] => self.action_context(Action::RevertSelected, |s, h| {
@@ -309,43 +309,43 @@ where
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
                             let result = s.application.version_control.revert_selected(&entries);
-                            s.handle_result(h, result)
+                            s.handle_result(h, &result)
                         } else {
                             s.show_header(h, HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.handle_result(h, Err(error)),
+                    Err(error) => s.handle_result(h, &Err(error)),
                 }
             }),
             ['r', 'r'] => self.action_context(Action::UnresolvedConflicts, |s, h| {
                 let result = s.application.version_control.conflicts();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['r', 'o'] => self.action_context(Action::MergeTakingOther, |s, h| {
                 let result = s.application.version_control.take_other();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['r', 'l'] => self.action_context(Action::MergeTakingLocal, |s, h| {
                 let result = s.application.version_control.take_local();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['f'] => self.action_context(Action::Fetch, |s, h| {
                 let result = s.application.version_control.fetch();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['p'] => self.action_context(Action::Pull, |s, h| {
                 let result = s.application.version_control.pull();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['P'] => self.action_context(Action::Push, |s, h| {
                 let result = s.application.version_control.push();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
             ['t', 'n'] => self.action_context(Action::NewTag, |s, h| {
                 if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel)")? {
                     let result = s.application.version_control.create_tag(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -353,12 +353,12 @@ where
             ['b'] => Ok(HandleChordResult::Unhandled),
             ['b', 'b'] => self.action_context(Action::ListBranches, |s, h| {
                 let result = s.application.version_control.list_branches();
-                s.handle_result(h, result)
+                s.handle_result(h, &result)
             }),
             ['b', 'n'] => self.action_context(Action::NewBranch, |s, h| {
                 if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel)")? {
                     let result = s.application.version_control.create_branch(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -366,7 +366,7 @@ where
             ['b', 'd'] => self.action_context(Action::DeleteBranch, |s, h| {
                 if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel)")? {
                     let result = s.application.version_control.close_branch(&input[..]);
-                    s.handle_result(h, result)
+                    s.handle_result(h, &result)
                 } else {
                     s.show_header(h, HeaderKind::Canceled)
                 }
@@ -452,7 +452,7 @@ where
                             let result = action.execute(
                                 self.application.version_control.get_root(),
                             );
-                            self.handle_result(header, result)?;
+                            self.handle_result(header, &result)?;
                             return Ok(());
                         }
                     }
@@ -504,7 +504,7 @@ where
     fn handle_result(
         &mut self,
         header: &Header,
-        result: std::result::Result<String, String>,
+        result: &std::result::Result<String, String>,
     ) -> Result<()> {
         let output = match result {
             Ok(output) => {
@@ -517,7 +517,7 @@ where
             }
         };
 
-        self.scroll_view.set_content(output);
+        self.scroll_view.set_content(&output[..]);
         self.scroll_view.show(&mut self.write)
     }
 

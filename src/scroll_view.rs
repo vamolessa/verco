@@ -16,9 +16,10 @@ pub struct ScrollView {
 }
 
 impl ScrollView {
-    pub fn set_content(&mut self, content: String) {
+    pub fn set_content(&mut self, content: &str) {
         self.scroll = 0;
-        self.content = content;
+        self.content.clear();
+        self.content.push_str(content);
     }
 
     pub fn show<W>(&self, write: &mut W) -> Result<()>
