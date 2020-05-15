@@ -170,7 +170,7 @@ where
             .unwrap();
     }
 
-    pub fn cancel_task(&self, id: Id) {
+    pub fn cancel_all_tasks(&self, id: Id) {
         self.operation_sender
             .send(TaskOperation::Remove(id))
             .unwrap();

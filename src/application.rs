@@ -236,7 +236,7 @@ impl Application {
     ) -> ActionResult {
         let ActionFuture { action, task } =
             (callback)(self.version_control.as_ref());
-        self.worker.cancel_task(action);
+        self.worker.cancel_all_tasks(action);
         self.worker.send_task(action, task);
         match self.results.get(&action) {
             Some(result) => result.clone(),
