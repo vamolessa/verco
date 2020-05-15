@@ -1,7 +1,4 @@
 use std::{
-    io::Read,
-    mem,
-    process::{Child, Command, Stdio},
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     task::Poll,
     thread,
@@ -134,122 +131,16 @@ where
     }
 }
 
-pub type ActionTaskResult = Result<String, String>;
-
-pub enum ActionTask {
-    Waiting(Command),
-    Running(Child),
-}
-
-impl Task for ActionTask {
-    type Output = ActionTaskResult;
-
-    fn poll(&mut self) -> Poll<Self::Output> {
-        match self {
-            ActionTask::Waiting(command) => match command
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-            {
-                Ok(child) => {
-                    *self = ActionTask::Running(child);
-                    Poll::Pending
-                }
-                Err(e) => Poll::Ready(Err(e.to_string())),
-            },
-            ActionTask::Running(child) => match child.try_wait() {
-                Ok(Some(status)) => Poll::Ready(if status.success() {
-                    if let Some(stdout) = &mut child.stdout {
-                        let mut output = String::new();
-                        match stdout.read_to_string(&mut output) {
-                            Ok(_) => Ok(output),
-                            Err(e) => Err(e.to_string()),
-                        }
-                    } else {
-                        Ok(String::new())
-                    }
-                } else {
-                    if let Some(stderr) = &mut child.stderr {
-                        let mut error = String::new();
-                        match stderr.read_to_string(&mut error) {
-                            Ok(_) => Err(error),
-                            Err(e) => Err(e.to_string()),
-                        }
-                    } else {
-                        Err(String::new())
-                    }
-                }),
-                Ok(None) => Poll::Pending,
-                Err(e) => Poll::Ready(Err(e.to_string())),
-            },
-        }
-    }
-
-    fn cancel(&mut self) {
-        match self {
-            ActionTask::Waiting(_) => (),
-            ActionTask::Running(child) => match child.kill() {
-                _ => (),
-            },
-        }
-    }
-}
-
-pub fn child_aggragator(
-    first: &mut ActionTaskResult,
-    second: &ActionTaskResult,
-) {
-    let mut temp = Err(String::new());
-    mem::swap(first, &mut temp);
-    let ok;
-    let mut text = match temp {
-        Ok(text) => {
-            ok = true;
-            text
-        }
-        Err(text) => {
-            ok = false;
-            text
-        }
-    };
-
-    *first = match (ok, second) {
-        (true, Ok(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Ok(text)
-        }
-        (true, Err(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Err(text)
-        }
-        (false, Ok(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Err(text)
-        }
-        (false, Err(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Err(text)
-        }
-    };
-}
-
-pub struct Worker<I, T>
+pub struct Worker<T>
 where
-    I: 'static,
     T: 'static,
 {
-    task_sender: Sender<(I, Box<dyn Task<Output = T>>)>,
-    result_receiver: Receiver<(I, T)>,
+    task_sender: Sender<Box<dyn Task<Output = T>>>,
+    result_receiver: Receiver<T>,
 }
 
-impl<I, T> Worker<I, T>
+impl<T> Worker<T>
 where
-    I: 'static + Send,
     T: 'static + Send,
 {
     pub fn new() -> Self {
@@ -266,22 +157,24 @@ where
         }
     }
 
-    pub fn send_task(&self, id: I, task: Box<dyn Task<Output = T>>) {
-        self.task_sender.send((id, task)).unwrap();
+    pub fn send_task(&self, task: Box<dyn Task<Output = T>>) {
+        self.task_sender.send(task).unwrap();
     }
 
-    pub fn receive_result(&self) -> Option<(I, T)> {
+    pub fn receive_result(&self) -> Option<T> {
         match self.result_receiver.try_recv() {
             Ok(result) => Some(result),
             Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => panic!("could not receive result. channel disconnected"),
+            Err(TryRecvError::Disconnected) => {
+                panic!("could not receive result. channel disconnected")
+            }
         }
     }
 }
 
-fn run_worker<I, T>(
-    task_receiver: Receiver<(I, Box<dyn Task<Output = T>>)>,
-    output_sender: Sender<(I, T)>,
+fn run_worker< T>(
+    task_receiver: Receiver<Box<dyn Task<Output = T>>>,
+    output_sender: Sender<T>,
 ) {
     let mut pending_tasks = Vec::new();
 
@@ -293,9 +186,9 @@ fn run_worker<I, T>(
         }
 
         for i in (0..pending_tasks.len()).rev() {
-            if let Poll::Ready(result) = pending_tasks[i].1.poll() {
-                let (task_id, _task) = pending_tasks.swap_remove(i);
-                match output_sender.send((task_id, result)) {
+            if let Poll::Ready(result) = pending_tasks[i].poll() {
+                pending_tasks.swap_remove(i);
+                match output_sender.send(result) {
                     Ok(()) => (),
                     Err(_) => return,
                 }

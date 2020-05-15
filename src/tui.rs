@@ -39,6 +39,7 @@ where
     W: Write,
 {
     application: Application,
+    current_action: Action,
 
     write: W,
     scroll_view: ScrollView,
@@ -51,6 +52,7 @@ where
     fn new(application: Application, write: W) -> Self {
         Tui {
             application,
+            current_action: Action::Quit,
             write,
             scroll_view: Default::default(),
         }
@@ -97,9 +99,21 @@ where
         )?;
 
         loop {
-            self.write.flush()?;
-            self.application.update();
+            if let Some(result) = self.application.update() {
+                if self.current_action == result.action {
+                    let header = Header {
+                        action_name: result.action.name(),
+                        directory_name: self
+                            .application
+                            .version_control
+                            .get_root()
+                            .into(),
+                    };
+                    self.handle_result(&header, result.output)?;
+                }
+            }
 
+            self.write.flush()?;
             match input::read_key()? {
                 KeyEvent {
                     code: KeyCode::Esc, ..
@@ -206,7 +220,7 @@ where
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
             ['D', 'C'] => self.action_context(Action::RevisionChanges, |s, h| {
-                if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel)")? {
                     let result = s.application.version_control.revision_changes(&input[..]);
                     s.handle_result(h, result)
                 } else {
@@ -214,7 +228,7 @@ where
                 }
             }),
             ['D', 'D'] => self.action_context(Action::RevisionDiffAll, |s, h| {
-                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel)")? {
                     let result = s.application.version_control.revision_diff_all(&input[..]);
                     s.handle_result(h, result)
                 } else {
@@ -222,7 +236,7 @@ where
                 }
             }),
             ['D', 'S'] => self.action_context(Action::RevisionDiffSelected, |s, h| {
-                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel)")? {
                     match s.application.version_control.get_revision_changed_files(&input[..]) {
                         Ok(mut entries) => {
                             if s.show_select_ui(&mut entries)? {
@@ -240,7 +254,7 @@ where
             }),
             ['c'] => Ok(HandleChordResult::Unhandled),
             ['c', 'c'] => self.action_context(Action::CommitAll, |s, h| {
-                if let Some(input) = s.handle_input("commit message (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("commit message (ctrl+c to cancel)")? {
                     let result = s.application.version_control.commit_all(&input[..]);
                     s.handle_result(h, result)
                 } else {
@@ -253,7 +267,7 @@ where
                         if s.show_select_ui(&mut entries)? {
                             s.show_header(h, HeaderKind::Waiting)?;
                             if let Some(input) =
-                                s.handle_input("commit message (ctrl+c to cancel): ")?
+                                s.handle_input("commit message (ctrl+c to cancel)")?
                             {
                                 let result =
                                     s.application.version_control.commit_selected(&input[..], &entries);
@@ -269,7 +283,7 @@ where
                 }
             }),
             ['u'] => self.action_context(Action::Update, |s, h| {
-                if let Some(input) = s.handle_input("update to (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("update to (ctrl+c to cancel)")? {
                     let result = s.application.version_control.update(&input[..]);
                     s.handle_result(h, result)
                 } else {
@@ -277,7 +291,7 @@ where
                 }
             }),
             ['m'] => self.action_context(Action::Merge, |s, h| {
-                if let Some(input) = s.handle_input("merge with (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("merge with (ctrl+c to cancel)")? {
                     let result = s.application.version_control.merge(&input[..]);
                     s.handle_result(h, result)
                 } else {
@@ -329,7 +343,7 @@ where
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
             ['t', 'n'] => self.action_context(Action::NewTag, |s, h| {
-                if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel)")? {
                     let result = s.application.version_control.create_tag(&input[..]);
                     s.handle_result(h, result)
                 } else {
@@ -342,7 +356,7 @@ where
                 s.handle_result(h, result)
             }),
             ['b', 'n'] => self.action_context(Action::NewBranch, |s, h| {
-                if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel)")? {
                     let result = s.application.version_control.create_branch(&input[..]);
                     s.handle_result(h, result)
                 } else {
@@ -350,7 +364,7 @@ where
                 }
             }),
             ['b', 'd'] => self.action_context(Action::DeleteBranch, |s, h| {
-                if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel): ")? {
+                if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel)")? {
                     let result = s.application.version_control.close_branch(&input[..]);
                     s.handle_result(h, result)
                 } else {
