@@ -112,14 +112,11 @@ pub struct ActionFuture {
 }
 
 #[derive(Clone)]
-pub struct ActionResult {
-    pub action: Action,
-    pub output: Result<String, String>,
-}
+pub struct ActionResult(pub Result<String, String>);
 
 pub enum ActionTask {
-    Waiting((Action, Command)),
-    Running((Action, Child)),
+    Waiting(Command),
+    Running(Child),
 }
 
 impl Task for ActionTask {
@@ -127,31 +124,24 @@ impl Task for ActionTask {
 
     fn poll(&mut self) -> Poll<Self::Output> {
         match self {
-            ActionTask::Waiting((action, command)) => match command
+            ActionTask::Waiting(command) => match command
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
             {
                 Ok(child) => {
-                    *self = ActionTask::Running((*action, child));
+                    *self = ActionTask::Running(child);
                     Poll::Pending
                 }
-                Err(e) => Poll::Ready(ActionResult {
-                    action: *action,
-                    output: Err(e.to_string()),
-                }),
+                Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
             },
-            ActionTask::Running((action, child)) => match child.try_wait() {
-                Ok(Some(status)) => Poll::Ready(ActionResult {
-                    action: *action,
-                    output: get_process_output(child, status),
-                }),
+            ActionTask::Running(child) => match child.try_wait() {
+                Ok(Some(status)) => {
+                    Poll::Ready(ActionResult(get_process_output(child, status)))
+                }
                 Ok(None) => Poll::Pending,
-                Err(e) => Poll::Ready(ActionResult {
-                    action: *action,
-                    output: Err(e.to_string()),
-                }),
+                Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
             },
         }
     }
@@ -159,7 +149,7 @@ impl Task for ActionTask {
     fn cancel(&mut self) {
         match self {
             ActionTask::Waiting(_) => (),
-            ActionTask::Running((_action, child)) => match child.kill() {
+            ActionTask::Running(child) => match child.kill() {
                 _ => (),
             },
         }
@@ -167,8 +157,8 @@ impl Task for ActionTask {
 }
 
 pub fn child_aggregator(first: &mut ActionResult, second: &ActionResult) {
-    let first = &mut first.output;
-    let second = &second.output;
+    let first = &mut first.0;
+    let second = &second.0;
 
     let mut temp = Err(String::new());
     mem::swap(first, &mut temp);
@@ -213,7 +203,7 @@ pub struct Application {
     pub custom_actions: Vec<CustomAction>,
 
     pub current_key_chord: Vec<char>,
-    worker: Worker<ActionResult>,
+    worker: Worker<Action, ActionResult>,
     results: HashMap<Action, ActionResult>,
 }
 
@@ -231,10 +221,10 @@ impl Application {
         }
     }
 
-    pub fn poll_action_result(&mut self) -> Option<ActionResult> {
-        if let Some(result) = self.worker.receive_result() {
-            self.results.insert(result.action, result.clone());
-            Some(result)
+    pub fn poll_action_result(&mut self) -> Option<(Action, ActionResult)> {
+        if let Some((action, result)) = self.worker.receive_result() {
+            self.results.insert(action, result.clone());
+            Some((action, result))
         } else {
             None
         }
@@ -246,13 +236,11 @@ impl Application {
     ) -> ActionResult {
         let ActionFuture { action, task } =
             (callback)(self.version_control.as_ref());
-        self.worker.send_task(task);
+        self.worker.cancel_task(action);
+        self.worker.send_task(action, task);
         match self.results.get(&action) {
             Some(result) => result.clone(),
-            None => ActionResult {
-                action,
-                output: Ok(String::new()),
-            },
+            None => ActionResult(Ok(String::new())),
         }
     }
 }

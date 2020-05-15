@@ -99,17 +99,19 @@ where
         )?;
 
         loop {
-            if let Some(result) = self.application.poll_action_result() {
-                if self.current_action == result.action {
+            if let Some((action, result)) =
+                self.application.poll_action_result()
+            {
+                if self.current_action == action {
                     let header = Header {
-                        action_name: result.action.name(),
+                        action_name: action.name(),
                         directory_name: self
                             .application
                             .version_control
                             .get_root()
                             .into(),
                     };
-                    self.handle_result(&header, &result.output)?;
+                    self.handle_result(&header, &result.0)?;
                 }
             }
 

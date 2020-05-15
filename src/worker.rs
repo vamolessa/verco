@@ -131,37 +131,52 @@ where
     }
 }
 
-pub struct Worker<T>
-where
-    T: 'static,
-{
-    task_sender: Sender<Box<dyn Task<Output = T>>>,
-    result_receiver: Receiver<T>,
+enum TaskOperation<Id, T> {
+    Add(Id, Box<dyn Task<Output = T>>),
+    Remove(Id),
 }
 
-impl<T> Worker<T>
+pub struct Worker<Id, T>
 where
+    Id: 'static + Eq,
+    T: 'static,
+{
+    operation_sender: Sender<TaskOperation<Id, T>>,
+    result_receiver: Receiver<(Id, T)>,
+}
+
+impl<Id, T> Worker<Id, T>
+where
+    Id: 'static + Send + Eq,
     T: 'static + Send,
 {
     pub fn new() -> Self {
-        let (task_sender, task_receiver) = channel();
+        let (operation_sender, operation_receiver) = channel();
         let (output_sender, result_receiver) = channel();
 
         thread::spawn(move || {
-            run_worker(task_receiver, output_sender);
+            run_worker(operation_receiver, output_sender);
         });
 
         Self {
-            task_sender,
+            operation_sender,
             result_receiver,
         }
     }
 
-    pub fn send_task(&self, task: Box<dyn Task<Output = T>>) {
-        self.task_sender.send(task).unwrap();
+    pub fn send_task(&self, id: Id, task: Box<dyn Task<Output = T>>) {
+        self.operation_sender
+            .send(TaskOperation::Add(id, task))
+            .unwrap();
     }
 
-    pub fn receive_result(&self) -> Option<T> {
+    pub fn cancel_task(&self, id: Id) {
+        self.operation_sender
+            .send(TaskOperation::Remove(id))
+            .unwrap();
+    }
+
+    pub fn receive_result(&self) -> Option<(Id, T)> {
         match self.result_receiver.try_recv() {
             Ok(result) => Some(result),
             Err(TryRecvError::Empty) => None,
@@ -172,23 +187,33 @@ where
     }
 }
 
-fn run_worker< T>(
-    task_receiver: Receiver<Box<dyn Task<Output = T>>>,
-    output_sender: Sender<T>,
-) {
+fn run_worker<Id, T>(
+    operation_receiver: Receiver<TaskOperation<Id, T>>,
+    output_sender: Sender<(Id, T)>,
+) where
+    Id: Eq,
+{
     let mut pending_tasks = Vec::new();
 
     loop {
-        match task_receiver.try_recv() {
-            Ok(task) => pending_tasks.push(task),
+        match operation_receiver.try_recv() {
+            Ok(TaskOperation::Add(id, task)) => pending_tasks.push((id, task)),
+            Ok(TaskOperation::Remove(id)) => {
+                for i in (0..pending_tasks.len()).rev() {
+                    if pending_tasks[i].0 == id {
+                        let (_id, mut task) = pending_tasks.swap_remove(i);
+                        task.cancel();
+                    }
+                }
+            }
             Err(TryRecvError::Empty) => (),
             Err(TryRecvError::Disconnected) => return,
         }
 
         for i in (0..pending_tasks.len()).rev() {
-            if let Poll::Ready(result) = pending_tasks[i].poll() {
-                pending_tasks.swap_remove(i);
-                match output_sender.send(result) {
+            if let Poll::Ready(result) = pending_tasks[i].1.poll() {
+                let (id, _task) = pending_tasks.swap_remove(i);
+                match output_sender.send((id, result)) {
                     Ok(()) => (),
                     Err(_) => return,
                 }

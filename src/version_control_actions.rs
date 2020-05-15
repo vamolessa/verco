@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use crate::select::Entry;
+use crate::{application::get_process_output, select::Entry};
 
 pub trait VersionControlActions: Send {
     /// Sets the root of the current repository
@@ -64,19 +64,13 @@ pub trait VersionControlActions: Send {
 }
 
 pub fn handle_command(command: &mut Command) -> Result<String, String> {
-    match command.output() {
-        Ok(output) => {
-            if output.status.success() {
-                Ok(String::from_utf8_lossy(&output.stdout[..]).into_owned())
-            } else {
-                let mut out = String::new();
-                out.push_str(&String::from_utf8_lossy(&output.stdout[..]).into_owned()[..]);
-                out.push('\n');
-                out.push('\n');
-                out.push_str(&String::from_utf8_lossy(&output.stderr[..]).into_owned()[..]);
-                Err(out)
+    match command.spawn() {
+        Ok(mut child) => {
+            match child.wait() {
+                Ok(status) => get_process_output(&mut child, status),
+                Err(e) => Err(e.to_string()),
             }
         }
-        Err(error) => Err(error.to_string()),
+        Err(e) => Err(e.to_string()),
     }
 }
