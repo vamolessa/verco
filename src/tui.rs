@@ -99,7 +99,7 @@ where
         )?;
 
         loop {
-            if let Some(result) = self.application.update() {
+            if let Some(result) = self.application.poll_action_result() {
                 if self.current_action == result.action {
                     let header = Header {
                         action_name: result.action.name(),

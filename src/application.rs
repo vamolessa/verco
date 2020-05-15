@@ -231,7 +231,7 @@ impl Application {
         }
     }
 
-    pub fn update(&mut self) -> Option<ActionResult> {
+    pub fn poll_action_result(&mut self) -> Option<ActionResult> {
         if let Some(result) = self.worker.receive_result() {
             self.results.insert(result.action, result.clone());
             Some(result)
