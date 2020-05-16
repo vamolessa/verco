@@ -111,10 +111,7 @@ where
 
 pub fn handle_command(command: &mut Command) -> Result<String, String> {
     match command.spawn() {
-        Ok(mut child) => match child.wait() {
-            Ok(status) => get_process_output(&mut child, status),
-            Err(e) => Err(e.to_string()),
-        },
+        Ok(mut child) => get_process_output(&mut child),
         Err(e) => Err(e.to_string()),
     }
 }

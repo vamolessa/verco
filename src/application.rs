@@ -1,8 +1,8 @@
 use std::{
     collections::HashMap,
-    io::Read,
+    io::{Read, ErrorKind},
     mem,
-    process::{Child, Command, ExitStatus, Stdio},
+    process::{Child, Command, Stdio},
     task::Poll,
 };
 
@@ -14,28 +14,30 @@ use crate::{
 
 pub fn get_process_output(
     child: &mut Child,
-    status: ExitStatus,
 ) -> Result<String, String> {
-    if status.success() {
-        if let Some(stdout) = &mut child.stdout {
-            let mut output = String::new();
-            match stdout.read_to_string(&mut output) {
-                Ok(_) => Ok(output),
-                Err(e) => Err(e.to_string()),
+    match child.wait() {
+        Ok(status) => if status.success() {
+            if let Some(stdout) = &mut child.stdout {
+                let mut output = String::new();
+                match stdout.read_to_string(&mut output) {
+                    Ok(_) => Ok(output),
+                    Err(e) => Err(e.to_string()),
+                }
+            } else {
+                Ok(String::new())
             }
         } else {
-            Ok(String::new())
-        }
-    } else {
-        if let Some(stderr) = &mut child.stderr {
-            let mut error = String::new();
-            match stderr.read_to_string(&mut error) {
-                Ok(_) => Err(error),
-                Err(e) => Err(e.to_string()),
+            if let Some(stderr) = &mut child.stderr {
+                let mut error = String::new();
+                match stderr.read_to_string(&mut error) {
+                    Ok(_) => Err(error),
+                    Err(e) => Err(e.to_string()),
+                }
+            } else {
+                Err(String::new())
             }
-        } else {
-            Err(String::new())
         }
+        Err(error) => Err(error.to_string()),
     }
 }
 
@@ -137,11 +139,12 @@ impl Task for ActionTask {
                 Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
             },
             ActionTask::Running(child) => match child.try_wait() {
-                Ok(Some(status)) => {
-                    Poll::Ready(ActionResult(get_process_output(child, status)))
-                }
-                Ok(None) => Poll::Pending,
-                Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
+                Ok(_) => Poll::Ready(ActionResult(get_process_output(child))),
+                Err(e) => if e.kind() == ErrorKind::WouldBlock {
+                    Poll::Pending
+                } else {
+                    Poll::Ready(ActionResult(Err(e.to_string())))
+                },
             },
         }
     }
