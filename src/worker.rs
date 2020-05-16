@@ -138,11 +138,13 @@ enum TaskOperation<Id, T> {
     Remove(Id),
 }
 
+use std::sync::{Arc, Mutex};
 pub struct Worker<Id, T>
 where
     Id: 'static + Eq,
     T: 'static,
 {
+    pub task_count: Arc<Mutex<usize>>,
     stop_sender: SyncSender<()>,
     operation_sender: Sender<TaskOperation<Id, T>>,
     result_receiver: Receiver<(Id, T)>,
@@ -155,15 +157,18 @@ where
     T: 'static + Send,
 {
     pub fn new() -> Self {
+        let task_count = Arc::new(Mutex::new(0));
         let (stop_sender, stop_receiver) = sync_channel(0);
         let (operation_sender, operation_receiver) = channel();
         let (output_sender, result_receiver) = channel();
 
+        let tc = Arc::clone(&task_count);
         let worker_thread = thread::spawn(move || {
-            run_worker(stop_receiver, operation_receiver, output_sender);
+            run_worker(tc, stop_receiver, operation_receiver, output_sender);
         });
 
         Self {
+            task_count,
             stop_sender,
             operation_sender,
             result_receiver,
@@ -200,6 +205,7 @@ where
 }
 
 fn run_worker<Id, T>(
+    task_count: Arc<Mutex<usize>>,
     stop_receiver: Receiver<()>,
     operation_receiver: Receiver<TaskOperation<Id, T>>,
     output_sender: Sender<(Id, T)>,
@@ -224,6 +230,8 @@ fn run_worker<Id, T>(
                         task.cancel();
                     }
                 }
+
+                *task_count.lock().unwrap() = pending_tasks.len();
             }
             Err(TryRecvError::Empty) => (),
             Err(TryRecvError::Disconnected) => panic!("could not receive task"),
@@ -238,6 +246,7 @@ fn run_worker<Id, T>(
                 }
             }
         }
+        *task_count.lock().unwrap() = pending_tasks.len();
 
         thread::sleep(Duration::from_millis(20));
     }

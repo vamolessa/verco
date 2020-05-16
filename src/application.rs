@@ -240,6 +240,10 @@ impl Application {
         }
     }
 
+    pub fn get_task_count(&self) -> usize {
+        *self.worker.task_count.lock().unwrap()
+    }
+
     pub fn stop(self) {
         self.worker.stop();
     }
