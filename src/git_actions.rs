@@ -1,5 +1,5 @@
 use crate::{
-    application::{ActionResult, action_aggregator},
+    application::{action_aggregator, ActionResult},
     select::{Entry, State},
     version_control_actions::{handle_command, task, VersionControlActions},
     worker::{parallel, serial, task_vec, Task},
@@ -39,7 +39,7 @@ impl VersionControlActions for GitActions {
         let dir = dir
             .lines()
             .next()
-            .expect("Root directory is an empty string");
+            .expect("root directory is an empty string");
         self.current_dir = dir.to_owned();
 
         Ok(())
@@ -115,13 +115,27 @@ impl VersionControlActions for GitActions {
     }
 
     fn log(&mut self, count: usize) -> Box<dyn Task<Output = ActionResult>> {
+        return task(self, |command| {
+            let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
+            command
+                .arg("log")
+                .arg("--all")
+                .arg("--decorate")
+                .arg("--oneline")
+                .arg("--graph")
+                .arg("-54")
+                .arg("--color")
+                .arg(template)
+                .arg("--date=short");
+        });
+
         task(self, |command| {
             let count_str = format!("-{}", count);
             let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
             command
                 .arg("log")
                 .arg("--all")
-                .arg("--decorate")
+                //.arg("--decorate")
                 .arg("--oneline")
                 .arg("--graph")
                 .arg(&count_str)

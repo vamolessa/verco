@@ -239,4 +239,8 @@ impl Application {
             None => ActionResult(Ok(String::new())),
         }
     }
+
+    pub fn stop(self) {
+        self.worker.stop();
+    }
 }

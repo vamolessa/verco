@@ -1,7 +1,9 @@
 use std::{
-    sync::mpsc::{channel, Receiver, Sender, TryRecvError},
+    sync::mpsc::{
+        channel, sync_channel, Receiver, Sender, SyncSender, TryRecvError,
+    },
     task::Poll,
-    thread,
+    thread::{self, JoinHandle},
     time::Duration,
 };
 
@@ -141,8 +143,10 @@ where
     Id: 'static + Eq,
     T: 'static,
 {
+    stop_sender: SyncSender<()>,
     operation_sender: Sender<TaskOperation<Id, T>>,
     result_receiver: Receiver<(Id, T)>,
+    worker_thread: JoinHandle<()>,
 }
 
 impl<Id, T> Worker<Id, T>
@@ -151,16 +155,19 @@ where
     T: 'static + Send,
 {
     pub fn new() -> Self {
+        let (stop_sender, stop_receiver) = sync_channel(0);
         let (operation_sender, operation_receiver) = channel();
         let (output_sender, result_receiver) = channel();
 
-        thread::spawn(move || {
-            run_worker(operation_receiver, output_sender);
+        let worker_thread = thread::spawn(move || {
+            run_worker(stop_receiver, operation_receiver, output_sender);
         });
 
         Self {
+            stop_sender,
             operation_sender,
             result_receiver,
+            worker_thread,
         }
     }
 
@@ -185,9 +192,15 @@ where
             }
         }
     }
+
+    pub fn stop(self) {
+        self.stop_sender.send(()).unwrap();
+        self.worker_thread.join().unwrap();
+    }
 }
 
 fn run_worker<Id, T>(
+    stop_receiver: Receiver<()>,
     operation_receiver: Receiver<TaskOperation<Id, T>>,
     output_sender: Sender<(Id, T)>,
 ) where
@@ -195,7 +208,13 @@ fn run_worker<Id, T>(
 {
     let mut pending_tasks = Vec::new();
 
-    loop {
+    while match stop_receiver.try_recv() {
+        Ok(()) => false,
+        Err(TryRecvError::Empty) => true,
+        Err(TryRecvError::Disconnected) => {
+            panic!("could not receive stop signal")
+        }
+    } {
         match operation_receiver.try_recv() {
             Ok(TaskOperation::Add(id, task)) => pending_tasks.push((id, task)),
             Ok(TaskOperation::Remove(id)) => {
@@ -207,7 +226,7 @@ fn run_worker<Id, T>(
                 }
             }
             Err(TryRecvError::Empty) => (),
-            Err(TryRecvError::Disconnected) => return,
+            Err(TryRecvError::Disconnected) => panic!("could not receive task"),
         }
 
         for i in (0..pending_tasks.len()).rev() {
@@ -215,7 +234,7 @@ fn run_worker<Id, T>(
                 let (id, _task) = pending_tasks.swap_remove(i);
                 match output_sender.send((id, result)) {
                     Ok(()) => (),
-                    Err(_) => return,
+                    Err(_) => panic!("could not send task result"),
                 }
             }
         }

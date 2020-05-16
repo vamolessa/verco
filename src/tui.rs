@@ -27,7 +27,11 @@ use crate::{
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub fn show_tui(application: Application) {
-    Tui::new(application, stdout().lock()).show().unwrap();
+    let stdout = stdout();
+    let stdout = stdout.lock();
+    let mut tui = Tui::new(application, stdout);
+    tui.show().unwrap();
+    tui.application.stop();
 }
 
 enum HandleChordResult {
@@ -61,8 +65,11 @@ where
     }
 
     fn show_header(&mut self, kind: HeaderKind) -> Result<()> {
+        let action_name =
+            format!("{} - tasks: {}", self.current_action.name(), 0);
         let header = Header {
-            action_name: self.current_action.name(),
+            //action_name: self.current_action.name(),
+            action_name: &action_name[..],
             directory_name: self.application.version_control.get_root(),
         };
         show_header(&mut self.write, header, kind)
@@ -81,7 +88,13 @@ where
             action: self.current_action,
             task,
         });
-        self.show_result(&result.0)
+        let output = match result.0 {
+            Ok(output) => output,
+            Err(error) => error,
+        };
+        self.show_header(HeaderKind::Waiting)?;
+        self.scroll_view.set_content(&output[..]);
+        self.scroll_view.show(&mut self.write)
     }
 
     fn action_context<F>(
@@ -118,8 +131,15 @@ where
                 self.application.poll_action_result()
             {
                 if self.current_action == action {
-                    self.show_result(&result.0)?;
-                    self.write.flush()?;
+                    self.show_header(HeaderKind::Canceled)?;
+                    execute!(
+                        self.write,
+                        Clear(ClearType::CurrentLine),
+                        Print("OPAAA TEMO RESULT AQUI DA ACTION "),
+                        Print(action.name())
+                    )?;
+                    //self.show_result(&result.0)?;
+                    //self.write.flush()?;
                 }
             }
 

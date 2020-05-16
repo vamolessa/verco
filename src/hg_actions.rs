@@ -38,7 +38,7 @@ impl<'a> VersionControlActions for HgActions {
         let dir = dir
             .lines()
             .next()
-            .expect("Root directory is an empty string");
+            .expect("root directory is an empty string");
         self.current_dir = dir.to_owned();
 
         Ok(())
