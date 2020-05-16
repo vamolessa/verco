@@ -364,7 +364,7 @@ where
             select.cursor_offset.1,
         ))?;
         write.flush()?;
-        match input::read_key()? {
+        match input::wait_for_key() {
             KeyEvent {
                 code: KeyCode::Esc, ..
             }

@@ -1,13 +1,30 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use std::time::Duration;
+
+use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use rustyline::{error::ReadlineError, Editor};
 
-pub fn read_key() -> crossterm::Result<KeyEvent> {
+pub enum Event {
+    None,
+    Resize,
+    Key(KeyEvent),
+}
+
+pub fn poll_event() -> Event {
+    if event::poll(Duration::from_millis(10)).unwrap() {
+        match event::read().unwrap() {
+            event::Event::Resize(_, _) => Event::Resize,
+            event::Event::Key(key) => Event::Key(key),
+            _ => Event::None,
+        }
+    } else {
+        Event::None
+    }
+}
+
+pub fn wait_for_key() -> KeyEvent {
     loop {
-        match event::read()? {
-            Event::Key(key_event) => {
-                return Ok(key_event);
-            }
-            _ => (),
+        if let event::Event::Key(key) = event::read().unwrap() {
+            return key;
         }
     }
 }

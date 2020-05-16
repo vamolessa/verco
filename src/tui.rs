@@ -11,12 +11,13 @@ use crossterm::{
 
 use std::{
     io::{stdout, Write},
-    iter,
+    iter, thread,
+    time::Duration,
 };
 
 use crate::{
     application::{Action, ActionFuture, ActionResult, Application},
-    input,
+    input::{self, Event},
     scroll_view::ScrollView,
     select::{select, Entry},
     tui_util::{show_header, Header, HeaderKind, ENTRY_COLOR},
@@ -72,7 +73,7 @@ where
         select(&mut self.write, entries)
     }
 
-    fn handle_action(
+    fn show_action(
         &mut self,
         task: Box<dyn Task<Output = ActionResult>>,
     ) -> Result<()> {
@@ -80,7 +81,7 @@ where
             action: self.current_action,
             task,
         });
-        self.handle_result(&result.0)
+        self.show_result(&result.0)
     }
 
     fn action_context<F>(
@@ -102,7 +103,7 @@ where
         {
             self.current_action = Action::Help;
             let help = self.show_help()?;
-            self.handle_result(&help)?;
+            self.show_result(&help)?;
         }
 
         let (w, h) = terminal::size()?;
@@ -117,34 +118,38 @@ where
                 self.application.poll_action_result()
             {
                 if self.current_action == action {
-                    self.handle_result(&result.0)?;
+                    self.show_result(&result.0)?;
+                    self.write.flush()?;
                 }
             }
 
-            self.write.flush()?;
-            match input::read_key()? {
-                KeyEvent {
+            match input::poll_event() {
+                Event::Resize => {}
+                Event::Key(KeyEvent {
                     code: KeyCode::Esc, ..
-                }
-                | KeyEvent {
+                })
+                | Event::Key(KeyEvent {
                     code: KeyCode::Char('c'),
                     modifiers: KeyModifiers::CONTROL,
-                } => {
+                }) => {
                     if self.application.current_key_chord.len() == 0 {
                         break;
                     }
 
                     self.application.current_key_chord.clear();
                     self.show_current_key_chord()?;
+                    self.write.flush()?;
                 }
-                key_event => {
+                Event::Key(key_event) => {
                     if self.scroll_view.update(&mut self.write, &key_event)? {
+                        self.write.flush()?;
                         continue;
                     }
 
                     if let Some(c) = input::key_to_char(key_event) {
                         self.application.current_key_chord.push(c);
                     }
+
                     match self.handle_key_chord()? {
                         HandleChordResult::Handled => {
                             self.application.current_key_chord.clear()
@@ -152,9 +157,14 @@ where
                         HandleChordResult::Unhandled => (),
                         HandleChordResult::Quit => break,
                     }
+
                     self.show_current_key_chord()?;
+                    self.write.flush()?;
                 }
+                _ => (),
             }
+
+            thread::sleep(Duration::from_millis(20));
         }
 
         execute!(
@@ -175,24 +185,24 @@ where
             ['h'] => {
             self.current_action = Action::Help;
             let help = self.show_help()?;
-            self.handle_result(&help)?;
+            self.show_result(&help)?;
                 Ok(HandleChordResult::Handled)
             }
             ['s'] => self.action_context(Action::Status, |s| {
                 let action =s.application.version_control.status();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
             ['l', 'l'] => self.action_context(Action::Log, |s| {
                 let (_w, h) = terminal::size()?;
                 let action = s.application.version_control.log(h as usize);
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['l', 'c'] => self.action_context(Action::LogCount, |s| {
                 if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
                     if let Ok(count) = input.parse() {
                         let action = s.application.version_control.log(count);
-                        s.handle_action(action)
+                        s.show_action(action)
                     } else {
                         s.show_header(HeaderKind::Error)?;
                         queue!(
@@ -208,31 +218,31 @@ where
             ['e'] => Ok(HandleChordResult::Unhandled),
             ['e', 'e'] => self.action_context(Action::CurrentFullRevision, |s| {
                 let action =  s.application.version_control.current_export();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
             ['d', 'd'] => self.action_context(Action::CurrentDiffAll, |s| {
                 let action =  s.application.version_control.current_diff_all();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['d', 's'] => self.action_context(Action::CurrentDiffSelected, |s| {
                 match s.application.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
                             let action =  s.application.version_control.current_diff_selected(&entries);
-                            s.handle_action(action)
+                            s.show_action(action)
                         } else {
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.handle_result( &Err(error)),
+                    Err(error) => s.show_result( &Err(error)),
                 }
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
             ['D', 'C'] => self.action_context(Action::RevisionChanges, |s| {
                 if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.revision_changes(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -240,7 +250,7 @@ where
             ['D', 'D'] => self.action_context(Action::RevisionDiffAll, |s| {
                 if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.revision_diff_all(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -251,12 +261,12 @@ where
                         Ok(mut entries) => {
                             if s.show_select_ui(&mut entries)? {
                                 let action =  s.application.version_control.revision_diff_selected(&input[..], &entries);
-                                s.handle_action(action)
+                                s.show_action(action)
                             } else {
                                 s.show_header( HeaderKind::Canceled)
                             }
                         }
-                        Err(error) => s.handle_result( &Err(error)),
+                        Err(error) => s.show_result( &Err(error)),
                     }
                 } else {
                     s.show_header( HeaderKind::Canceled)
@@ -266,7 +276,7 @@ where
             ['c', 'c'] => self.action_context(Action::CommitAll, |s| {
                 if let Some(input) = s.handle_input("commit message (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.commit_all(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -280,7 +290,7 @@ where
                                 s.handle_input("commit message (ctrl+c to cancel)")?
                             {
                                 let action =  s.application.version_control.commit_selected(&input[..], &entries);
-                                s.handle_action(action)
+                                s.show_action(action)
                             } else {
                                 s.show_header( HeaderKind::Canceled)
                             }
@@ -288,13 +298,13 @@ where
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.handle_result( &Err(error)),
+                    Err(error) => s.show_result( &Err(error)),
                 }
             }),
             ['u'] => self.action_context(Action::Update, |s| {
                 if let Some(input) = s.handle_input("update to (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.update(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -302,7 +312,7 @@ where
             ['m'] => self.action_context(Action::Merge, |s| {
                 if let Some(input) = s.handle_input("merge with (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.merge(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -310,7 +320,7 @@ where
             ['R'] => Ok(HandleChordResult::Unhandled),
             ['R', 'A'] => self.action_context(Action::RevertAll, |s| {
                 let action =  s.application.version_control.revert_all();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['r'] => Ok(HandleChordResult::Unhandled),
             ['r', 's'] => self.action_context(Action::RevertSelected, |s| {
@@ -318,43 +328,43 @@ where
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
                             let action =  s.application.version_control.revert_selected(&entries);
-                            s.handle_action(action)
+                            s.show_action(action)
                         } else {
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.handle_result( &Err(error)),
+                    Err(error) => s.show_result( &Err(error)),
                 }
             }),
             ['r', 'r'] => self.action_context(Action::UnresolvedConflicts, |s| {
                 let action =  s.application.version_control.conflicts();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['r', 'o'] => self.action_context(Action::MergeTakingOther, |s| {
                 let action =  s.application.version_control.take_other();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['r', 'l'] => self.action_context(Action::MergeTakingLocal, |s| {
                 let action =  s.application.version_control.take_local();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['f'] => self.action_context(Action::Fetch, |s| {
                 let action =  s.application.version_control.fetch();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['p'] => self.action_context(Action::Pull, |s| {
                 let action =  s.application.version_control.pull();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['P'] => self.action_context(Action::Push, |s| {
                 let action =  s.application.version_control.push();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
             ['t', 'n'] => self.action_context(Action::NewTag, |s| {
                 if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.create_tag(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -362,12 +372,12 @@ where
             ['b'] => Ok(HandleChordResult::Unhandled),
             ['b', 'b'] => self.action_context(Action::ListBranches, |s| {
                 let action =  s.application.version_control.list_branches();
-                s.handle_action(action)
+                s.show_action(action)
             }),
             ['b', 'n'] => self.action_context(Action::NewBranch, |s| {
                 if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.create_branch(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -375,7 +385,7 @@ where
             ['b', 'd'] => self.action_context(Action::DeleteBranch, |s| {
                 if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel)")? {
                     let action =  s.application.version_control.close_branch(&input[..]);
-                    s.handle_action(action)
+                    s.show_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -418,17 +428,18 @@ where
 
         'outer: loop {
             self.write.flush()?;
-            match input::read_key()? {
-                KeyEvent {
+            match input::poll_event() {
+                Event::Resize => (),
+                Event::Key(KeyEvent {
                     code: KeyCode::Esc, ..
-                }
-                | KeyEvent {
+                })
+                | Event::Key(KeyEvent {
                     code: KeyCode::Char('c'),
                     modifiers: KeyModifiers::CONTROL,
-                } => {
+                }) => {
                     return self.show_header(HeaderKind::Canceled);
                 }
-                key_event => {
+                Event::Key(key_event) => {
                     if let Some(c) = input::key_to_char(key_event) {
                         self.application.current_key_chord.push(c);
                     }
@@ -461,7 +472,7 @@ where
                             let result = action.execute(
                                 self.application.version_control.get_root(),
                             );
-                            self.handle_result(&result)?;
+                            self.show_result(&result)?;
                             return Ok(());
                         }
                     }
@@ -482,6 +493,7 @@ where
                     self.write.queue(Print("no match found"))?;
                     return Ok(());
                 }
+                _ => (),
             }
         }
     }
@@ -511,7 +523,7 @@ where
         Ok(res)
     }
 
-    fn handle_result(
+    fn show_result(
         &mut self,
         result: &std::result::Result<String, String>,
     ) -> Result<()> {
