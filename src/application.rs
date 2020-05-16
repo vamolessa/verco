@@ -127,25 +127,31 @@ impl Task for ActionTask {
     fn poll(&mut self) -> Poll<Self::Output> {
         match self {
             ActionTask::Waiting(command) => match command
-                .stdin(Stdio::null())
+                .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
             {
-                Ok(child) => {
+                Ok(mut child) => {
+                    let mut stdin = None;
+                    std::mem::swap(&mut child.stdin, &mut stdin);
+                    if let Some(stdin) = stdin {
+                        drop(stdin);
+                    }
                     *self = ActionTask::Running(child);
                     Poll::Pending
                 }
                 Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
             },
-            ActionTask::Running(child) => match child.try_wait() {
+            ActionTask::Running(child) => match child.wait() {
                 Ok(_) => Poll::Ready(ActionResult(get_process_output(child))),
-                Err(e) => if e.kind() == ErrorKind::WouldBlock {
-                    Poll::Pending
-                } else {
-                    Poll::Ready(ActionResult(Err(e.to_string())))
-                },
+                Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
             },
+            //ActionTask::Running(child) => match child.try_wait() {
+            //    Ok(Some(_)) => Poll::Ready(ActionResult(get_process_output(child))),
+            //    Ok(None) => Poll::Pending,
+            //    Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
+            //},
         }
     }
 
