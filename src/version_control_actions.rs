@@ -13,7 +13,7 @@ pub trait VersionControlActions: Send {
     fn command(&self) -> Command {
         let mut command = Command::new(self.executable_name());
         command.current_dir(self.current_dir());
-        command.stdin(Stdio::null());
+        command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
         command

@@ -136,14 +136,14 @@ where
     Id: 'static + Eq,
     T: 'static,
 {
-    pending_tasks: Vec<(Id, Box<dyn Task<Output= T>>)>,
+    pending_tasks: Vec<(Id, Box<dyn Task<Output = T>>)>,
     results: Vec<(Id, T)>,
 }
 
 impl<Id, T> Worker<Id, T>
 where
-    Id: 'static  + Eq,
-    T: 'static ,
+    Id: 'static + Eq,
+    T: 'static,
 {
     pub fn new() -> Self {
         Self {

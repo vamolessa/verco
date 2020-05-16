@@ -65,8 +65,11 @@ where
     }
 
     fn show_header(&mut self, kind: HeaderKind) -> Result<()> {
-        let action_name =
-            format!("{} - tasks: {}", self.current_action.name(), self.application.task_count());
+        let action_name = format!(
+            "{} - tasks: {}",
+            self.current_action.name(),
+            self.application.task_count()
+        );
         let header = Header {
             //action_name: self.current_action.name(),
             action_name: &action_name[..],
@@ -220,7 +223,7 @@ where
             }),
             ['l', 'c'] => self.action_context(Action::LogCount, |s| {
                 if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
-                    if let Ok(count) = input.parse() {
+                    if let Ok(count) = input.trim().parse() {
                         let action = s.application.version_control.log(count);
                         s.show_action(action)
                     } else {
