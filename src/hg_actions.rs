@@ -1,9 +1,8 @@
-use std::process::Command;
-
 use crate::{
-    revision_shortcut::RevisionShortcut,
+    application::{action_aggregator, ActionResult},
     select::{Entry, State},
-    version_control_actions::{handle_command, VersionControlActions},
+    version_control_actions::{handle_command, task, VersionControlActions},
+    worker::{parallel, serial, task_vec, Task},
 };
 
 fn str_to_state(s: &str) -> State {
@@ -21,25 +20,17 @@ fn str_to_state(s: &str) -> State {
 
 pub struct HgActions {
     pub current_dir: String,
-    pub revision_shortcut: RevisionShortcut,
-}
-
-impl HgActions {
-    fn command(&self) -> Command {
-        let mut command = Command::new("hg");
-        command.current_dir(&self.current_dir[..]);
-        command
-    }
-
-    /// Disables user customizations for internal invocations
-    fn plain_command(&self) -> Command {
-        let mut command = self.command();
-        command.env("HGPLAIN", "");
-        command
-    }
 }
 
 impl<'a> VersionControlActions for HgActions {
+    fn executable_name(&self) -> &'static str {
+        "hg"
+    }
+
+    fn current_dir(&self) -> &str {
+        &self.current_dir[..]
+    }
+
     fn set_root(&mut self) -> Result<(), String> {
         let mut command = self.command();
         let dir = handle_command(command.arg("root"))?;
@@ -81,7 +72,6 @@ impl<'a> VersionControlActions for HgActions {
         &mut self,
         target: &str,
     ) -> Result<Vec<Entry>, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
         let output = handle_command(
             self.command().arg("status").arg("--change").arg(target),
         )?;
@@ -107,49 +97,28 @@ impl<'a> VersionControlActions for HgActions {
         handle_command(self.command().arg("--version"))
     }
 
-    fn status(&mut self) -> Result<String, String> {
-        let mut output = String::new();
-
-        output.push_str(
-            &handle_command(
-                self.command().args(&["summary", "--color", "always"]),
-            )?[..],
-        );
-        output.push_str("\n");
-        output.push_str(
-            &handle_command(
-                self.command().args(&["status", "--color", "always"]),
-            )?[..],
-        );
-
-        Ok(output)
+    fn status(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        let mut tasks = task_vec();
+        tasks.push(task(self, |command| {
+            command.args(&["summary", "--color", "always"]);
+        }));
+        tasks.push(task(self, |command| {
+            command.args(&["status", "--color", "always"]);
+        }));
+        parallel(tasks, action_aggregator)
     }
 
-    fn current_export(&mut self) -> Result<String, String> {
-        handle_command(self.command().args(&["export", "--color", "always"]))
+    fn current_export(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.args(&["export", "--color", "always"]);
+        })
     }
 
-    fn log(&mut self, count: u32) -> Result<String, String> {
-        let count_str = format!("{}", count);
-
-        let hashes_output = handle_command(
-            self.plain_command()
-                .arg("log")
-                .arg("--template")
-                .arg("{node|short} ")
-                .arg("-l")
-                .arg(&count_str),
-        )?;
-        let hashes: Vec<_> = hashes_output
-            .split_whitespace()
-            .take(RevisionShortcut::max())
-            .map(String::from)
-            .collect();
-        self.revision_shortcut.update_hashes(hashes);
-
-        let template = "{label('green', if(topics, '[{topics}]'))} {label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}";
-        let mut output = handle_command(
-            self.command()
+    fn log(&mut self, count: usize) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            let count_str = format!("{}", count);
+            let template = "{label('green', if(topics, '[{topics}]'))} {label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}";
+            command
                 .arg("log")
                 .arg("--config")
                 .arg("experimental.graphshorten=True")
@@ -159,248 +128,252 @@ impl<'a> VersionControlActions for HgActions {
                 .arg("-l")
                 .arg(&count_str)
                 .arg("--color")
-                .arg("always"),
-        )?;
-
-        self.revision_shortcut.replace_occurrences(&mut output);
-        Ok(output)
+                .arg("always");
+        })
     }
 
-    fn current_diff_all(&mut self) -> Result<String, String> {
-        handle_command(self.command().arg("diff").arg("--color").arg("always"))
+    fn current_diff_all(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.arg("diff").arg("--color").arg("always");
+        })
     }
 
     fn current_diff_selected(
         &mut self,
         entries: &Vec<Entry>,
-    ) -> Result<String, String> {
-        let mut command = self.command();
-        command.arg("diff").arg("--color").arg("always").arg("--");
-
-        for e in entries.iter() {
-            if e.selected {
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.arg("diff").arg("--color").arg("always").arg("--");
+            for e in entries.iter().filter(|e| e.selected) {
                 command.arg(&e.filename);
             }
-        }
-
-        handle_command(&mut command)
+        })
     }
 
-    fn revision_changes(&mut self, target: &str) -> Result<String, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        handle_command(
-            self.command()
+    fn revision_changes(
+        &mut self,
+        target: &str,
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command
                 .arg("status")
                 .arg("--change")
                 .arg(target)
                 .arg("--color")
-                .arg("always"),
-        )
+                .arg("always");
+        })
     }
 
-    fn revision_diff_all(&mut self, target: &str) -> Result<String, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        handle_command(
-            self.command()
+    fn revision_diff_all(
+        &mut self,
+        target: &str,
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command
                 .arg("diff")
                 .arg("--change")
                 .arg(target)
                 .arg("--color")
-                .arg("always"),
-        )
+                .arg("always");
+        })
     }
 
     fn revision_diff_selected(
         &mut self,
         target: &str,
         entries: &Vec<Entry>,
-    ) -> Result<String, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command
+                .arg("diff")
+                .arg("--change")
+                .arg(target)
+                .arg("--color")
+                .arg("always")
+                .arg("--");
 
-        let mut command = self.command();
-        command
-            .arg("diff")
-            .arg("--change")
-            .arg(target)
-            .arg("--color")
-            .arg("always")
-            .arg("--");
-
-        for e in entries.iter() {
-            if e.selected {
+            for e in entries.iter().filter(|e| e.selected) {
                 command.arg(&e.filename);
             }
-        }
-
-        handle_command(&mut command)
+        })
     }
 
-    fn commit_all(&mut self, message: &str) -> Result<String, String> {
-        handle_command(
-            self.command()
+    fn commit_all(
+        &mut self,
+        message: &str,
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command
                 .arg("commit")
                 .arg("--addremove")
                 .arg("-m")
                 .arg(message)
                 .arg("--color")
-                .arg("always"),
-        )
+                .arg("always");
+        })
     }
 
     fn commit_selected(
         &mut self,
         message: &str,
         entries: &Vec<Entry>,
-    ) -> Result<String, String> {
-        let mut cmd = self.command();
-        cmd.arg("commit");
-
-        for e in entries.iter() {
-            if e.selected {
-                match e.state {
-                    State::Missing | State::Deleted => {
-                        handle_command(
-                            self.command().arg("remove").arg(&e.filename),
-                        )?;
-                    }
-                    State::Untracked => {
-                        handle_command(
-                            self.command().arg("add").arg(&e.filename),
-                        )?;
-                    }
-                    _ => (),
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        let mut tasks = task_vec();
+        let mut files_to_commit = Vec::new();
+        for e in entries.iter().filter(|e| e.selected) {
+            match e.state {
+                State::Missing | State::Deleted => {
+                    tasks.push(task(self, |command| {
+                        command.arg("remove").arg(&e.filename);
+                    }))
                 }
-
-                cmd.arg(&e.filename);
+                State::Untracked => tasks.push(task(self, |command| {
+                    command.arg("add").arg(&e.filename);
+                })),
+                _ => (),
             }
+            files_to_commit.push(&e.filename);
         }
-
-        handle_command(cmd.arg("-m").arg(message).arg("--color").arg("always"))
+        tasks.push(task(self, |command| {
+            command
+                .arg("commit")
+                .arg("-m")
+                .arg(message)
+                .arg("--color")
+                .arg("always");
+            for file in files_to_commit {
+                command.arg(file);
+            }
+        }));
+        serial(tasks, action_aggregator)
     }
 
-    fn revert_all(&mut self) -> Result<String, String> {
-        let mut output = String::new();
-
-        output.push_str(&handle_command(self.command().args(&["revert", "-C", "--all"]))?[..]);
-        output.push_str("\n");
-        output.push_str(&handle_command(self.command().args(&["purge"]))?[..]);
-
-        Ok(output)
+    fn revert_all(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        let mut tasks = task_vec();
+        tasks.push(task(self, |command| {
+            command.args(&["revert", "-C", "--all"]);
+        }));
+        tasks.push(task(self, |command| {
+            command.args(&["purge"]);
+        }));
+        serial(tasks, action_aggregator)
     }
 
     fn revert_selected(
         &mut self,
         entries: &Vec<Entry>,
-    ) -> Result<String, String> {
-        let mut output = String::new();
-
-        let mut cmd = self.command();
-        cmd.arg("revert").arg("-C").arg("--color").arg("always");
-
-        let mut has_revert_file = false;
-
-        for e in entries.iter() {
-            if !e.selected {
-                continue;
-            }
-
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        let mut tasks = task_vec();
+        let mut files_to_revert = Vec::new();
+        for e in entries.iter().filter(|e| e.selected) {
             match e.state {
-                State::Untracked => {
-                    output.push_str(
-                        &handle_command(
-                            self.command().arg("purge").arg(&e.filename),
-                        )?[..],
-                    );
-                }
-                _ => {
-                    has_revert_file = true;
-                    cmd.arg(&e.filename);
-                }
+                State::Untracked => tasks.push(task(self, |command| {
+                    command.arg("purge").arg(&e.filename);
+                })),
+                _ => files_to_revert.push(&e.filename),
             }
         }
-
-        if has_revert_file {
-            output.push_str(&handle_command(&mut cmd)?[..]);
+        if files_to_revert.len() > 0 {
+            tasks.push(task(self, |command| {
+                command.arg("revert").arg("-C").arg("--color").arg("always");
+                for file in files_to_revert {
+                    command.arg(file);
+                }
+            }));
         }
-
-        Ok(output)
+        parallel(tasks, action_aggregator)
     }
 
-    fn update(&mut self, target: &str) -> Result<String, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        handle_command(self.command().arg("update").arg(target))
+    fn update(&mut self, target: &str) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.arg("update").arg(target);
+        })
     }
 
-    fn merge(&mut self, target: &str) -> Result<String, String> {
-        let target = self.revision_shortcut.get_hash(target).unwrap_or(target);
-        handle_command(self.command().arg("merge").arg(target))
+    fn merge(&mut self, target: &str) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.arg("merge").arg(target);
+        })
     }
 
-    fn conflicts(&mut self) -> Result<String, String> {
-        handle_command(
-            self.command().args(&["resolve", "-l", "--color", "always"]),
-        )
+    fn conflicts(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.args(&["resolve", "-l", "--color", "always"]);
+        })
     }
 
-    fn take_other(&mut self) -> Result<String, String> {
-        handle_command(self.command().args(&[
-            "resolve",
-            "-a",
-            "-t",
-            "internal:other",
-        ]))
+    fn take_other(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.args(&["resolve", "-a", "-t", "internal:other"]);
+        })
     }
 
-    fn take_local(&mut self) -> Result<String, String> {
-        handle_command(self.command().args(&[
-            "resolve",
-            "-a",
-            "-t",
-            "internal:local",
-        ]))
+    fn take_local(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.args(&["resolve", "-a", "-t", "internal:local"]);
+        })
     }
 
-    fn fetch(&mut self) -> Result<String, String> {
+    fn fetch(&mut self) -> Box<dyn Task<Output = ActionResult>> {
         self.pull()
     }
 
-    fn pull(&mut self) -> Result<String, String> {
-        handle_command(self.command().arg("pull"))
+    fn pull(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.arg("pull");
+        })
     }
 
-    fn push(&mut self) -> Result<String, String> {
-        handle_command(self.command().args(&["push", "--new-branch"]))
+    fn push(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.args(&["push", "--new-branch"]);
+        })
     }
 
-    fn create_tag(&mut self, name: &str) -> Result<String, String> {
-        handle_command(self.command().arg("tag").arg(name).arg("-f"))
+    fn create_tag(
+        &mut self,
+        name: &str,
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.arg("tag").arg(name).arg("-f");
+        })
     }
 
-    fn list_branches(&mut self) -> Result<String, String> {
-        handle_command(self.command().args(&["branches", "--color", "always"]))
+    fn list_branches(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.args(&["branches", "--color", "always"]);
+        })
     }
 
-    fn create_branch(&mut self, name: &str) -> Result<String, String> {
-        handle_command(self.command().arg("branch").arg(name))
+    fn create_branch(
+        &mut self,
+        name: &str,
+    ) -> Box<dyn Task<Output = ActionResult>> {
+        task(self, |command| {
+            command.arg("branch").arg(name);
+        })
     }
 
-    fn close_branch(&mut self, name: &str) -> Result<String, String> {
+    fn close_branch(
+        &mut self,
+        name: &str,
+    ) -> Box<dyn Task<Output = ActionResult>> {
         let changeset =
-            handle_command(self.command().args(&["identify", "--num"]))?;
-        self.update(name)?;
+            handle_command(self.command().args(&["identify", "--num"])).ok();
 
-        let mut output = String::new();
-        output.push_str(
-            &handle_command(self.command().args(&[
+        let mut tasks = task_vec();
+        tasks.push(self.update(name));
+        tasks.push(task(self, |command| {
+            command.args(&[
                 "commit",
                 "-m",
                 "\"close branch\"",
                 "--close-branch",
-            ]))?[..],
-        );
-        output.push_str("\n");
-        output.push_str(&self.update(changeset.trim())?[..]);
-
-        Ok(output)
+            ]);
+        }));
+        if let Some(changeset) = changeset {
+            tasks.push(self.update(changeset.trim()));
+        }
+        serial(tasks, action_aggregator)
     }
 }

@@ -111,6 +111,15 @@ pub struct ActionFuture {
     pub task: Box<dyn 'static + Task<Output = ActionResult>>,
 }
 
+impl ActionFuture {
+    pub fn new(
+        action: Action,
+        task: Box<dyn 'static + Task<Output = ActionResult>>,
+    ) -> Self {
+        Self { action, task }
+    }
+}
+
 #[derive(Clone)]
 pub struct ActionResult(pub Result<String, String>);
 
@@ -156,7 +165,7 @@ impl Task for ActionTask {
     }
 }
 
-pub fn child_aggregator(first: &mut ActionResult, second: &ActionResult) {
+pub fn action_aggregator(first: &mut ActionResult, second: &ActionResult) {
     let first = &mut first.0;
     let second = &second.0;
 
@@ -230,12 +239,8 @@ impl Application {
         }
     }
 
-    pub fn run_action(
-        &mut self,
-        callback: fn(&dyn VersionControlActions) -> ActionFuture,
-    ) -> ActionResult {
-        let ActionFuture { action, task } =
-            (callback)(self.version_control.as_ref());
+    pub fn run_action(&mut self, action_future: ActionFuture) -> ActionResult {
+        let ActionFuture { action, task } = action_future;
         self.worker.cancel_all_tasks(action);
         self.worker.send_task(action, task);
         match self.results.get(&action) {

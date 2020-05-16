@@ -35,7 +35,7 @@ pub enum HeaderKind {
 
 pub struct Header<'a> {
     pub action_name: &'a str,
-    pub directory_name: String,
+    pub directory_name: &'a str,
 }
 
 impl<'a> Header<'a> {
@@ -49,7 +49,7 @@ impl<'a> Header<'a> {
 
 pub fn show_header<W>(
     write: &mut W,
-    header: &Header,
+    header: Header,
     kind: HeaderKind,
 ) -> Result<()>
 where

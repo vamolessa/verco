@@ -22,7 +22,6 @@ pub fn get_current_version_control() -> Option<Box<dyn VersionControlActions>> {
             .to_str()
             .expect("current directory is not valid utf8")
             .into(),
-        revision_shortcut: Default::default(),
     });
 
     if git_actions.set_root().is_ok() {
@@ -35,7 +34,6 @@ pub fn get_current_version_control() -> Option<Box<dyn VersionControlActions>> {
             .to_str()
             .expect("current directory is not valid utf8")
             .into(),
-        revision_shortcut: Default::default(),
     });
 
     if hg_actions.set_root().is_ok() {
