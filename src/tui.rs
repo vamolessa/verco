@@ -59,7 +59,7 @@ where
         }
     }
 
-    fn show_header(&self, kind: HeaderKind) -> Result<()> {
+    fn show_header(&mut self, kind: HeaderKind) -> Result<()> {
         let header = Header {
             action_name: self.current_action.name(),
             directory_name: self.application.version_control.get_root(),
@@ -99,8 +99,11 @@ where
         execute!(self.write, EnterAlternateScreen, cursor::Hide)?;
         terminal::enable_raw_mode()?;
 
-        self.current_action = Action::Help;
-        self.handle_result(&self.show_help()?)?;
+        {
+            self.current_action = Action::Help;
+            let help = self.show_help()?;
+            self.handle_result(&help)?;
+        }
 
         let (w, h) = terminal::size()?;
         queue!(
@@ -171,21 +174,25 @@ where
             ['q'] => Ok(HandleChordResult::Quit),
             ['h'] => {
             self.current_action = Action::Help;
-            self.handle_result(&self.show_help()?)?;
+            let help = self.show_help()?;
+            self.handle_result(&help)?;
                 Ok(HandleChordResult::Handled)
             }
             ['s'] => self.action_context(Action::Status, |s| {
-                s.handle_action(s.application.version_control.status())
+                let action =s.application.version_control.status();
+                s.handle_action(action)
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
             ['l', 'l'] => self.action_context(Action::Log, |s| {
                 let (_w, h) = terminal::size()?;
-                s.handle_action(s.application.version_control.log(h as usize))
+                let action = s.application.version_control.log(h as usize);
+                s.handle_action(action)
             }),
             ['l', 'c'] => self.action_context(Action::LogCount, |s| {
                 if let Some(input) = s.handle_input("logs to show (ctrl+c to cancel)")? {
                     if let Ok(count) = input.parse() {
-                        s.handle_action(s.application.version_control.log(count))
+                        let action = s.application.version_control.log(count);
+                        s.handle_action(action)
                     } else {
                         s.show_header(HeaderKind::Error)?;
                         queue!(
@@ -200,17 +207,20 @@ where
             }),
             ['e'] => Ok(HandleChordResult::Unhandled),
             ['e', 'e'] => self.action_context(Action::CurrentFullRevision, |s| {
-                s.handle_action( s.application.version_control.current_export())
+                let action =  s.application.version_control.current_export();
+                s.handle_action(action)
             }),
             ['d'] => Ok(HandleChordResult::Unhandled),
             ['d', 'd'] => self.action_context(Action::CurrentDiffAll, |s| {
-                s.handle_action( s.application.version_control.current_diff_all())
+                let action =  s.application.version_control.current_diff_all();
+                s.handle_action(action)
             }),
             ['d', 's'] => self.action_context(Action::CurrentDiffSelected, |s| {
                 match s.application.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
-                            s.handle_action( s.application.version_control.current_diff_selected(&entries))
+                            let action =  s.application.version_control.current_diff_selected(&entries);
+                            s.handle_action(action)
                         } else {
                             s.show_header( HeaderKind::Canceled)
                         }
@@ -221,14 +231,16 @@ where
             ['D'] => Ok(HandleChordResult::Unhandled),
             ['D', 'C'] => self.action_context(Action::RevisionChanges, |s| {
                 if let Some(input) = s.handle_input("show changes from (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.revision_changes(&input[..]))
+                    let action =  s.application.version_control.revision_changes(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
             }),
             ['D', 'D'] => self.action_context(Action::RevisionDiffAll, |s| {
                 if let Some(input) = s.handle_input("show diff from (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.revision_diff_all(&input[..]))
+                    let action =  s.application.version_control.revision_diff_all(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -238,7 +250,8 @@ where
                     match s.application.version_control.get_revision_changed_files(&input[..]) {
                         Ok(mut entries) => {
                             if s.show_select_ui(&mut entries)? {
-                                s.handle_action( s.application.version_control.revision_diff_selected(&input[..], &entries))
+                                let action =  s.application.version_control.revision_diff_selected(&input[..], &entries);
+                                s.handle_action(action)
                             } else {
                                 s.show_header( HeaderKind::Canceled)
                             }
@@ -252,7 +265,8 @@ where
             ['c'] => Ok(HandleChordResult::Unhandled),
             ['c', 'c'] => self.action_context(Action::CommitAll, |s| {
                 if let Some(input) = s.handle_input("commit message (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.commit_all(&input[..]))
+                    let action =  s.application.version_control.commit_all(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
@@ -265,8 +279,8 @@ where
                             if let Some(input) =
                                 s.handle_input("commit message (ctrl+c to cancel)")?
                             {
-                                s.handle_action(
-                                    s.application.version_control.commit_selected(&input[..], &entries))
+                                let action =  s.application.version_control.commit_selected(&input[..], &entries);
+                                s.handle_action(action)
                             } else {
                                 s.show_header( HeaderKind::Canceled)
                             }
@@ -279,28 +293,32 @@ where
             }),
             ['u'] => self.action_context(Action::Update, |s| {
                 if let Some(input) = s.handle_input("update to (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.update(&input[..]))
+                    let action =  s.application.version_control.update(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
             }),
             ['m'] => self.action_context(Action::Merge, |s| {
                 if let Some(input) = s.handle_input("merge with (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.merge(&input[..]))
+                    let action =  s.application.version_control.merge(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
             }),
             ['R'] => Ok(HandleChordResult::Unhandled),
             ['R', 'A'] => self.action_context(Action::RevertAll, |s| {
-                s.handle_action( s.application.version_control.revert_all())
+                let action =  s.application.version_control.revert_all();
+                s.handle_action(action)
             }),
             ['r'] => Ok(HandleChordResult::Unhandled),
             ['r', 's'] => self.action_context(Action::RevertSelected, |s| {
                 match s.application.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
                         if s.show_select_ui(&mut entries)? {
-                            s.handle_action( s.application.version_control.revert_selected(&entries))
+                            let action =  s.application.version_control.revert_selected(&entries);
+                            s.handle_action(action)
                         } else {
                             s.show_header( HeaderKind::Canceled)
                         }
@@ -309,45 +327,55 @@ where
                 }
             }),
             ['r', 'r'] => self.action_context(Action::UnresolvedConflicts, |s| {
-                s.handle_action( s.application.version_control.conflicts())
+                let action =  s.application.version_control.conflicts();
+                s.handle_action(action)
             }),
             ['r', 'o'] => self.action_context(Action::MergeTakingOther, |s| {
-                s.handle_action( s.application.version_control.take_other())
+                let action =  s.application.version_control.take_other();
+                s.handle_action(action)
             }),
             ['r', 'l'] => self.action_context(Action::MergeTakingLocal, |s| {
-                s.handle_action( s.application.version_control.take_local())
+                let action =  s.application.version_control.take_local();
+                s.handle_action(action)
             }),
             ['f'] => self.action_context(Action::Fetch, |s| {
-                s.handle_action( s.application.version_control.fetch())
+                let action =  s.application.version_control.fetch();
+                s.handle_action(action)
             }),
             ['p'] => self.action_context(Action::Pull, |s| {
-                s.handle_action( s.application.version_control.pull())
+                let action =  s.application.version_control.pull();
+                s.handle_action(action)
             }),
             ['P'] => self.action_context(Action::Push, |s| {
-                s.handle_action( s.application.version_control.push())
+                let action =  s.application.version_control.push();
+                s.handle_action(action)
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
             ['t', 'n'] => self.action_context(Action::NewTag, |s| {
                 if let Some(input) = s.handle_input("new tag name (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.create_tag(&input[..]))
+                    let action =  s.application.version_control.create_tag(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
             }),
             ['b'] => Ok(HandleChordResult::Unhandled),
             ['b', 'b'] => self.action_context(Action::ListBranches, |s| {
-                s.handle_action( s.application.version_control.list_branches())
+                let action =  s.application.version_control.list_branches();
+                s.handle_action(action)
             }),
             ['b', 'n'] => self.action_context(Action::NewBranch, |s| {
                 if let Some(input) = s.handle_input("new branch name (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.create_branch(&input[..]))
+                    let action =  s.application.version_control.create_branch(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }
             }),
             ['b', 'd'] => self.action_context(Action::DeleteBranch, |s| {
                 if let Some(input) = s.handle_input("branch to delete (ctrl+c to cancel)")? {
-                    s.handle_action( s.application.version_control.close_branch(&input[..]))
+                    let action =  s.application.version_control.close_branch(&input[..]);
+                    s.handle_action(action)
                 } else {
                     s.show_header( HeaderKind::Canceled)
                 }

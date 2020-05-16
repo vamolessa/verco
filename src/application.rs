@@ -111,15 +111,6 @@ pub struct ActionFuture {
     pub task: Box<dyn 'static + Task<Output = ActionResult>>,
 }
 
-impl ActionFuture {
-    pub fn new(
-        action: Action,
-        task: Box<dyn 'static + Task<Output = ActionResult>>,
-    ) -> Self {
-        Self { action, task }
-    }
-}
-
 #[derive(Clone)]
 pub struct ActionResult(pub Result<String, String>);
 
