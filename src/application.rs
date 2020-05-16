@@ -222,6 +222,7 @@ impl Application {
     }
 
     pub fn poll_action_result(&mut self) -> Option<(Action, ActionResult)> {
+        self.worker.poll_tasks();
         if let Some((action, result)) = self.worker.receive_result() {
             self.results.insert(action, result.clone());
             Some((action, result))
@@ -232,7 +233,7 @@ impl Application {
 
     pub fn run_action(&mut self, action_future: ActionFuture) -> ActionResult {
         let ActionFuture { action, task } = action_future;
-        self.worker.cancel_all_tasks(action);
+        self.worker.cancel_tasks_with_id(action);
         self.worker.send_task(action, task);
         match self.results.get(&action) {
             Some(result) => result.clone(),
@@ -240,11 +241,11 @@ impl Application {
         }
     }
 
-    pub fn get_task_count(&self) -> usize {
-        *self.worker.task_count.lock().unwrap()
+    pub fn task_count(&self) -> usize {
+        self.worker.task_count()
     }
 
-    pub fn stop(self) {
-        self.worker.stop();
+    pub fn stop(mut self) {
+        self.worker.cancel_all_tasks();
     }
 }

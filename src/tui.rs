@@ -66,7 +66,7 @@ where
 
     fn show_header(&mut self, kind: HeaderKind) -> Result<()> {
         let action_name =
-            format!("{} - tasks: {}", self.current_action.name(), self.application.get_task_count());
+            format!("{} - tasks: {}", self.current_action.name(), self.application.task_count());
         let header = Header {
             //action_name: self.current_action.name(),
             action_name: &action_name[..],
