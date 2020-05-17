@@ -1,3 +1,4 @@
+mod async_process;
 mod application;
 mod custom_actions;
 mod git_actions;

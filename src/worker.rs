@@ -1,70 +1,46 @@
-use std::{
-    sync::mpsc::{
-        channel, sync_channel, Receiver, Sender, SyncSender, TryRecvError,
-    },
-    task::Poll,
-};
+use std::task::Poll;
+
+use crate::application::Action;
+use crate::async_process::{ChildOutput, Executor};
 
 pub trait Task: Send {
-    type Output;
-
-    fn poll(&mut self) -> Poll<Self::Output>;
-    fn cancel(&mut self);
+    fn poll(&mut self, executor: &mut Executor) -> Poll<ChildOutput>;
+    fn cancel(&mut self, executor: &mut Executor);
 }
 
-pub fn task_vec<T>() -> Vec<Box<dyn Task<Output = T>>> {
+pub fn task_vec() -> Vec<Box<dyn Task>> {
     Vec::new()
 }
 
-pub fn parallel<T>(
-    tasks: Vec<Box<dyn Task<Output = T>>>,
-    aggregator: fn(&mut T, &T),
-) -> Box<dyn Task<Output = T>>
-where
-    T: 'static + Send,
-{
-    let cached_results = tasks.iter().map(|_| None).collect();
+pub fn parallel(tasks: Vec<Box<dyn Task>>) -> Box<dyn Task> {
+    let cached_outputs = tasks.iter().map(|_| None).collect();
     Box::new(ParallelTasks {
         tasks,
-        cached_results,
-        aggregator,
+        cached_outputs,
     })
 }
 
-pub fn serial<T>(
-    tasks: Vec<Box<dyn Task<Output = T>>>,
-    aggregator: fn(&mut T, &T),
-) -> Box<dyn Task<Output = T>>
-where
-    T: 'static + Send,
-{
+pub fn serial(tasks: Vec<Box<dyn Task>>) -> Box<dyn Task> {
     Box::new(SerialTasks {
         tasks,
-        cached_results: Vec::new(),
-        aggregator,
+        cached_outputs: Vec::new(),
     })
 }
 
-struct ParallelTasks<T> {
-    tasks: Vec<Box<dyn Task<Output = T>>>,
-    cached_results: Vec<Option<T>>,
-    aggregator: fn(&mut T, &T),
+struct ParallelTasks {
+    tasks: Vec<Box<dyn Task>>,
+    cached_outputs: Vec<Option<ChildOutput>>,
 }
 
-impl<T> Task for ParallelTasks<T>
-where
-    T: Send,
-{
-    type Output = T;
-
-    fn poll(&mut self) -> Poll<Self::Output> {
+impl Task for ParallelTasks {
+    fn poll(&mut self, executor: &mut Executor) -> Poll<ChildOutput> {
         let mut all_ready = true;
         for (task, cached_result) in
-            self.tasks.iter_mut().zip(self.cached_results.iter_mut())
+            self.tasks.iter_mut().zip(self.cached_outputs.iter_mut())
         {
             if cached_result.is_none() {
                 all_ready = false;
-                match task.poll() {
+                match task.poll(executor) {
                     Poll::Ready(result) => *cached_result = Some(result),
                     Poll::Pending => (),
                 }
@@ -72,83 +48,85 @@ where
         }
 
         if all_ready {
-            let mut iter = self.cached_results.drain(..);
-            let mut aggregated = iter.next().unwrap().unwrap();
-            for result in iter {
-                (self.aggregator)(&mut aggregated, &result.unwrap());
-            }
-            Poll::Ready(aggregated)
+            Poll::Ready(aggregate_output(
+                self.cached_outputs.drain(..).map(|o| o.unwrap()),
+            ))
         } else {
             Poll::Pending
         }
     }
 
-    fn cancel(&mut self) {
+    fn cancel(&mut self, executor: &mut Executor) {
         for (task, cached_result) in
-            self.tasks.iter_mut().zip(self.cached_results.iter())
+            self.tasks.iter_mut().zip(self.cached_outputs.iter())
         {
             if cached_result.is_none() {
-                task.cancel();
+                task.cancel(executor);
             }
         }
     }
 }
 
-struct SerialTasks<T> {
-    tasks: Vec<Box<dyn Task<Output = T>>>,
-    cached_results: Vec<T>,
-    aggregator: fn(&mut T, &T),
+struct SerialTasks {
+    tasks: Vec<Box<dyn Task>>,
+    cached_outputs: Vec<ChildOutput>,
 }
 
-impl<T> Task for SerialTasks<T>
-where
-    T: Send,
-{
-    type Output = T;
-
-    fn poll(&mut self) -> Poll<Self::Output> {
-        match self.tasks[self.cached_results.len()].poll() {
-            Poll::Ready(result) => self.cached_results.push(result),
+impl Task for SerialTasks {
+    fn poll(&mut self, executor: &mut Executor) -> Poll<ChildOutput> {
+        match self.tasks[self.cached_outputs.len()].poll(executor) {
+            Poll::Ready(result) => self.cached_outputs.push(result),
             Poll::Pending => return Poll::Pending,
         }
 
-        if self.cached_results.len() == self.tasks.len() {
-            let mut iter = self.cached_results.drain(..);
-            let mut aggregated = iter.next().unwrap();
-            for result in iter {
-                (self.aggregator)(&mut aggregated, &result);
-            }
-            Poll::Ready(aggregated)
+        if self.cached_outputs.len() == self.tasks.len() {
+            Poll::Ready(aggregate_output(self.cached_outputs.drain(..)))
         } else {
             Poll::Pending
         }
     }
 
-    fn cancel(&mut self) {
-        for task in self.tasks.iter_mut().skip(self.cached_results.len()) {
-            task.cancel();
+    fn cancel(&mut self, executor: &mut Executor) {
+        for task in self.tasks.iter_mut().skip(self.cached_outputs.len()) {
+            task.cancel(executor);
         }
     }
 }
 
-pub struct Worker<Id, T>
+fn aggregate_output<I>(iter: I) -> ChildOutput
 where
-    Id: 'static + Eq,
-    T: 'static,
+    I: Iterator<Item = ChildOutput>,
 {
-    pending_tasks: Vec<(Id, Box<dyn Task<Output = T>>)>,
-    results: Vec<(Id, T)>,
+    let mut all_ok = true;
+    let mut aggregated = String::new();
+    for output in iter {
+        let output = match output {
+            ChildOutput::Ok(output) => output,
+            ChildOutput::Err(output) => {
+                all_ok = false;
+                output
+            }
+        };
+        aggregated.push('\n');
+        aggregated.push_str(&output[..]);
+    }
+    if all_ok {
+        ChildOutput::Ok(aggregated)
+    } else {
+        ChildOutput::Err(aggregated)
+    }
 }
 
-impl<Id, T> Worker<Id, T>
-where
-    Id: 'static + Eq,
-    T: 'static,
-{
+pub struct Worker {
+    pending_tasks: Vec<(Action, Box<dyn Task>)>,
+    outputs: Vec<(Action, ChildOutput)>,
+}
+
+impl Worker {
     pub fn new() -> Self {
         Self {
             pending_tasks: Vec::new(),
-            results: Vec::new(),
+            outputs: Vec::new(),
         }
     }
 
@@ -156,21 +134,21 @@ where
         self.pending_tasks.len()
     }
 
-    pub fn send_task(&mut self, id: Id, task: Box<dyn Task<Output = T>>) {
-        self.pending_tasks.push((id, task));
+    pub fn send_task(&mut self, kind: Action, task: Box<dyn Task>) {
+        self.pending_tasks.push((kind, task));
     }
 
     pub fn cancel_all_tasks(&mut self) {
-        for (_id, task) in &mut self.pending_tasks {
+        for (_kind, task) in &mut self.pending_tasks {
             task.cancel();
         }
         self.pending_tasks.clear();
     }
 
-    pub fn cancel_tasks_with_id(&mut self, id: Id) {
+    pub fn cancel_tasks_with_kind(&mut self, kind: Action) {
         for i in (0..self.pending_tasks.len()).rev() {
-            if self.pending_tasks[i].0 == id {
-                let (_id, mut task) = self.pending_tasks.swap_remove(i);
+            if self.pending_tasks[i].0 == kind {
+                let (_kind, mut task) = self.pending_tasks.swap_remove(i);
                 task.cancel();
             }
         }
@@ -179,16 +157,16 @@ where
     pub fn poll_tasks(&mut self) {
         for i in (0..self.pending_tasks.len()).rev() {
             if let Poll::Ready(result) = self.pending_tasks[i].1.poll() {
-                let (id, _task) = self.pending_tasks.swap_remove(i);
-                self.results.push((id, result));
+                let (kind, _task) = self.pending_tasks.swap_remove(i);
+                self.outputs.push((kind, result));
             }
         }
     }
 
-    pub fn receive_result(&mut self) -> Option<(Id, T)> {
-        let len = self.results.len();
+    pub fn receive_result(&mut self) -> Option<(Action, ChildOutput)> {
+        let len = self.outputs.len();
         if len > 0 {
-            Some(self.results.remove(len - 1))
+            Some(self.outputs.remove(len - 1))
         } else {
             None
         }

@@ -12,35 +12,6 @@ use crate::{
     worker::{Task, Worker},
 };
 
-pub fn get_process_output(
-    child: &mut Child,
-) -> Result<String, String> {
-    match child.wait() {
-        Ok(status) => if status.success() {
-            if let Some(stdout) = &mut child.stdout {
-                let mut output = String::new();
-                match stdout.read_to_string(&mut output) {
-                    Ok(_) => Ok(output),
-                    Err(e) => Err(e.to_string()),
-                }
-            } else {
-                Ok(String::new())
-            }
-        } else {
-            if let Some(stderr) = &mut child.stderr {
-                let mut error = String::new();
-                match stderr.read_to_string(&mut error) {
-                    Ok(_) => Err(error),
-                    Err(e) => Err(e.to_string()),
-                }
-            } else {
-                Err(String::new())
-            }
-        }
-        Err(error) => Err(error.to_string()),
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Action {
     Quit,
@@ -171,47 +142,6 @@ impl Task for ActionTask {
     }
 }
 
-pub fn action_aggregator(first: &mut ActionResult, second: &ActionResult) {
-    let first = &mut first.0;
-    let second = &second.0;
-
-    let mut temp = Err(String::new());
-    mem::swap(first, &mut temp);
-    let ok;
-    let mut text = match temp {
-        Ok(text) => {
-            ok = true;
-            text
-        }
-        Err(text) => {
-            ok = false;
-            text
-        }
-    };
-
-    *first = match (ok, second) {
-        (true, Ok(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Ok(text)
-        }
-        (true, Err(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Err(text)
-        }
-        (false, Ok(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Err(text)
-        }
-        (false, Err(b)) => {
-            text.push('\n');
-            text.push_str(&b[..]);
-            Err(text)
-        }
-    };
-}
 
 pub struct Application {
     pub version_control: Box<dyn 'static + VersionControlActions>,
