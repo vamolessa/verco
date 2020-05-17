@@ -133,6 +133,16 @@ impl Task for ActionTask {
                 .spawn()
             {
                 Ok(mut child) => {
+                    match child.wait_with_output() {
+                        Ok(output) => if output.status.success() {
+                            let s = String::from_utf8(output.stdout).unwrap();
+                            return Poll::Ready(ActionResult(Ok(s)));
+                        } else {
+                            let s = String::from_utf8(output.stderr).unwrap();
+                            return Poll::Ready(ActionResult(Err(s)));
+                        },
+                        Err(error) => return Poll::Ready(ActionResult(Err(error.to_string()))),
+                    }
                     let mut stdin = None;
                     std::mem::swap(&mut child.stdin, &mut stdin);
                     if let Some(stdin) = stdin {
@@ -143,15 +153,11 @@ impl Task for ActionTask {
                 }
                 Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
             },
-            ActionTask::Running(child) => match child.wait() {
-                Ok(_) => Poll::Ready(ActionResult(get_process_output(child))),
+            ActionTask::Running(child) => match child.try_wait() {
+                Ok(Some(_)) => Poll::Ready(ActionResult(get_process_output(child))),
+                Ok(None) => Poll::Pending,
                 Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
             },
-            //ActionTask::Running(child) => match child.try_wait() {
-            //    Ok(Some(_)) => Poll::Ready(ActionResult(get_process_output(child))),
-            //    Ok(None) => Poll::Pending,
-            //    Err(e) => Poll::Ready(ActionResult(Err(e.to_string()))),
-            //},
         }
     }
 
