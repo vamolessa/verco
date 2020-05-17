@@ -1,5 +1,6 @@
 use std::{
-    process::Child,
+    io::{self, Read},
+    process::{Child, Output},
     sync::mpsc::{
         channel, sync_channel, Receiver, Sender, SyncSender, TryRecvError,
     },
@@ -28,7 +29,7 @@ impl Executor {
                     Ok(executor) => executor,
                     Err(_) => break,
                 };
-                match AsyncChildExecutor::wait_output(executor) {
+                match AsyncChildExecutor::wait_for_output(executor) {
                     Ok(()) => (),
                     Err(()) => break,
                 }
@@ -75,8 +76,8 @@ pub enum ChildOutput {
 }
 
 impl ChildOutput {
-    pub fn from_child(child: Child) -> Self {
-        match child.wait_with_output() {
+    pub fn from_raw_output(raw: io::Result<Output>) -> Self {
+        match raw {
             Ok(output) => {
                 if output.status.success() {
                     match String::from_utf8(output.stdout) {
@@ -119,9 +120,43 @@ struct AsyncChildExecutor {
 }
 
 impl AsyncChildExecutor {
-    fn wait_output(self) -> Result<(), ()> {
-        self.output_sender
-            .send(ChildOutput::from_child(self.child))
-            .map_err(|_| ())
+    fn wait_for_output(mut self) -> Result<(), ()> {
+        fn try_read_line<R>(
+            maybe_read: &mut Option<R>,
+            buf: &mut [u8],
+            bytes: &mut Vec<u8>,
+        ) where
+            R: Read,
+        {
+            if let Some(read) = maybe_read {
+                match read.read(buf) {
+                    Ok(0) => *maybe_read = None,
+                    Ok(byte_count) => {
+                        bytes.extend_from_slice(&buf[..byte_count])
+                    }
+                    Err(_) => *maybe_read = None,
+                }
+            }
+        }
+
+        drop(self.child.stdin.take());
+
+        let mut out_bytes = Vec::new();
+        let mut err_bytes = Vec::new();
+        let mut stdout = self.child.stdout.take();
+        let mut stderr = self.child.stderr.take();
+        let mut buf = [0; 1024 * 4];
+
+        while stdout.is_some() || stderr.is_some() {
+            try_read_line(&mut stdout, &mut buf, &mut out_bytes);
+            try_read_line(&mut stderr, &mut buf, &mut err_bytes);
+        }
+
+        let output = ChildOutput::from_raw_output(Ok(Output {
+            status: self.child.wait().map_err(|_| ())?,
+            stdout: out_bytes,
+            stderr: err_bytes,
+        }));
+        self.output_sender.send(output).map_err(|_| ())
     }
 }

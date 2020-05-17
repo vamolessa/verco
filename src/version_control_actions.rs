@@ -89,11 +89,8 @@ where
 }
 
 pub fn handle_command(command: &mut Command) -> Result<String, String> {
-    match command.spawn() {
-        Ok(child) => match ChildOutput::from_child(child) {
-            ChildOutput::Ok(output) => Ok(output),
-            ChildOutput::Err(output) => Err(output),
-        },
-        Err(e) => Err(e.to_string()),
+    match ChildOutput::from_raw_output(command.output()) {
+        ChildOutput::Ok(output) => Ok(output),
+        ChildOutput::Err(output) => Err(output),
     }
 }
