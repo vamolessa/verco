@@ -10,7 +10,7 @@ mod select;
 mod tui;
 mod tui_util;
 mod version_control_actions;
-mod worker;
+mod action;
 
 fn main() {
     if !crossterm::tty::IsTty::is_tty(&std::io::stdin()) {

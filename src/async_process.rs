@@ -106,6 +106,8 @@ impl AsyncChild {
             }
         }
     }
+
+    pub fn kill(&self) {}
 }
 
 struct AsyncChildExecutor {

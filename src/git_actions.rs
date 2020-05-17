@@ -1,8 +1,7 @@
 use crate::{
-    application::{action_aggregator, ActionResult},
+    action::{parallel, serial, task_vec, ActionTask},
     select::{Entry, State},
     version_control_actions::{handle_command, task, VersionControlActions},
-    worker::{parallel, serial, task_vec, Task},
 };
 
 fn str_to_state(s: &str) -> State {
@@ -102,40 +101,26 @@ impl VersionControlActions for GitActions {
         handle_command(self.command().arg("--version"))
     }
 
-    fn status(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn status(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["-c", "color.status=always", "status"]);
         })
     }
 
-    fn current_export(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn current_export(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["show", "--color"]);
         })
     }
 
-    fn log(&mut self, count: usize) -> Box<dyn Task<Output = ActionResult>> {
-        return task(self, |command| {
-            let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
-            command
-                .arg("log")
-                .arg("--all")
-                .arg("--decorate")
-                .arg("--oneline")
-                .arg("--graph")
-                .arg("-54")
-                .arg("--color")
-                .arg(template)
-                .arg("--date=short");
-        });
-
+    fn log(&mut self, count: usize) -> Box<dyn ActionTask> {
         task(self, |command| {
             let count_str = format!("-{}", count);
             let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
             command
                 .arg("log")
                 .arg("--all")
-                //.arg("--decorate")
+                .arg("--decorate")
                 .arg("--oneline")
                 .arg("--graph")
                 .arg(&count_str)
@@ -145,7 +130,7 @@ impl VersionControlActions for GitActions {
         })
     }
 
-    fn current_diff_all(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn current_diff_all(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["diff", "--color"]);
         })
@@ -154,7 +139,7 @@ impl VersionControlActions for GitActions {
     fn current_diff_selected(
         &mut self,
         entries: &Vec<Entry>,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    ) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("diff").arg("--color").arg("--");
             for e in entries.iter().filter(|e| e.selected) {
@@ -163,10 +148,7 @@ impl VersionControlActions for GitActions {
         })
     }
 
-    fn revision_changes(
-        &mut self,
-        target: &str,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    fn revision_changes(&mut self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command
                 .arg("diff-tree")
@@ -178,10 +160,7 @@ impl VersionControlActions for GitActions {
         })
     }
 
-    fn revision_diff_all(
-        &mut self,
-        target: &str,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    fn revision_diff_all(&mut self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             let mut parents = String::from(target);
             parents.push_str("^@");
@@ -193,7 +172,7 @@ impl VersionControlActions for GitActions {
         &mut self,
         target: &str,
         entries: &Vec<Entry>,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    ) -> Box<dyn ActionTask> {
         task(self, |command| {
             let mut parents = String::from(target);
             parents.push_str("^@");
@@ -211,10 +190,7 @@ impl VersionControlActions for GitActions {
         })
     }
 
-    fn commit_all(
-        &mut self,
-        message: &str,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    fn commit_all(&mut self, message: &str) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         tasks.push(task(self, |command| {
             command.args(&["add", "--all"]);
@@ -222,14 +198,14 @@ impl VersionControlActions for GitActions {
         tasks.push(task(self, |command| {
             command.arg("commit").arg("-m").arg(message);
         }));
-        serial(tasks, action_aggregator)
+        serial(tasks)
     }
 
     fn commit_selected(
         &mut self,
         message: &str,
         entries: &Vec<Entry>,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    ) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         for e in entries.iter().filter(|e| e.selected) {
             tasks.push(task(self, |command| {
@@ -240,10 +216,10 @@ impl VersionControlActions for GitActions {
         tasks.push(task(self, |command| {
             command.arg("commit").arg("-m").arg(message);
         }));
-        serial(tasks, action_aggregator)
+        serial(tasks)
     }
 
-    fn revert_all(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn revert_all(&mut self) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         tasks.push(task(self, |command| {
             command.args(&["reset", "--hard"]);
@@ -251,13 +227,10 @@ impl VersionControlActions for GitActions {
         tasks.push(task(self, |command| {
             command.args(&["clean", "-df"]);
         }));
-        serial(tasks, action_aggregator)
+        serial(tasks)
     }
 
-    fn revert_selected(
-        &mut self,
-        entries: &Vec<Entry>,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    fn revert_selected(&mut self, entries: &Vec<Entry>) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         for e in entries.iter().filter(|e| e.selected) {
             match e.state {
@@ -282,61 +255,58 @@ impl VersionControlActions for GitActions {
                 }
             }
         }
-        parallel(tasks, action_aggregator)
+        parallel(tasks)
     }
 
-    fn update(&mut self, target: &str) -> Box<dyn Task<Output = ActionResult>> {
+    fn update(&mut self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("checkout").arg(target);
         })
     }
 
-    fn merge(&mut self, target: &str) -> Box<dyn Task<Output = ActionResult>> {
+    fn merge(&mut self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("merge").arg(target);
         })
     }
 
-    fn conflicts(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn conflicts(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["diff", "--name-only", "--diff-filter=U"]);
         })
     }
 
-    fn take_other(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn take_other(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["checkout", ".", "--theirs"]);
         })
     }
 
-    fn take_local(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn take_local(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["checkout", ".", "--ours"]);
         })
     }
 
-    fn fetch(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn fetch(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["fetch", "--all"]);
         })
     }
 
-    fn pull(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn pull(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["pull", "--all"]);
         })
     }
 
-    fn push(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn push(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("push");
         })
     }
 
-    fn create_tag(
-        &mut self,
-        name: &str,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    fn create_tag(&mut self, name: &str) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         tasks.push(task(self, |command| {
             command.arg("tag").arg(name).arg("-f");
@@ -344,19 +314,16 @@ impl VersionControlActions for GitActions {
         tasks.push(task(self, |command| {
             command.arg("push").arg("origin").arg(name);
         }));
-        serial(tasks, action_aggregator)
+        serial(tasks)
     }
 
-    fn list_branches(&mut self) -> Box<dyn Task<Output = ActionResult>> {
+    fn list_branches(&mut self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["branch", "--all", "--color"]);
         })
     }
 
-    fn create_branch(
-        &mut self,
-        name: &str,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    fn create_branch(&mut self, name: &str) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         tasks.push(task(self, |command| {
             command.arg("branch").arg(name);
@@ -369,13 +336,10 @@ impl VersionControlActions for GitActions {
                 .arg("origin")
                 .arg(name);
         }));
-        serial(tasks, action_aggregator)
+        serial(tasks)
     }
 
-    fn close_branch(
-        &mut self,
-        name: &str,
-    ) -> Box<dyn Task<Output = ActionResult>> {
+    fn close_branch(&mut self, name: &str) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         tasks.push(task(self, |command| {
             command.arg("branch").arg("-d").arg(name);
@@ -383,6 +347,6 @@ impl VersionControlActions for GitActions {
         tasks.push(task(self, |command| {
             command.arg("push").arg("-d").arg("origin").arg(name);
         }));
-        serial(tasks, action_aggregator)
+        serial(tasks)
     }
 }
