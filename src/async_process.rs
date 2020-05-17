@@ -28,7 +28,10 @@ impl Executor {
                     Ok(executor) => executor,
                     Err(_) => break,
                 };
-                AsyncChildExecutor::wait_output(executor);
+                match AsyncChildExecutor::wait_output(executor) {
+                    Ok(()) => (),
+                    Err(()) => break,
+                }
             });
             thread_pool.push(ExecutorThread {
                 handle,
@@ -116,9 +119,9 @@ struct AsyncChildExecutor {
 }
 
 impl AsyncChildExecutor {
-    pub fn wait_output(self) {
+    fn wait_output(self) -> Result<(), ()> {
         self.output_sender
             .send(ChildOutput::from_child(self.child))
-            .unwrap();
+            .map_err(|_| ())
     }
 }
