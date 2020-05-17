@@ -21,15 +21,15 @@ pub struct Executor {
 impl Executor {
     pub fn new(thread_pool_size: usize) -> Self {
         let mut thread_pool = Vec::new();
-        for _i in 0..thread_pool_size {
+        for _ in 0..thread_pool_size {
             let (async_child_executor_sender, async_child_executor_receiver) =
                 channel();
             let handle = thread::spawn(move || loop {
-                let executor = match async_child_executor_receiver.recv() {
-                    Ok(executor) => executor,
+                let child = match async_child_executor_receiver.recv() {
+                    Ok(child) => child,
                     Err(_) => break,
                 };
-                match AsyncChildExecutor::wait_for_output(executor) {
+                match AsyncChildExecutor::wait_for_output(child) {
                     Ok(()) => (),
                     Err(()) => break,
                 }
@@ -48,16 +48,23 @@ impl Executor {
 
     pub fn run_child_async(&mut self, child: Child) -> AsyncChild {
         let (output_sender, output_receiver) = sync_channel(1);
-        let executor = AsyncChildExecutor {
+        let (cancel_sender, cancel_receiver) = sync_channel(1);
+
+        let child = AsyncChildExecutor {
             child,
             output_sender,
+            cancel_receiver,
         };
+
         let thread = &mut self.thread_pool[self.next_thread_index];
-        thread.async_child_executor_sender.send(executor).unwrap();
+        thread.async_child_executor_sender.send(child).unwrap();
         self.next_thread_index =
             (self.next_thread_index + 1) % self.thread_pool.len();
 
-        AsyncChild { output_receiver }
+        AsyncChild {
+            output_receiver,
+            cancel_sender,
+        }
     }
 }
 
@@ -98,6 +105,7 @@ impl ChildOutput {
 
 pub struct AsyncChild {
     output_receiver: Receiver<ChildOutput>,
+    cancel_sender: SyncSender<()>,
 }
 
 impl AsyncChild {
@@ -111,12 +119,15 @@ impl AsyncChild {
         }
     }
 
-    pub fn kill(&self) {}
+    pub fn kill(&self) {
+        self.cancel_sender.send(()).unwrap_or(());
+    }
 }
 
 struct AsyncChildExecutor {
     pub child: Child,
     pub output_sender: SyncSender<ChildOutput>,
+    pub cancel_receiver: Receiver<()>,
 }
 
 impl AsyncChildExecutor {
@@ -150,6 +161,15 @@ impl AsyncChildExecutor {
         while stdout.is_some() || stderr.is_some() {
             try_read_line(&mut stdout, &mut buf, &mut out_bytes);
             try_read_line(&mut stderr, &mut buf, &mut err_bytes);
+
+            match self.cancel_receiver.try_recv() {
+                Ok(()) => {
+                    self.child.kill().unwrap_or(());
+                    return Ok(());
+                }
+                Err(TryRecvError::Empty) => (),
+                Err(TryRecvError::Disconnected) => return Err(()),
+            }
         }
 
         let output = ChildOutput::from_raw_output(Ok(Output {

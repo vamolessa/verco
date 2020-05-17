@@ -76,7 +76,7 @@ impl ActionKind {
 
 pub trait ActionTask: Send {
     fn poll(&mut self, executor: &mut Executor) -> Poll<ActionResult>;
-    fn cancel(&mut self, executor: &mut Executor);
+    fn cancel(&mut self);
 }
 
 pub enum CommandTask {
@@ -104,7 +104,7 @@ impl ActionTask for CommandTask {
         }
     }
 
-    fn cancel(&mut self, _executor: &mut Executor) {
+    fn cancel(&mut self) {
         match self {
             CommandTask::Waiting(_) => (),
             CommandTask::Running(child) => child.kill(),
@@ -160,12 +160,12 @@ impl ActionTask for ParallelTasks {
         }
     }
 
-    fn cancel(&mut self, executor: &mut Executor) {
+    fn cancel(&mut self) {
         for (task, cached_result) in
             self.tasks.iter_mut().zip(self.cached_results.iter())
         {
             if cached_result.is_none() {
-                task.cancel(executor);
+                task.cancel();
             }
         }
     }
@@ -190,9 +190,9 @@ impl ActionTask for SerialTasks {
         }
     }
 
-    fn cancel(&mut self, executor: &mut Executor) {
+    fn cancel(&mut self) {
         for task in self.tasks.iter_mut().skip(self.cached_results.len()) {
-            task.cancel(executor);
+            task.cancel();
         }
     }
 }
