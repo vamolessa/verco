@@ -1,5 +1,6 @@
-mod async_process;
+mod action;
 mod application;
+mod async_process;
 mod custom_actions;
 mod git_actions;
 mod hg_actions;
@@ -10,7 +11,6 @@ mod select;
 mod tui;
 mod tui_util;
 mod version_control_actions;
-mod action;
 
 fn main() {
     if !crossterm::tty::IsTty::is_tty(&std::io::stdin()) {

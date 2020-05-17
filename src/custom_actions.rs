@@ -5,6 +5,8 @@ use std::{
     process::Command,
 };
 
+use crate::action::ActionResult;
+
 pub struct CustomAction {
     pub shortcut: String,
     pub command: String,
@@ -57,7 +59,7 @@ impl CustomAction {
         Ok(actions)
     }
 
-    pub fn execute(&self, current_dir: &str) -> Result<String, String> {
+    pub fn execute(&self, current_dir: &str) -> ActionResult {
         let mut command = Command::new(&self.command);
         command.current_dir(current_dir);
         for a in &self.args {
@@ -67,7 +69,10 @@ impl CustomAction {
         match command.output() {
             Ok(output) => {
                 if output.status.success() {
-                    Ok(String::from_utf8_lossy(&output.stdout[..]).into_owned())
+                    ActionResult::Ok(
+                        String::from_utf8_lossy(&output.stdout[..])
+                            .into_owned(),
+                    )
                 } else {
                     let mut out = String::new();
                     out.push_str(
@@ -80,10 +85,10 @@ impl CustomAction {
                         &String::from_utf8_lossy(&output.stderr[..])
                             .into_owned()[..],
                     );
-                    Err(out)
+                    ActionResult::Err(out)
                 }
             }
-            Err(error) => Err(error.to_string()),
+            Err(error) => ActionResult::Err(error.to_string()),
         }
     }
 }

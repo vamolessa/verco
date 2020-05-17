@@ -65,14 +65,8 @@ where
     }
 
     fn show_header(&mut self, kind: HeaderKind) -> Result<()> {
-        let action_name = format!(
-            "{} - tasks: {}",
-            self.current_action_kind.name(),
-            self.application.task_count()
-        );
         let header = Header {
-            //action_name: self.current_action_kind.name(),
-            action_name: &action_name[..],
+            action_name: self.current_action_kind.name(),
             directory_name: self.application.version_control.get_root(),
         };
         show_header(&mut self.write, header, kind)
@@ -127,18 +121,12 @@ where
         )?;
 
         loop {
-            if let Some(_result) = self
+            if let Some(result) = self
                 .application
                 .poll_and_check_action(self.current_action_kind)
             {
-                self.show_header(HeaderKind::Canceled)?;
-                execute!(
-                    self.write,
-                    Clear(ClearType::CurrentLine),
-                    Print("OPAAA TEMO RESULT DA CURRENT ACTION AQUI"),
-                )?;
-                //self.show_result(&result)?;
-                //self.write.flush()?;
+                self.show_result(&result)?;
+                self.write.flush()?;
             }
 
             match input::poll_event() {
@@ -253,7 +241,7 @@ where
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.show_result( &Err(error)),
+                    Err(error) => s.show_result( &ActionResult::Err(error)),
                 }
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
@@ -284,7 +272,7 @@ where
                                 s.show_header( HeaderKind::Canceled)
                             }
                         }
-                        Err(error) => s.show_result( &Err(error)),
+                        Err(error) => s.show_result( &ActionResult::Err(error)),
                     }
                 } else {
                     s.show_header( HeaderKind::Canceled)
@@ -316,7 +304,7 @@ where
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.show_result( &Err(error)),
+                    Err(error) => s.show_result( &ActionResult::Err(error)),
                 }
             }),
             ['u'] => self.action_context(ActionKind::Update, |s| {
@@ -351,7 +339,7 @@ where
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.show_result( &Err(error)),
+                    Err(error) => s.show_result( &ActionResult::Err(error)),
                 }
             }),
             ['r', 'r'] => self.action_context(ActionKind::UnresolvedConflicts, |s| {
@@ -541,16 +529,13 @@ where
         Ok(res)
     }
 
-    fn show_result(
-        &mut self,
-        result: &std::result::Result<String, String>,
-    ) -> Result<()> {
+    fn show_result(&mut self, result: &ActionResult) -> Result<()> {
         let output = match result {
-            Ok(output) => {
+            ActionResult::Ok(output) => {
                 self.show_header(HeaderKind::Ok)?;
                 output
             }
-            Err(error) => {
+            ActionResult::Err(error) => {
                 self.show_header(HeaderKind::Error)?;
                 error
             }
@@ -578,7 +563,7 @@ where
         Ok(())
     }
 
-    fn show_help(&mut self) -> Result<std::result::Result<String, String>> {
+    fn show_help(&mut self) -> Result<ActionResult> {
         let mut write = Vec::with_capacity(1024);
 
         queue!(
@@ -664,7 +649,7 @@ where
         Self::show_help_action(&mut write, "x", ActionKind::CustomAction)?;
 
         write.flush()?;
-        Ok(Ok(String::from_utf8(write)?))
+        Ok(ActionResult::Ok(String::from_utf8(write)?))
     }
 
     fn show_help_action<HW>(

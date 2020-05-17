@@ -38,7 +38,10 @@ impl Application {
         }
     }
 
-    pub fn poll_and_check_action(&mut self, kind: ActionKind) -> Option<ActionResult> {
+    pub fn poll_and_check_action(
+        &mut self,
+        kind: ActionKind,
+    ) -> Option<ActionResult> {
         let mut action_result = None;
 
         for i in (0..self.pending_actions.len()).rev() {
@@ -48,8 +51,12 @@ impl Application {
                 let action = self.pending_actions.swap_remove(i);
                 if action.kind == kind {
                     action_result = match &result {
-                        ActionResult::Ok(result) => Some(ActionResult::Ok(result.clone())),
-                        ActionResult::Err(result) => Some(ActionResult::Err(result.clone())),
+                        ActionResult::Ok(result) => {
+                            Some(ActionResult::Ok(result.clone()))
+                        }
+                        ActionResult::Err(result) => {
+                            Some(ActionResult::Err(result.clone()))
+                        }
                     };
                 }
 
