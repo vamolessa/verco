@@ -86,10 +86,6 @@ impl Application {
         cached_result
     }
 
-    pub fn task_count(&self) -> usize {
-        self.pending_actions.len()
-    }
-
     pub fn stop(mut self) {
         for action in &mut self.pending_actions {
             action.task.cancel(&mut self.executor);
