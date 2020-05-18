@@ -280,6 +280,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "os_pipe"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db4d06355a7090ce852965b2d08e11426c315438462638c6d721448d0b47aa22"
+dependencies = [
+ "libc",
+ "winapi 0.3.8",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -414,6 +424,7 @@ version = "5.0.0"
 dependencies = [
  "crossterm",
  "ctrlc",
+ "os_pipe",
  "rustyline",
 ]
 

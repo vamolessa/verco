@@ -87,19 +87,24 @@ pub enum CommandTask {
 impl ActionTask for CommandTask {
     fn poll(&mut self, executor: &mut Executor) -> Poll<ActionResult> {
         match self {
-            CommandTask::Waiting(command) => match command
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .spawn()
-            {
-                Ok(child) => {
-                    let async_child = executor.run_child_async(child);
-                    *self = CommandTask::Running(async_child);
-                    Poll::Pending
+            CommandTask::Waiting(command) => {
+                let (reader, writer) = os_pipe::pipe().unwrap();
+                let writer_clone = writer.try_clone().unwrap();
+                let child = command
+                    .stdin(Stdio::null())
+                    .stdout(writer)
+                    .stderr(writer_clone)
+                    .spawn();
+                drop(command);
+                match child {
+                    Ok(child) => {
+                        let async_child = executor.run_child_async(child, reader);
+                        *self = CommandTask::Running(async_child);
+                        Poll::Pending
+                    }
+                    Err(e) => Poll::Ready(ActionResult::Err(e.to_string())),
                 }
-                Err(e) => Poll::Ready(ActionResult::Err(e.to_string())),
-            },
+            }
             CommandTask::Running(child) => child.poll(),
         }
     }

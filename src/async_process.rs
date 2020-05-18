@@ -8,6 +8,8 @@ use std::{
     thread::{self, JoinHandle},
 };
 
+use os_pipe::PipeReader;
+
 struct ExecutorThread {
     pub handle: JoinHandle<()>,
     pub async_child_executor_sender: Sender<AsyncChildExecutor>,
@@ -46,12 +48,17 @@ impl Executor {
         }
     }
 
-    pub fn run_child_async(&mut self, child: Child) -> AsyncChild {
+    pub fn run_child_async(
+        &mut self,
+        child: Child,
+        pipe_reader: PipeReader,
+    ) -> AsyncChild {
         let (output_sender, output_receiver) = sync_channel(1);
         let (cancel_sender, cancel_receiver) = sync_channel(1);
 
         let child = AsyncChildExecutor {
             child,
+            pipe_reader,
             output_sender,
             cancel_receiver,
         };
@@ -72,7 +79,7 @@ impl Drop for Executor {
     fn drop(&mut self) {
         for thread in self.thread_pool.drain(..) {
             drop(thread.async_child_executor_sender);
-            thread.handle.join().unwrap();
+            //thread.handle.join().unwrap();
         }
     }
 }
@@ -126,41 +133,24 @@ impl AsyncChild {
 
 struct AsyncChildExecutor {
     pub child: Child,
+    pub pipe_reader: PipeReader,
     pub output_sender: SyncSender<ChildOutput>,
     pub cancel_receiver: Receiver<()>,
 }
 
 impl AsyncChildExecutor {
     fn wait_for_output(mut self) -> Result<(), ()> {
-        fn try_read_line<R>(
-            maybe_read: &mut Option<R>,
-            buf: &mut [u8],
-            bytes: &mut Vec<u8>,
-        ) where
-            R: Read,
-        {
-            if let Some(read) = maybe_read {
-                match read.read(buf) {
-                    Ok(0) => *maybe_read = None,
-                    Ok(byte_count) => {
-                        bytes.extend_from_slice(&buf[..byte_count])
-                    }
-                    Err(_) => *maybe_read = None,
-                }
-            }
-        }
-
         drop(self.child.stdin.take());
 
-        let mut out_bytes = Vec::new();
-        let mut err_bytes = Vec::new();
-        let mut stdout = self.child.stdout.take();
-        //let mut stderr = self.child.stderr.take();
+        let mut bytes = Vec::new();
         let mut buf = [0; 1024 * 4];
 
-        while stdout.is_some() /*|| stderr.is_some()*/ {
-            try_read_line(&mut stdout, &mut buf, &mut out_bytes);
-            //try_read_line(&mut stderr, &mut buf, &mut err_bytes);
+        loop {
+            match self.pipe_reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(byte_count) => bytes.extend_from_slice(&buf[..byte_count]),
+                Err(_) => break,
+            }
 
             match self.cancel_receiver.try_recv() {
                 Ok(()) => {
@@ -172,11 +162,19 @@ impl AsyncChildExecutor {
             }
         }
 
-        let output = ChildOutput::from_raw_output(Ok(Output {
-            status: self.child.wait().map_err(|_| ())?,
-            stdout: out_bytes,
-            stderr: err_bytes,
-        }));
+        let mut success = self.child.wait().map_err(|_| ())?.success();
+        let output = match String::from_utf8(bytes) {
+            Ok(output) => output,
+            Err(error) => {
+                success = false;
+                error.to_string()
+            }
+        };
+        let output = if success {
+            ChildOutput::Ok(output)
+        } else {
+            ChildOutput::Err(output)
+        };
         self.output_sender.send(output).map_err(|_| ())
     }
 }
