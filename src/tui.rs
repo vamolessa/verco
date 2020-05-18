@@ -31,7 +31,6 @@ pub fn show_tui(mut app: Application) {
     let stdout = stdout.lock();
     let mut tui = Tui::new(stdout);
     tui.show(&mut app).unwrap();
-    app.stop();
 }
 
 enum HandleChordResult {

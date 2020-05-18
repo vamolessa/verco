@@ -76,7 +76,6 @@ impl ActionKind {
 
 pub trait ActionTask: Send {
     fn poll(&mut self, executor: &mut Executor) -> Poll<ActionResult>;
-    fn cancel(&mut self);
 }
 
 pub enum CommandTask {
@@ -88,18 +87,14 @@ impl ActionTask for CommandTask {
     fn poll(&mut self, executor: &mut Executor) -> Poll<ActionResult> {
         match self {
             CommandTask::Waiting(command) => {
-                let (reader, writer) = os_pipe::pipe().unwrap();
-                let writer_clone = writer.try_clone().unwrap();
                 let child = command
                     .stdin(Stdio::null())
-                    .stdout(writer)
-                    .stderr(writer_clone)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
                     .spawn();
-                drop(command);
                 match child {
                     Ok(child) => {
-                        let async_child =
-                            executor.run_child_async(child, reader);
+                        let async_child = executor.run_child_async(child);
                         *self = CommandTask::Running(async_child);
                         Poll::Pending
                     }
@@ -109,13 +104,6 @@ impl ActionTask for CommandTask {
                 }
             }
             CommandTask::Running(child) => child.poll(),
-        }
-    }
-
-    fn cancel(&mut self) {
-        match self {
-            CommandTask::Waiting(_) => (),
-            CommandTask::Running(child) => child.kill(),
         }
     }
 }
@@ -167,16 +155,6 @@ impl ActionTask for ParallelTasks {
             Poll::Pending
         }
     }
-
-    fn cancel(&mut self) {
-        for (task, cached_result) in
-            self.tasks.iter_mut().zip(self.cached_results.iter())
-        {
-            if cached_result.is_none() {
-                task.cancel();
-            }
-        }
-    }
 }
 
 struct SerialTasks {
@@ -195,12 +173,6 @@ impl ActionTask for SerialTasks {
             Poll::Ready(aggregate_results(self.cached_results.drain(..)))
         } else {
             Poll::Pending
-        }
-    }
-
-    fn cancel(&mut self) {
-        for task in self.tasks.iter_mut().skip(self.cached_results.len()) {
-            task.cancel();
         }
     }
 }

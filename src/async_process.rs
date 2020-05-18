@@ -1,5 +1,4 @@
 use std::{
-    io::Read,
     process::Child,
     sync::mpsc::{
         channel, sync_channel, Receiver, Sender, SyncSender, TryRecvError,
@@ -7,8 +6,6 @@ use std::{
     task::Poll,
     thread::{self, JoinHandle},
 };
-
-use os_pipe::PipeReader;
 
 struct ExecutorThread {
     pub handle: JoinHandle<()>,
@@ -48,19 +45,12 @@ impl Executor {
         }
     }
 
-    pub fn run_child_async(
-        &mut self,
-        child: Child,
-        pipe_reader: PipeReader,
-    ) -> AsyncChild {
+    pub fn run_child_async(&mut self, child: Child) -> AsyncChild {
         let (output_sender, output_receiver) = sync_channel(1);
-        let (cancel_sender, cancel_receiver) = sync_channel(1);
 
         let child = AsyncChildExecutor {
             child,
-            pipe_reader,
             output_sender,
-            cancel_receiver,
         };
 
         let thread = &mut self.thread_pool[self.next_thread_index];
@@ -68,19 +58,7 @@ impl Executor {
         self.next_thread_index =
             (self.next_thread_index + 1) % self.thread_pool.len();
 
-        AsyncChild {
-            output_receiver,
-            cancel_sender,
-        }
-    }
-}
-
-impl Drop for Executor {
-    fn drop(&mut self) {
-        for thread in self.thread_pool.drain(..) {
-            drop(thread.async_child_executor_sender);
-            //thread.handle.join().unwrap();
-        }
+        AsyncChild { output_receiver }
     }
 }
 
@@ -104,11 +82,37 @@ impl ChildOutput {
             output,
         }
     }
+
+    pub fn from_child(child: Child) -> Self {
+        let mut success;
+        let output = match child.wait_with_output() {
+            Ok(output) => {
+                success = output.status.success();
+                let bytes = if success {
+                    output.stdout
+                } else {
+                    output.stderr
+                };
+                match String::from_utf8(bytes) {
+                    Ok(output) => output,
+                    Err(error) => {
+                        success = false;
+                        error.to_string()
+                    }
+                }
+            }
+            Err(error) => {
+                success = false;
+                error.to_string()
+            }
+        };
+
+        Self { success, output }
+    }
 }
 
 pub struct AsyncChild {
     output_receiver: Receiver<ChildOutput>,
-    cancel_sender: SyncSender<()>,
 }
 
 impl AsyncChild {
@@ -121,56 +125,16 @@ impl AsyncChild {
             }
         }
     }
-
-    pub fn kill(&self) {
-        self.cancel_sender.send(()).unwrap_or(());
-    }
 }
 
 struct AsyncChildExecutor {
     pub child: Child,
-    pub pipe_reader: PipeReader,
     pub output_sender: SyncSender<ChildOutput>,
-    pub cancel_receiver: Receiver<()>,
 }
 
 impl AsyncChildExecutor {
-    fn wait_for_output(mut self) -> Result<(), ()> {
-        drop(self.child.stdin.take());
-
-        let mut bytes = Vec::new();
-        let mut buf = [0; 1024 * 4];
-
-        loop {
-            match self.pipe_reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(byte_count) => bytes.extend_from_slice(&buf[..byte_count]),
-                Err(error) => {
-                    bytes.extend(error.to_string().bytes());
-                    break;
-                }
-            }
-
-            match self.cancel_receiver.try_recv() {
-                Ok(()) => {
-                    self.child.kill().unwrap_or(());
-                    return Ok(());
-                }
-                Err(TryRecvError::Empty) => (),
-                Err(TryRecvError::Disconnected) => return Err(()),
-            }
-        }
-
-        let mut success = self.child.wait().map_err(|_| ())?.success();
-        let output = match String::from_utf8(bytes) {
-            Ok(output) => output,
-            Err(error) => {
-                success = false;
-                error.to_string()
-            }
-        };
-        self.output_sender
-            .send(ChildOutput { success, output })
-            .map_err(|_| ())
+    fn wait_for_output(self) -> Result<(), ()> {
+        let output = ChildOutput::from_child(self.child);
+        self.output_sender.send(output).map_err(|_| ())
     }
 }

@@ -67,8 +67,7 @@ impl Application {
     pub fn run_action(&mut self, action: ActionFuture) {
         for i in (0..self.pending_actions.len()).rev() {
             if self.pending_actions[i].kind == action.kind {
-                let mut action = self.pending_actions.swap_remove(i);
-                action.task.cancel();
+                return;
             }
         }
 
@@ -83,12 +82,5 @@ impl Application {
         }
 
         false
-    }
-
-    pub fn stop(mut self) {
-        for action in &mut self.pending_actions {
-            action.task.cancel();
-        }
-        self.pending_actions.clear();
     }
 }
