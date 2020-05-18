@@ -94,10 +94,8 @@ where
             kind: self.current_action_kind,
             task,
         });
-        self.show_header(app, HeaderKind::Waiting)?;
         let result = app.get_cached_action_result(self.current_action_kind);
-        self.scroll_view.set_content(&result.output[..]);
-        self.scroll_view.show(&mut self.write)
+        self.show_result(app, result)
     }
 
     fn action_context<F>(
@@ -551,7 +549,9 @@ where
         app: &Application,
         result: &ActionResult,
     ) -> Result<()> {
-        if result.success {
+        if app.has_pending_action_of_type(self.current_action_kind) {
+            self.show_header(app, HeaderKind::Waiting)?;
+        } else if result.success {
             self.show_header(app, HeaderKind::Ok)?;
         } else {
             self.show_header(app, HeaderKind::Error)?;

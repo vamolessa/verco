@@ -75,6 +75,16 @@ impl Application {
         self.pending_actions.push(action);
     }
 
+    pub fn has_pending_action_of_type(&self, kind: ActionKind) -> bool {
+        for action in &self.pending_actions {
+            if action.kind == kind {
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub fn stop(mut self) {
         for action in &mut self.pending_actions {
             action.task.cancel();
