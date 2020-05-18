@@ -90,12 +90,11 @@ where
 pub fn handle_command(command: &mut Command) -> Result<String, String> {
     match command.output() {
         Ok(output) => {
-            let stream = if output.status.success() {
-                output.stdout
+            if output.status.success() {
+                String::from_utf8(output.stdout).map_err(|e| e.to_string())
             } else {
-                output.stderr
-            };
-            String::from_utf8(stream).map_err(|e| e.to_string())
+                String::from_utf8(output.stderr).map_err(|e| e.to_string()).and_then(|o| Err(o))
+            }
         }
         Err(error) => Err(error.to_string()),
     }
