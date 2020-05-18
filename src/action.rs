@@ -98,11 +98,14 @@ impl ActionTask for CommandTask {
                 drop(command);
                 match child {
                     Ok(child) => {
-                        let async_child = executor.run_child_async(child, reader);
+                        let async_child =
+                            executor.run_child_async(child, reader);
                         *self = CommandTask::Running(async_child);
                         Poll::Pending
                     }
-                    Err(e) => Poll::Ready(ActionResult::Err(e.to_string())),
+                    Err(e) => {
+                        Poll::Ready(ActionResult::from_err(e.to_string()))
+                    }
                 }
             }
             CommandTask::Running(child) => child.poll(),
@@ -206,22 +209,16 @@ fn aggregate_results<I>(iter: I) -> ActionResult
 where
     I: Iterator<Item = ActionResult>,
 {
-    let mut all_ok = true;
+    let mut all_success = true;
     let mut aggregated = String::new();
     for result in iter {
-        let result = match result {
-            ActionResult::Ok(result) => result,
-            ActionResult::Err(result) => {
-                all_ok = false;
-                result
-            }
-        };
+        all_success = all_success && result.success;
+        let result = result.output;
         aggregated.push('\n');
         aggregated.push_str(&result[..]);
     }
-    if all_ok {
-        ActionResult::Ok(aggregated)
-    } else {
-        ActionResult::Err(aggregated)
+    ActionResult {
+        success: all_success,
+        output: aggregated,
     }
 }

@@ -50,14 +50,7 @@ impl Application {
             {
                 let action = self.pending_actions.swap_remove(i);
                 if action.kind == kind {
-                    action_result = match &result {
-                        ActionResult::Ok(result) => {
-                            Some(ActionResult::Ok(result.clone()))
-                        }
-                        ActionResult::Err(result) => {
-                            Some(ActionResult::Err(result.clone()))
-                        }
-                    };
+                    action_result = Some(result.clone());
                 }
 
                 self.action_results.insert(action.kind, result);
@@ -76,11 +69,8 @@ impl Application {
         }
 
         let cached_result = match self.action_results.get(&action.kind) {
-            Some(ActionResult::Ok(result)) => ActionResult::Ok(result.clone()),
-            Some(ActionResult::Err(result)) => {
-                ActionResult::Err(result.clone())
-            }
-            None => ActionResult::Ok(String::new()),
+            Some(result) => result.clone(),
+            None => ActionResult::from_ok(String::new()),
         };
         self.pending_actions.push(action);
         cached_result

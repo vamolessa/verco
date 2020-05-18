@@ -1,6 +1,6 @@
 use std::{
-    io::{self, Read},
-    process::{Child, Output},
+    io::Read,
+    process::Child,
     sync::mpsc::{
         channel, sync_channel, Receiver, Sender, SyncSender, TryRecvError,
     },
@@ -84,28 +84,24 @@ impl Drop for Executor {
     }
 }
 
-pub enum ChildOutput {
-    Ok(String),
-    Err(String),
+#[derive(Clone)]
+pub struct ChildOutput {
+    pub success: bool,
+    pub output: String,
 }
 
 impl ChildOutput {
-    pub fn from_raw_output(raw: io::Result<Output>) -> Self {
-        match raw {
-            Ok(output) => {
-                if output.status.success() {
-                    match String::from_utf8(output.stdout) {
-                        Ok(output) => Self::Ok(output),
-                        Err(error) => Self::Err(error.to_string()),
-                    }
-                } else {
-                    match String::from_utf8(output.stderr) {
-                        Ok(output) => Self::Err(output),
-                        Err(error) => Self::Err(error.to_string()),
-                    }
-                }
-            }
-            Err(error) => Self::Err(error.to_string()),
+    pub fn from_ok(output: String) -> Self {
+        Self {
+            success: true,
+            output,
+        }
+    }
+
+    pub fn from_err(output: String) -> Self {
+        Self {
+            success: false,
+            output,
         }
     }
 }
@@ -149,7 +145,10 @@ impl AsyncChildExecutor {
             match self.pipe_reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(byte_count) => bytes.extend_from_slice(&buf[..byte_count]),
-                Err(_) => break,
+                Err(error) => {
+                    bytes.extend(error.to_string().bytes());
+                    break;
+                }
             }
 
             match self.cancel_receiver.try_recv() {
@@ -170,11 +169,8 @@ impl AsyncChildExecutor {
                 error.to_string()
             }
         };
-        let output = if success {
-            ChildOutput::Ok(output)
-        } else {
-            ChildOutput::Err(output)
-        };
-        self.output_sender.send(output).map_err(|_| ())
+        self.output_sender
+            .send(ChildOutput { success, output })
+            .map_err(|_| ())
     }
 }

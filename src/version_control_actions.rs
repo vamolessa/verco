@@ -2,7 +2,6 @@ use std::process::{Command, Stdio};
 
 use crate::{
     action::{ActionTask, CommandTask},
-    async_process::ChildOutput,
     select::Entry,
 };
 
@@ -89,8 +88,15 @@ where
 }
 
 pub fn handle_command(command: &mut Command) -> Result<String, String> {
-    match ChildOutput::from_raw_output(command.output()) {
-        ChildOutput::Ok(output) => Ok(output),
-        ChildOutput::Err(output) => Err(output),
+    match command.output() {
+        Ok(output) => {
+            let stream = if output.status.success() {
+                output.stdout
+            } else {
+                output.stderr
+            };
+            String::from_utf8(stream).map_err(|e| e.to_string())
+        }
+        Err(error) => Err(error.to_string()),
     }
 }

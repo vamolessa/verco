@@ -69,7 +69,7 @@ impl CustomAction {
         match command.output() {
             Ok(output) => {
                 if output.status.success() {
-                    ActionResult::Ok(
+                    ActionResult::from_ok(
                         String::from_utf8_lossy(&output.stdout[..])
                             .into_owned(),
                     )
@@ -85,10 +85,10 @@ impl CustomAction {
                         &String::from_utf8_lossy(&output.stderr[..])
                             .into_owned()[..],
                     );
-                    ActionResult::Err(out)
+                    ActionResult::from_err(out)
                 }
             }
-            Err(error) => ActionResult::Err(error.to_string()),
+            Err(error) => ActionResult::from_err(error.to_string()),
         }
     }
 }

@@ -82,12 +82,8 @@ where
             kind: self.current_action_kind,
             task,
         });
-        let output = match result {
-            ActionResult::Ok(output) => output,
-            ActionResult::Err(error) => error,
-        };
         self.show_header(HeaderKind::Waiting)?;
-        self.scroll_view.set_content(&output[..]);
+        self.scroll_view.set_content(&result.output[..]);
         self.scroll_view.show(&mut self.write)
     }
 
@@ -241,7 +237,7 @@ where
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.show_result( &ActionResult::Err(error)),
+                    Err(error) => s.show_result( &ActionResult::from_err(error)),
                 }
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
@@ -272,7 +268,7 @@ where
                                 s.show_header( HeaderKind::Canceled)
                             }
                         }
-                        Err(error) => s.show_result( &ActionResult::Err(error)),
+                        Err(error) => s.show_result( &ActionResult::from_err(error)),
                     }
                 } else {
                     s.show_header( HeaderKind::Canceled)
@@ -304,7 +300,7 @@ where
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.show_result( &ActionResult::Err(error)),
+                    Err(error) => s.show_result( &ActionResult::from_err(error)),
                 }
             }),
             ['u'] => self.action_context(ActionKind::Update, |s| {
@@ -339,7 +335,7 @@ where
                             s.show_header( HeaderKind::Canceled)
                         }
                     }
-                    Err(error) => s.show_result( &ActionResult::Err(error)),
+                    Err(error) => s.show_result( &ActionResult::from_err(error)),
                 }
             }),
             ['r', 'r'] => self.action_context(ActionKind::UnresolvedConflicts, |s| {
@@ -530,18 +526,13 @@ where
     }
 
     fn show_result(&mut self, result: &ActionResult) -> Result<()> {
-        let output = match result {
-            ActionResult::Ok(output) => {
-                self.show_header(HeaderKind::Ok)?;
-                output
-            }
-            ActionResult::Err(error) => {
-                self.show_header(HeaderKind::Error)?;
-                error
-            }
-        };
+        if result.success {
+            self.show_header(HeaderKind::Ok)?;
+        } else {
+            self.show_header(HeaderKind::Error)?;
+        }
 
-        self.scroll_view.set_content(&output[..]);
+        self.scroll_view.set_content(&result.output[..]);
         self.scroll_view.show(&mut self.write)
     }
 
@@ -649,7 +640,7 @@ where
         Self::show_help_action(&mut write, "x", ActionKind::CustomAction)?;
 
         write.flush()?;
-        Ok(ActionResult::Ok(String::from_utf8(write)?))
+        Ok(ActionResult::from_ok(String::from_utf8(write)?))
     }
 
     fn show_help_action<HW>(
