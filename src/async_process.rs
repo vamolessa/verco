@@ -155,12 +155,12 @@ impl AsyncChildExecutor {
         let mut out_bytes = Vec::new();
         let mut err_bytes = Vec::new();
         let mut stdout = self.child.stdout.take();
-        let mut stderr = self.child.stderr.take();
+        //let mut stderr = self.child.stderr.take();
         let mut buf = [0; 1024 * 4];
 
-        while stdout.is_some() || stderr.is_some() {
+        while stdout.is_some() /*|| stderr.is_some()*/ {
             try_read_line(&mut stdout, &mut buf, &mut out_bytes);
-            try_read_line(&mut stderr, &mut buf, &mut err_bytes);
+            //try_read_line(&mut stderr, &mut buf, &mut err_bytes);
 
             match self.cancel_receiver.try_recv() {
                 Ok(()) => {

@@ -88,9 +88,9 @@ impl ActionTask for CommandTask {
     fn poll(&mut self, executor: &mut Executor) -> Poll<ActionResult> {
         match self {
             CommandTask::Waiting(command) => match command
-                .stdin(Stdio::piped())
+                .stdin(Stdio::null())
                 .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
+                .stderr(Stdio::null())
                 .spawn()
             {
                 Ok(child) => {
