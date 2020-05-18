@@ -16,8 +16,6 @@ pub struct Application {
     pub version_control: Box<dyn 'static + VersionControlActions>,
     pub custom_actions: Vec<CustomAction>,
 
-    pub current_key_chord: Vec<char>,
-
     executor: Executor,
     pending_actions: Vec<ActionFuture>,
     action_results: HashMap<ActionKind, ActionResult>,
@@ -31,36 +29,42 @@ impl Application {
         Self {
             version_control,
             custom_actions,
-            current_key_chord: Vec::new(),
             executor: Executor::new(2),
             pending_actions: Vec::new(),
             action_results: HashMap::new(),
         }
     }
 
-    pub fn poll_and_check_action(
-        &mut self,
-        kind: ActionKind,
-    ) -> Option<ActionResult> {
-        let mut action_result = None;
+    pub fn get_cached_action_result(&self, kind: ActionKind) -> &ActionResult {
+        static EMPTY_ACTION_RESULT: ActionResult = ActionResult {
+            success: true,
+            output: String::new(),
+        };
 
+        match self.action_results.get(&kind) {
+            Some(result) => result,
+            None => &EMPTY_ACTION_RESULT,
+        }
+    }
+
+    pub fn poll_and_check_action(&mut self, kind: ActionKind) -> bool {
+        let mut just_finished = false;
         for i in (0..self.pending_actions.len()).rev() {
             if let Poll::Ready(result) =
                 self.pending_actions[i].task.poll(&mut self.executor)
             {
                 let action = self.pending_actions.swap_remove(i);
                 if action.kind == kind {
-                    action_result = Some(result.clone());
+                    just_finished = true;
                 }
-
                 self.action_results.insert(action.kind, result);
             }
         }
 
-        action_result
+        just_finished
     }
 
-    pub fn run_action(&mut self, action: ActionFuture) -> ActionResult {
+    pub fn run_action(&mut self, action: ActionFuture) {
         for i in (0..self.pending_actions.len()).rev() {
             if self.pending_actions[i].kind == action.kind {
                 let mut action = self.pending_actions.swap_remove(i);
@@ -68,12 +72,7 @@ impl Application {
             }
         }
 
-        let cached_result = match self.action_results.get(&action.kind) {
-            Some(result) => result.clone(),
-            None => ActionResult::from_ok(String::new()),
-        };
         self.pending_actions.push(action);
-        cached_result
     }
 
     pub fn stop(mut self) {

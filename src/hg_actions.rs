@@ -47,7 +47,7 @@ impl<'a> VersionControlActions for HgActions {
         &self.current_dir[..]
     }
 
-    fn get_current_changed_files(&mut self) -> Result<Vec<Entry>, String> {
+    fn get_current_changed_files(&self) -> Result<Vec<Entry>, String> {
         let output = handle_command(self.command().arg("status"))?;
 
         let files = output
@@ -92,11 +92,11 @@ impl<'a> VersionControlActions for HgActions {
         Ok(files)
     }
 
-    fn version(&mut self) -> Result<String, String> {
+    fn version(&self) -> Result<String, String> {
         handle_command(self.command().arg("--version"))
     }
 
-    fn status(&mut self) -> Box<dyn ActionTask> {
+    fn status(&self) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         tasks.push(task(self, |command| {
             command.args(&["summary", "--color", "always"]);
@@ -107,13 +107,13 @@ impl<'a> VersionControlActions for HgActions {
         parallel(tasks)
     }
 
-    fn current_export(&mut self) -> Box<dyn ActionTask> {
+    fn current_export(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["export", "--color", "always"]);
         })
     }
 
-    fn log(&mut self, count: usize) -> Box<dyn ActionTask> {
+    fn log(&self, count: usize) -> Box<dyn ActionTask> {
         task(self, |command| {
             let count_str = format!("{}", count);
             let template = "{label('green', if(topics, '[{topics}]'))} {label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}";
@@ -131,7 +131,7 @@ impl<'a> VersionControlActions for HgActions {
         })
     }
 
-    fn current_diff_all(&mut self) -> Box<dyn ActionTask> {
+    fn current_diff_all(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("diff").arg("--color").arg("always");
         })
@@ -149,7 +149,7 @@ impl<'a> VersionControlActions for HgActions {
         })
     }
 
-    fn revision_changes(&mut self, target: &str) -> Box<dyn ActionTask> {
+    fn revision_changes(&self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command
                 .arg("status")
@@ -160,7 +160,7 @@ impl<'a> VersionControlActions for HgActions {
         })
     }
 
-    fn revision_diff_all(&mut self, target: &str) -> Box<dyn ActionTask> {
+    fn revision_diff_all(&self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command
                 .arg("diff")
@@ -191,7 +191,7 @@ impl<'a> VersionControlActions for HgActions {
         })
     }
 
-    fn commit_all(&mut self, message: &str) -> Box<dyn ActionTask> {
+    fn commit_all(&self, message: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command
                 .arg("commit")
@@ -238,7 +238,7 @@ impl<'a> VersionControlActions for HgActions {
         serial(tasks)
     }
 
-    fn revert_all(&mut self) -> Box<dyn ActionTask> {
+    fn revert_all(&self) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         tasks.push(task(self, |command| {
             command.args(&["revert", "-C", "--all"]);
@@ -249,7 +249,7 @@ impl<'a> VersionControlActions for HgActions {
         serial(tasks)
     }
 
-    fn revert_selected(&mut self, entries: &Vec<Entry>) -> Box<dyn ActionTask> {
+    fn revert_selected(&self, entries: &Vec<Entry>) -> Box<dyn ActionTask> {
         let mut tasks = task_vec();
         let mut files_to_revert = Vec::new();
         for e in entries.iter().filter(|e| e.selected) {
@@ -271,71 +271,71 @@ impl<'a> VersionControlActions for HgActions {
         parallel(tasks)
     }
 
-    fn update(&mut self, target: &str) -> Box<dyn ActionTask> {
+    fn update(&self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("update").arg(target);
         })
     }
 
-    fn merge(&mut self, target: &str) -> Box<dyn ActionTask> {
+    fn merge(&self, target: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("merge").arg(target);
         })
     }
 
-    fn conflicts(&mut self) -> Box<dyn ActionTask> {
+    fn conflicts(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["resolve", "-l", "--color", "always"]);
         })
     }
 
-    fn take_other(&mut self) -> Box<dyn ActionTask> {
+    fn take_other(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["resolve", "-a", "-t", "internal:other"]);
         })
     }
 
-    fn take_local(&mut self) -> Box<dyn ActionTask> {
+    fn take_local(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["resolve", "-a", "-t", "internal:local"]);
         })
     }
 
-    fn fetch(&mut self) -> Box<dyn ActionTask> {
+    fn fetch(&self) -> Box<dyn ActionTask> {
         self.pull()
     }
 
-    fn pull(&mut self) -> Box<dyn ActionTask> {
+    fn pull(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("pull");
         })
     }
 
-    fn push(&mut self) -> Box<dyn ActionTask> {
+    fn push(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["push", "--new-branch"]);
         })
     }
 
-    fn create_tag(&mut self, name: &str) -> Box<dyn ActionTask> {
+    fn create_tag(&self, name: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("tag").arg(name).arg("-f");
         })
     }
 
-    fn list_branches(&mut self) -> Box<dyn ActionTask> {
+    fn list_branches(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.args(&["branches", "--color", "always"]);
         })
     }
 
-    fn create_branch(&mut self, name: &str) -> Box<dyn ActionTask> {
+    fn create_branch(&self, name: &str) -> Box<dyn ActionTask> {
         task(self, |command| {
             command.arg("branch").arg(name);
         })
     }
 
-    fn close_branch(&mut self, name: &str) -> Box<dyn ActionTask> {
+    fn close_branch(&self, name: &str) -> Box<dyn ActionTask> {
         let changeset =
             handle_command(self.command().args(&["identify", "--num"])).ok();
 
