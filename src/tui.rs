@@ -121,13 +121,14 @@ where
         )?;
         terminal::enable_raw_mode()?;
 
+        self.terminal_size = TerminalSize::get()?;
+
         {
             self.current_action_kind = ActionKind::Help;
             let help = self.show_help(app)?;
             self.show_result(app, &help)?;
         }
 
-        self.terminal_size = TerminalSize::get()?;
         execute!(
             self.write,
             cursor::MoveTo(
