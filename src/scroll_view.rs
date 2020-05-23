@@ -2,22 +2,26 @@ use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     queue,
-    style::Print,
+    style::{Print, ResetColor, SetBackgroundColor},
     terminal::{self, Clear, ClearType},
     QueueableCommand, Result,
 };
 
 use std::io::Write;
 
+use crate::select::{move_cursor, SELECTED_BG_COLOR};
+
 #[derive(Default)]
 pub struct ScrollView {
     content: String,
     scroll: usize,
+    cursor: Option<usize>,
 }
 
 impl ScrollView {
-    pub fn set_content(&mut self, content: &str) {
+    pub fn set_content(&mut self, content: &str, has_cursor: bool) {
         self.scroll = 0;
+        self.cursor = if has_cursor { Some(0) } else { None };
         self.content.clear();
         self.content.push_str(content);
     }
@@ -28,18 +32,27 @@ impl ScrollView {
     {
         let available_size = Self::available_size();
         write.queue(cursor::MoveTo(0, 1))?;
-        for line in self
+        for (i, line) in self
             .content
             .lines()
             .skip(self.scroll)
             .take(available_size.1 - 1)
+            .enumerate()
         {
+            if Some(i) == self.cursor {
+                write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
+            }
+
             queue!(
                 write,
                 Clear(ClearType::CurrentLine),
                 Print(line),
                 cursor::MoveToNextLine(1),
             )?;
+
+            if Some(i) == self.cursor {
+                write.queue(ResetColor)?;
+            }
         }
         write.queue(Clear(ClearType::FromCursorDown))?;
 
@@ -170,8 +183,16 @@ impl ScrollView {
     }
 
     fn scroll(&mut self, delta: i32) {
-        self.scroll = (self.scroll as i32 + delta)
-            .min(self.content_height() as i32 - Self::available_size().1 as i32)
-            .max(0) as usize;
+        if let Some(ref mut cursor) = self.cursor {
+            let line_count = self.content.lines().count();
+            move_cursor(&mut self.scroll, cursor, line_count, delta);
+        } else {
+            self.scroll = (self.scroll as i32 + delta)
+                .min(
+                    self.content_height() as i32
+                        - Self::available_size().1 as i32,
+                )
+                .max(0) as usize;
+        }
     }
 }

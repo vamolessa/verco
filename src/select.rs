@@ -14,7 +14,7 @@ use std::io::Write;
 
 use crate::{input, tui_util::ENTRY_COLOR};
 
-const SELECTED_BG_COLOR: Color = Color::DarkGrey;
+pub const SELECTED_BG_COLOR: Color = Color::DarkGrey;
 const UNTRACKED_COLOR: Color = Color::Rgb {
     r: 100,
     g: 180,
@@ -160,37 +160,18 @@ impl<'a> Select<'a> {
     where
         W: Write,
     {
-        let previous_cursor = self.cursor;
-        let len = self.filtered_entries().count();
-        let target_cursor = self.cursor as i32 + delta;
-        self.cursor = if target_cursor < 0 {
-            if previous_cursor == 0 {
-                (target_cursor + len as i32) as usize % len
-            } else {
-                0
-            }
-        } else if target_cursor >= len as i32 {
-            if previous_cursor == len - 1 {
-                (target_cursor + len as i32) as usize % len
-            } else {
-                len - 1
-            }
-        } else {
-            target_cursor as usize
-        };
+        let entry_count = self.filtered_entries().count();
+        move_cursor(&mut self.scroll, &mut self.cursor, entry_count, delta);
 
         let available_size = self.available_size();
 
         if self.cursor < self.scroll {
             self.scroll = self.cursor;
-            self.draw_all_entries(write, available_size)?;
         } else if self.cursor >= self.scroll + available_size.1 as usize {
             self.scroll = self.cursor - available_size.1 as usize + 1;
-            self.draw_all_entries(write, available_size)?;
-        } else {
-            self.draw_entry(write, previous_cursor, available_size)?;
-            self.draw_entry(write, self.cursor, available_size)?;
         }
+
+        self.draw_all_entries(write, available_size)?;
 
         Ok(())
     }
@@ -547,4 +528,29 @@ where
     select.draw_header(write)?;
     select.draw_all_entries(write, available_size)?;
     Ok(())
+}
+
+pub fn move_cursor(
+    scroll: &mut usize,
+    cursor: &mut usize,
+    entry_count: usize,
+    delta: i32,
+) {
+    let previous_cursor = *cursor;
+    let target_cursor = *cursor as i32 + delta;
+    *cursor = if target_cursor < 0 {
+        if previous_cursor == 0 {
+            (target_cursor + entry_count as i32) as usize % entry_count
+        } else {
+            0
+        }
+    } else if target_cursor >= entry_count as i32 {
+        if previous_cursor == entry_count - 1 {
+            (target_cursor + entry_count as i32) as usize % entry_count
+        } else {
+            entry_count - 1
+        }
+    } else {
+        target_cursor as usize
+    };
 }
