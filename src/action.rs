@@ -90,7 +90,9 @@ impl ActionKind {
         }
     }
 
-    pub fn line_writer<W>(self) -> fn(&mut W, &str, AvailableSize) -> Result<()>
+    pub fn line_formatter<W>(
+        self,
+    ) -> fn(&mut W, &str, AvailableSize) -> Result<()>
     where
         W: Write,
     {
