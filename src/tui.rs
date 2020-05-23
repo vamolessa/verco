@@ -22,7 +22,7 @@ use crate::{
     input::{self, Event},
     scroll_view::ScrollView,
     select::{select, Entry},
-    tui_util::{TerminalSize, show_header, Header, HeaderKind, ENTRY_COLOR},
+    tui_util::{show_header, Header, HeaderKind, TerminalSize, ENTRY_COLOR},
 };
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -75,7 +75,7 @@ where
             action_name: self.current_action_kind.name(),
             directory_name: app.version_control.get_root(),
         };
-        show_header(&mut self.write, header, kind)
+        show_header(&mut self.write, header, kind, self.terminal_size)
     }
 
     fn show_select_ui(
@@ -130,7 +130,10 @@ where
         self.terminal_size = TerminalSize::get()?;
         execute!(
             self.write,
-            cursor::MoveTo(self.terminal_size.width, self.terminal_size.height - 1),
+            cursor::MoveTo(
+                self.terminal_size.width,
+                self.terminal_size.height - 1
+            ),
             Clear(ClearType::CurrentLine),
         )?;
 
@@ -143,7 +146,8 @@ where
             }
 
             match input::poll_event() {
-                Event::Resize => {
+                Event::Resize(terminal_size) => {
+                    self.terminal_size = terminal_size;
                     let result =
                         app.get_cached_action_result(self.current_action_kind);
                     self.show_result(app, result)?;
@@ -218,8 +222,7 @@ where
             }),
             ['l'] => Ok(HandleChordResult::Unhandled),
             ['l', 'l'] => self.action_context(ActionKind::Log, |s| {
-                let (_w, h) = terminal::size()?;
-                let action = app.version_control.log(h as usize);
+                let action = app.version_control.log(s.terminal_size.height as usize);
                 s.show_action(app,action)
             }),
             ['l', 'c'] => self.action_context(ActionKind::LogCount, |s| {
@@ -453,7 +456,9 @@ where
         'outer: loop {
             self.write.flush()?;
             match input::poll_event() {
-                Event::Resize => (),
+                Event::Resize(terminal_size) => {
+                    self.terminal_size = terminal_size;
+                }
                 Event::Key(KeyEvent {
                     code: KeyCode::Esc, ..
                 })
@@ -567,10 +572,13 @@ where
     }
 
     fn show_current_key_chord(&mut self) -> Result<()> {
-        let (w, h) = terminal::size()?;
+        let TerminalSize { width, height } = self.terminal_size;
         queue!(
             self.write,
-            cursor::MoveTo(w - self.current_key_chord.len() as u16, h - 1),
+            cursor::MoveTo(
+                width - self.current_key_chord.len() as u16,
+                height - 1
+            ),
             Clear(ClearType::CurrentLine),
             SetForegroundColor(ENTRY_COLOR),
         )?;

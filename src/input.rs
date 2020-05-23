@@ -3,16 +3,20 @@ use std::time::Duration;
 use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use rustyline::{error::ReadlineError, Editor};
 
+use crate::tui_util::TerminalSize;
+
 pub enum Event {
     None,
-    Resize,
+    Resize(TerminalSize),
     Key(KeyEvent),
 }
 
 pub fn poll_event() -> Event {
     if event::poll(Duration::from_millis(10)).unwrap() {
         match event::read().unwrap() {
-            event::Event::Resize(_, _) => Event::Resize,
+            event::Event::Resize(width, height) => {
+                Event::Resize(TerminalSize { width, height })
+            }
             event::Event::Key(key) => Event::Key(key),
             _ => Event::None,
         }

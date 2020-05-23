@@ -60,6 +60,7 @@ pub fn show_header<W>(
     write: &mut W,
     header: Header,
     kind: HeaderKind,
+    terminal_size: TerminalSize,
 ) -> Result<()>
 where
     W: Write,
@@ -88,7 +89,7 @@ where
     let header_prefix;
     let directory_name;
 
-    let terminal_width = terminal::size()?.0 as usize;
+    let terminal_width = terminal_size.width as usize;
     let mut padding = 0;
 
     fn fit(
