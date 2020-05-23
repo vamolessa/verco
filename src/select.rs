@@ -1,20 +1,25 @@
 use crossterm::{
     cursor,
-    event::{KeyCode, KeyEvent, KeyModifiers},
+    event::{self, KeyCode, KeyEvent, KeyModifiers},
     queue,
     style::{
         Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor,
         SetForegroundColor,
     },
-    terminal::{self, Clear, ClearType},
+    terminal::{Clear, ClearType},
     QueueableCommand, Result,
 };
 
 use std::io::Write;
 
-use crate::{input, tui_util::ENTRY_COLOR};
+use crate::{
+    input,
+    tui_util::{
+        move_cursor, AvailableSize, TerminalSize, ENTRY_COLOR,
+        SELECTED_BG_COLOR,
+    },
+};
 
-pub const SELECTED_BG_COLOR: Color = Color::DarkGrey;
 const UNTRACKED_COLOR: Color = Color::Rgb {
     r: 100,
     g: 180,
@@ -58,7 +63,7 @@ const CLEAN_COLOR: Color = Color::Rgb {
     g: 180,
     b: 255,
 };
-const ITEM_NAME_COLUMN: u16 = 16;
+const ITEM_NAME_COLUMN: usize = 16;
 
 #[derive(Clone, Debug)]
 pub enum State {
@@ -104,20 +109,11 @@ struct Select<'a> {
     entries: &'a mut Vec<Entry>,
     scroll: usize,
     cursor: usize,
-    cursor_offset: (u16, u16),
     header_position: (u16, u16),
     filter: Vec<char>,
 }
 
 impl<'a> Select<'a> {
-    fn available_size(&self) -> (u16, u16) {
-        let size = terminal::size().unwrap_or((0, 0));
-        (
-            size.0.max(self.cursor_offset.0) - self.cursor_offset.0,
-            size.1.max(self.cursor_offset.1) - self.cursor_offset.1,
-        )
-    }
-
     fn filtered_entries(&self) -> impl Iterator<Item = &Entry> {
         let filter = &self.filter;
         let filter_len = filter.len();
@@ -156,20 +152,23 @@ impl<'a> Select<'a> {
         })
     }
 
-    fn move_cursor<W>(&mut self, write: &mut W, delta: i32) -> Result<()>
+    fn move_cursor<W>(
+        &mut self,
+        write: &mut W,
+        available_size: AvailableSize,
+        delta: i32,
+    ) -> Result<()>
     where
         W: Write,
     {
         let entry_count = self.filtered_entries().count();
-        move_cursor(&mut self.scroll, &mut self.cursor, entry_count, delta);
-
-        let available_size = self.available_size();
-
-        if self.cursor < self.scroll {
-            self.scroll = self.cursor;
-        } else if self.cursor >= self.scroll + available_size.1 as usize {
-            self.scroll = self.cursor - available_size.1 as usize + 1;
-        }
+        move_cursor(
+            &mut self.scroll,
+            &mut self.cursor,
+            available_size,
+            entry_count,
+            delta,
+        );
 
         self.draw_all_entries(write, available_size)?;
 
@@ -179,7 +178,7 @@ impl<'a> Select<'a> {
     fn draw_all_entries<W>(
         &self,
         write: &mut W,
-        available_size: (u16, u16),
+        available_size: AvailableSize,
     ) -> Result<()>
     where
         W: Write,
@@ -187,13 +186,13 @@ impl<'a> Select<'a> {
         queue!(
             write,
             Clear(ClearType::FromCursorDown),
-            cursor::MoveTo(self.cursor_offset.0, self.cursor_offset.1)
+            cursor::MoveTo(0, 2)
         )?;
 
         let end_index = self
             .filtered_entries()
             .count()
-            .min(self.scroll + self.available_size().1 as usize);
+            .min(self.scroll + available_size.height);
         for i in self.scroll..end_index {
             self.draw_entry(write, i, available_size)?;
         }
@@ -204,15 +203,13 @@ impl<'a> Select<'a> {
         &self,
         write: &mut W,
         index: usize,
-        available_size: (u16, u16),
+        available_size: AvailableSize,
     ) -> Result<()>
     where
         W: Write,
     {
-        write.queue(cursor::MoveTo(
-            self.cursor_offset.0,
-            self.cursor_offset.1 + index as u16 - self.scroll as u16,
-        ))?;
+        write
+            .queue(cursor::MoveTo(0, 2 + index as u16 - self.scroll as u16))?;
 
         if index == self.cursor {
             write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
@@ -241,28 +238,32 @@ impl<'a> Select<'a> {
             write.queue(ResetColor)?;
         }
 
-        let cursor_x = self.cursor_offset.0 + 2 + state_name.len() as u16;
+        let cursor_x = 2 + state_name.len();
         for _ in cursor_x..ITEM_NAME_COLUMN {
             write.queue(Print(' '))?;
         }
-        let max_len = (entry.filename.len() as u16)
-            .min(available_size.0 - ITEM_NAME_COLUMN);
+        let max_len =
+            (entry.filename.len()).min(available_size.width - ITEM_NAME_COLUMN);
         let cursor_x = ITEM_NAME_COLUMN + max_len;
         write.queue(Print(
             &entry.filename[(entry.filename.len() - max_len as usize)..],
         ))?;
-        for _ in cursor_x..available_size.0 {
+        for _ in cursor_x..available_size.width {
             write.queue(Print(' '))?;
         }
         write.queue(ResetColor)?;
         Ok(())
     }
 
-    fn draw_header<W>(&self, write: &mut W) -> Result<()>
+    fn draw_header<W>(
+        &self,
+        write: &mut W,
+        available_size: AvailableSize,
+    ) -> Result<()>
     where
         W: Write,
     {
-        let width = terminal::size()?.0;
+        let width = available_size.width as u16;
         let filter_text = "filter: ";
         let filter_len = filter_text.len() + self.filter.len();
 
@@ -326,189 +327,201 @@ where
         entries,
         scroll: 0,
         cursor: 0,
-        cursor_offset: (0, 0),
         header_position: cursor::position()?,
         filter: Vec::new(),
     };
 
-    select.draw_header(write)?;
-    write.flush()?;
-    select.cursor_offset = cursor::position()?;
-
-    let available_size = select.available_size();
+    let mut available_size =
+        AvailableSize::from_temrinal_size(TerminalSize::get()?);
+    select.draw_header(write, available_size)?;
     select.draw_all_entries(write, available_size)?;
 
     let selected;
     loop {
-        write.queue(cursor::MoveTo(
-            select.cursor_offset.0,
-            select.cursor_offset.1,
-        ))?;
+        write.queue(cursor::MoveTo(0, 2))?;
         write.flush()?;
-        match input::wait_for_key() {
-            KeyEvent {
-                code: KeyCode::Esc, ..
+        match event::read()? {
+            event::Event::Resize(width, height) => {
+                available_size =
+                    AvailableSize::from_temrinal_size(TerminalSize {
+                        width,
+                        height,
+                    });
             }
-            | KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::Char('q'),
-                modifiers: KeyModifiers::CONTROL,
-            } => {
-                if select.filter.len() > 0 {
-                    select.filter.clear();
-                    on_filter_changed(&mut select, write, available_size)?;
-                } else {
-                    selected = false;
+            event::Event::Key(key_event) => match key_event {
+                KeyEvent {
+                    code: KeyCode::Esc, ..
+                }
+                | KeyEvent {
+                    code: KeyCode::Char('c'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::Char('q'),
+                    modifiers: KeyModifiers::CONTROL,
+                } => {
+                    if select.filter.len() > 0 {
+                        select.filter.clear();
+                        on_filter_changed(&mut select, write, available_size)?;
+                    } else {
+                        selected = false;
+                        break;
+                    }
+                }
+                KeyEvent {
+                    code: KeyCode::Enter,
+                    ..
+                } => {
+                    selected = select.filtered_entries().any(|e| e.selected);
                     break;
                 }
-            }
-            KeyEvent {
-                code: KeyCode::Enter,
-                ..
-            } => {
-                selected = select.filtered_entries().any(|e| e.selected);
-                break;
-            }
-            KeyEvent {
-                code: KeyCode::Char('j'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::Char('n'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::Down,
-                ..
-            } => {
-                select.move_cursor(write, 1)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('k'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::Char('p'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::Up, ..
-            } => {
-                select.move_cursor(write, -1)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('d'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::PageDown,
-                ..
-            } => {
-                let height = select
-                    .filtered_entries()
-                    .count()
-                    .min(available_size.1 as usize);
-                select.move_cursor(write, height as i32 / 2)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('u'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::PageUp,
-                ..
-            } => {
-                let height = select
-                    .filtered_entries()
-                    .count()
-                    .min(available_size.1 as usize);
-                select.move_cursor(write, height as i32 / -2)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('g'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::Char('b'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::Home,
-                ..
-            } => {
-                select.scroll = 0;
-                select.cursor = 0;
-                select.draw_all_entries(write, available_size)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('e'),
-                modifiers: KeyModifiers::CONTROL,
-            }
-            | KeyEvent {
-                code: KeyCode::End, ..
-            } => {
-                let entries_len = select.filtered_entries().count();
-                select.scroll = 0
-                    .max(entries_len as i32 - select.available_size().1 as i32)
-                    as usize;
-                select.cursor = entries_len - 1;
-                select.draw_all_entries(write, available_size)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char(' '),
-                ..
-            } => {
-                let cursor = select.cursor;
-                if let Some(e) = select.filtered_entries_mut().nth(cursor) {
-                    e.selected = !e.selected;
+                KeyEvent {
+                    code: KeyCode::Char('j'),
+                    modifiers: KeyModifiers::CONTROL,
                 }
-                select.draw_entry(write, select.cursor, available_size)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('a'),
-                modifiers: KeyModifiers::CONTROL,
-            } => {
-                let all_selected =
-                    select.filtered_entries().all(|e| e.selected);
-                for e in select.filtered_entries_mut() {
-                    e.selected = !all_selected;
+                | KeyEvent {
+                    code: KeyCode::Char('n'),
+                    modifiers: KeyModifiers::CONTROL,
                 }
-                select.draw_all_entries(write, available_size)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('h'),
-                modifiers: KeyModifiers::CONTROL,
-            } => {
-                select.filter.swap_remove(select.filter.len() - 1);
-                on_filter_changed(&mut select, write, available_size)?;
-            }
-            KeyEvent {
-                code: KeyCode::Char('w'),
-                modifiers: KeyModifiers::CONTROL,
-            } => {
-                select.filter.clear();
-                on_filter_changed(&mut select, write, available_size)?;
-            }
-            KeyEvent {
-                code: KeyCode::Backspace,
-                modifiers,
-            } => {
-                if modifiers == KeyModifiers::CONTROL {
-                    select.filter.clear();
-                } else if select.filter.len() > 0 {
+                | KeyEvent {
+                    code: KeyCode::Down,
+                    ..
+                } => {
+                    select.move_cursor(write, available_size, 1)?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('k'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::Char('p'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::Up, ..
+                } => {
+                    select.move_cursor(write, available_size, -1)?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('d'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::PageDown,
+                    ..
+                } => {
+                    let height = select
+                        .filtered_entries()
+                        .count()
+                        .min(available_size.height);
+                    select.move_cursor(
+                        write,
+                        available_size,
+                        height as i32 / 2,
+                    )?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('u'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::PageUp,
+                    ..
+                } => {
+                    let height = select
+                        .filtered_entries()
+                        .count()
+                        .min(available_size.height);
+                    select.move_cursor(
+                        write,
+                        available_size,
+                        height as i32 / -2,
+                    )?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('g'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::Char('b'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::Home,
+                    ..
+                } => {
+                    select.scroll = 0;
+                    select.cursor = 0;
+                    select.draw_all_entries(write, available_size)?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('e'),
+                    modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::End, ..
+                } => {
+                    let entries_len = select.filtered_entries().count();
+                    select.scroll = 0
+                        .max(entries_len as i32 - available_size.height as i32)
+                        as usize;
+                    select.cursor = entries_len - 1;
+                    select.draw_all_entries(write, available_size)?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char(' '),
+                    ..
+                } => {
+                    let cursor = select.cursor;
+                    if let Some(e) = select.filtered_entries_mut().nth(cursor) {
+                        e.selected = !e.selected;
+                    }
+                    select.draw_entry(write, select.cursor, available_size)?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('a'),
+                    modifiers: KeyModifiers::CONTROL,
+                } => {
+                    let all_selected =
+                        select.filtered_entries().all(|e| e.selected);
+                    for e in select.filtered_entries_mut() {
+                        e.selected = !all_selected;
+                    }
+                    select.draw_all_entries(write, available_size)?;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('h'),
+                    modifiers: KeyModifiers::CONTROL,
+                } => {
                     select.filter.swap_remove(select.filter.len() - 1);
-                }
-                on_filter_changed(&mut select, write, available_size)?;
-            }
-            key_event => {
-                if let Some(c) = input::key_to_char(key_event) {
-                    select.filter.push(c);
                     on_filter_changed(&mut select, write, available_size)?;
                 }
-            }
+                KeyEvent {
+                    code: KeyCode::Char('w'),
+                    modifiers: KeyModifiers::CONTROL,
+                } => {
+                    select.filter.clear();
+                    on_filter_changed(&mut select, write, available_size)?;
+                }
+                KeyEvent {
+                    code: KeyCode::Backspace,
+                    modifiers,
+                } => {
+                    if modifiers == KeyModifiers::CONTROL {
+                        select.filter.clear();
+                    } else if select.filter.len() > 0 {
+                        select.filter.swap_remove(select.filter.len() - 1);
+                    }
+                    on_filter_changed(&mut select, write, available_size)?;
+                }
+                key_event => {
+                    if let Some(c) = input::key_to_char(key_event) {
+                        select.filter.push(c);
+                        on_filter_changed(&mut select, write, available_size)?;
+                    }
+                }
+            },
+            _ => (),
         }
     }
 
@@ -518,39 +531,14 @@ where
 fn on_filter_changed<W>(
     select: &mut Select,
     write: &mut W,
-    available_size: (u16, u16),
+    available_size: AvailableSize,
 ) -> Result<()>
 where
     W: Write,
 {
     select.cursor = 0;
     select.scroll = 0;
-    select.draw_header(write)?;
+    select.draw_header(write, available_size)?;
     select.draw_all_entries(write, available_size)?;
     Ok(())
-}
-
-pub fn move_cursor(
-    scroll: &mut usize,
-    cursor: &mut usize,
-    entry_count: usize,
-    delta: i32,
-) {
-    let previous_cursor = *cursor;
-    let target_cursor = *cursor as i32 + delta;
-    *cursor = if target_cursor < 0 {
-        if previous_cursor == 0 {
-            (target_cursor + entry_count as i32) as usize % entry_count
-        } else {
-            0
-        }
-    } else if target_cursor >= entry_count as i32 {
-        if previous_cursor == entry_count - 1 {
-            (target_cursor + entry_count as i32) as usize % entry_count
-        } else {
-            entry_count - 1
-        }
-    } else {
-        target_cursor as usize
-    };
 }

@@ -22,7 +22,7 @@ use crate::{
     input::{self, Event},
     scroll_view::ScrollView,
     select::{select, Entry},
-    tui_util::{show_header, Header, HeaderKind, ENTRY_COLOR},
+    tui_util::{TerminalSize, show_header, Header, HeaderKind, ENTRY_COLOR},
 };
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -48,6 +48,7 @@ where
     current_key_chord: Vec<char>,
 
     write: W,
+    terminal_size: TerminalSize,
     scroll_view: ScrollView,
 }
 
@@ -60,6 +61,7 @@ where
             current_action_kind: ActionKind::Quit,
             current_key_chord: Vec::new(),
             write,
+            terminal_size: Default::default(),
             scroll_view: Default::default(),
         }
     }
@@ -125,10 +127,10 @@ where
             self.show_result(app, &help)?;
         }
 
-        let (w, h) = terminal::size()?;
+        self.terminal_size = TerminalSize::get()?;
         execute!(
             self.write,
-            cursor::MoveTo(w, h - 1),
+            cursor::MoveTo(self.terminal_size.width, self.terminal_size.height - 1),
             Clear(ClearType::CurrentLine),
         )?;
 
@@ -162,7 +164,11 @@ where
                     self.write.flush()?;
                 }
                 Event::Key(key_event) => {
-                    if self.scroll_view.update(&mut self.write, &key_event)? {
+                    if self.scroll_view.update(
+                        &mut self.write,
+                        &key_event,
+                        self.terminal_size,
+                    )? {
                         self.write.flush()?;
                         continue;
                     }
@@ -188,13 +194,7 @@ where
             thread::sleep(Duration::from_millis(20));
         }
 
-        execute!(
-            self.write,
-            ResetColor,
-            cursor::MoveTo(0, h),
-            Clear(ClearType::CurrentLine),
-            cursor::Show
-        )?;
+        execute!(self.write, ResetColor, cursor::Show)?;
         terminal::disable_raw_mode()?;
         self.write.execute(LeaveAlternateScreen)?;
         Ok(())
@@ -563,7 +563,7 @@ where
         }
 
         self.scroll_view.set_content(&result.output[..], false);
-        self.scroll_view.show(&mut self.write)
+        self.scroll_view.show(&mut self.write, self.terminal_size)
     }
 
     fn show_current_key_chord(&mut self) -> Result<()> {

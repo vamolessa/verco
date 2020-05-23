@@ -21,14 +21,6 @@ pub fn poll_event() -> Event {
     }
 }
 
-pub fn wait_for_key() -> KeyEvent {
-    loop {
-        if let event::Event::Key(key) = event::read().unwrap() {
-            return key;
-        }
-    }
-}
-
 pub fn key_to_char(key: KeyEvent) -> Option<char> {
     match key {
         KeyEvent {

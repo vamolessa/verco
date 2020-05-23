@@ -3,13 +3,15 @@ use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     queue,
     style::{Print, ResetColor, SetBackgroundColor},
-    terminal::{self, Clear, ClearType},
+    terminal::{Clear, ClearType},
     QueueableCommand, Result,
 };
 
 use std::io::Write;
 
-use crate::select::{move_cursor, SELECTED_BG_COLOR};
+use crate::tui_util::{
+    move_cursor, AvailableSize, TerminalSize, SELECTED_BG_COLOR,
+};
 
 #[derive(Default)]
 pub struct ScrollView {
@@ -26,17 +28,21 @@ impl ScrollView {
         self.content.push_str(content);
     }
 
-    pub fn show<W>(&self, write: &mut W) -> Result<()>
+    pub fn show<W>(
+        &self,
+        write: &mut W,
+        terminal_size: TerminalSize,
+    ) -> Result<()>
     where
         W: Write,
     {
-        let available_size = Self::available_size();
+        let available_size = AvailableSize::from_temrinal_size(terminal_size);
         write.queue(cursor::MoveTo(0, 1))?;
         for (i, line) in self
             .content
             .lines()
             .skip(self.scroll)
-            .take(available_size.1 - 1)
+            .take(available_size.height - 1)
             .enumerate()
         {
             if Some(i) == self.cursor {
@@ -63,10 +69,12 @@ impl ScrollView {
         &mut self,
         write: &mut W,
         key_event: &KeyEvent,
+        terminal_size: TerminalSize,
     ) -> Result<bool>
     where
         W: Write,
     {
+        let available_size = AvailableSize::from_temrinal_size(terminal_size);
         match key_event {
             KeyEvent {
                 code: KeyCode::Char('j'),
@@ -88,8 +96,8 @@ impl ScrollView {
                 code: KeyCode::Char('\n'),
                 ..
             } => {
-                self.scroll(1);
-                self.show(write)?;
+                self.scroll(available_size, 1);
+                self.show(write, terminal_size)?;
                 Ok(true)
             }
             KeyEvent {
@@ -103,8 +111,8 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::Up, ..
             } => {
-                self.scroll(-1);
-                self.show(write)?;
+                self.scroll(available_size, -1);
+                self.show(write, terminal_size)?;
                 Ok(true)
             }
             KeyEvent {
@@ -119,8 +127,8 @@ impl ScrollView {
                 code: KeyCode::Char(' '),
                 ..
             } => {
-                self.scroll(Self::available_size().1 as i32 / 2);
-                self.show(write)?;
+                self.scroll(available_size, available_size.height as i32 / 2);
+                self.show(write, terminal_size)?;
                 Ok(true)
             }
             KeyEvent {
@@ -131,8 +139,8 @@ impl ScrollView {
                 code: KeyCode::PageUp,
                 ..
             } => {
-                self.scroll(Self::available_size().1 as i32 / -2);
-                self.show(write)?;
+                self.scroll(available_size, available_size.height as i32 / -2);
+                self.show(write, terminal_size)?;
                 Ok(true)
             }
             KeyEvent {
@@ -148,7 +156,7 @@ impl ScrollView {
                 ..
             } => {
                 self.scroll = 0;
-                self.show(write)?;
+                self.show(write, terminal_size)?;
                 Ok(true)
             }
             KeyEvent {
@@ -159,38 +167,39 @@ impl ScrollView {
                 code: KeyCode::End, ..
             } => {
                 self.scroll = 0.max(
-                    self.content_height() as i32
-                        - Self::available_size().1 as i32,
+                    self.content_height(available_size) as i32
+                        - available_size.height as i32,
                 ) as usize;
-                self.show(write)?;
+                self.show(write, terminal_size)?;
                 Ok(true)
             }
             _ => Ok(false),
         }
     }
 
-    fn available_size() -> (usize, usize) {
-        let terminal_size = terminal::size().unwrap_or((0, 0));
-        (terminal_size.0 as usize, terminal_size.1 as usize - 2)
-    }
-
-    fn content_height(&self) -> usize {
-        let width = Self::available_size().0;
+    fn content_height(&self, available_size: AvailableSize) -> usize {
+        let width = available_size.width;
         self.content
             .lines()
             .map(|l| (l.len() + width - 1) / width)
             .sum()
     }
 
-    fn scroll(&mut self, delta: i32) {
+    fn scroll(&mut self, available_size: AvailableSize, delta: i32) {
         if let Some(ref mut cursor) = self.cursor {
             let line_count = self.content.lines().count();
-            move_cursor(&mut self.scroll, cursor, line_count, delta);
+            move_cursor(
+                &mut self.scroll,
+                cursor,
+                available_size,
+                line_count,
+                delta,
+            );
         } else {
             self.scroll = (self.scroll as i32 + delta)
                 .min(
-                    self.content_height() as i32
-                        - Self::available_size().1 as i32,
+                    self.content_height(available_size) as i32
+                        - available_size.height as i32,
                 )
                 .max(0) as usize;
         }
