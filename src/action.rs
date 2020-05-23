@@ -1,5 +1,5 @@
 use std::{
-    fmt::Write,
+    io::Write,
     process::{Command, Stdio},
     task::Poll,
 };
@@ -7,11 +7,12 @@ use std::{
 use crossterm::{
     handle_command,
     style::{Print, SetForegroundColor},
+    Result,
 };
 
 use crate::{
     async_process::{AsyncChild, ChildOutput, Executor},
-    tui_util::LOG_COLORS,
+    tui_util::{AvailableSize, LOG_COLORS},
 };
 
 pub type ActionResult = ChildOutput;
@@ -89,32 +90,25 @@ impl ActionKind {
         }
     }
 
-    pub fn parse_raw_output(
-        self,
-        output: &str,
-        scroll_view_content: &mut String,
-    ) {
+    pub fn line_writer<W>(self) -> fn(&mut W, &str, AvailableSize) -> Result<()>
+    where
+        W: Write,
+    {
         match self {
-            Self::Log => {
-                let mut buf = String::with_capacity(128);
-                for line in output.lines() {
-                    buf.clear();
-                    for (part, color) in line
-                        .splitn(LOG_COLORS.len(), '\x1e')
-                        .zip(LOG_COLORS.iter())
-                    {
-                        handle_command!(buf, SetForegroundColor(*color))
-                            .unwrap();
-                        handle_command!(buf, Print(part)).unwrap();
-                        buf.push(' ');
-                    }
-                    buf.push('\n');
-                    scroll_view_content.push_str(&buf[..]);
+            Self::Log => |write, line, available_size| {
+                let line = &line[..line.len().min(available_size.width - 1)];
+                for (part, color) in
+                    line.splitn(LOG_COLORS.len(), '\x1e').zip(LOG_COLORS.iter())
+                {
+                    handle_command!(write, SetForegroundColor(*color))?;
+                    handle_command!(write, Print(part))?;
+                    handle_command!(write, Print(' '))?;
                 }
-            }
-            _ => {
-                scroll_view_content.push_str(output);
-            }
+                Ok(())
+            },
+            _ => |write, line, _available_size| {
+                handle_command!(write, Print(line))
+            },
         }
     }
 }

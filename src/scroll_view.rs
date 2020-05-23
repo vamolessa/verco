@@ -1,10 +1,10 @@
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
-    queue,
-    style::{Print, ResetColor, SetBackgroundColor},
+    handle_command,
+    style::{ResetColor, SetBackgroundColor},
     terminal::{Clear, ClearType},
-    QueueableCommand, Result,
+    Result,
 };
 
 use std::io::Write;
@@ -15,6 +15,7 @@ use crate::{
 };
 
 pub struct ScrollView {
+    action_kind: ActionKind,
     content: String,
     scroll: usize,
     cursor: Option<usize>,
@@ -23,6 +24,7 @@ pub struct ScrollView {
 impl Default for ScrollView {
     fn default() -> Self {
         Self {
+            action_kind: ActionKind::Quit,
             content: String::with_capacity(1024 * 4),
             scroll: 0,
             cursor: None,
@@ -32,9 +34,9 @@ impl Default for ScrollView {
 
 impl ScrollView {
     pub fn set_content(&mut self, content: &str, action_kind: ActionKind) {
+        self.action_kind = action_kind;
         self.content.clear();
-        action_kind.parse_raw_output(content, &mut self.content);
-
+        self.content.push_str(content);
         self.scroll = 0;
         self.cursor = if action_kind.can_select_output() {
             Some(0)
@@ -51,8 +53,10 @@ impl ScrollView {
     where
         W: Write,
     {
+        let line_writer = self.action_kind.line_writer::<W>();
+
         let available_size = AvailableSize::from_temrinal_size(terminal_size);
-        write.queue(cursor::MoveTo(0, 1))?;
+        handle_command!(write, cursor::MoveTo(0, 1))?;
         for (i, line) in self
             .content
             .lines()
@@ -61,21 +65,18 @@ impl ScrollView {
             .enumerate()
         {
             if Some(i) == self.cursor {
-                write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
+                handle_command!(write, SetBackgroundColor(SELECTED_BG_COLOR))?;
             }
 
-            queue!(
-                write,
-                Clear(ClearType::CurrentLine),
-                Print(line),
-                cursor::MoveToNextLine(1),
-            )?;
+            handle_command!(write, Clear(ClearType::CurrentLine))?;
+            line_writer(write, line, available_size)?;
+            handle_command!(write, cursor::MoveToNextLine(1))?;
 
             if Some(i) == self.cursor {
-                write.queue(ResetColor)?;
+                handle_command!(write, ResetColor)?;
             }
         }
-        write.queue(Clear(ClearType::FromCursorDown))?;
+        handle_command!(write, Clear(ClearType::FromCursorDown))?;
 
         Ok(())
     }
