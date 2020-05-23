@@ -1,6 +1,6 @@
 [package]
 name = "verco"
-version = "5.0.0"
+version = "5.1.0"
 authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
 edition = "2018"
 exclude = [
@@ -21,6 +21,6 @@ name = "verco"
 path = "src/main.rs"
 
 [dependencies]
-crossterm = "0.17.1"
+crossterm = "0.17.5"
 ctrlc = "3.1.4"
 rustyline = "6.1.1"

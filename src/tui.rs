@@ -5,6 +5,7 @@ use crossterm::{
     style::{Print, ResetColor, SetForegroundColor},
     terminal::{
         self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen,
+        SetTitle,
     },
     ExecutableCommand, QueueableCommand, Result,
 };
@@ -110,7 +111,12 @@ where
     }
 
     fn show(&mut self, app: &mut Application) -> Result<()> {
-        execute!(self.write, EnterAlternateScreen, cursor::Hide)?;
+        execute!(
+            self.write,
+            SetTitle(app.version_control.get_root()),
+            EnterAlternateScreen,
+            cursor::Hide
+        )?;
         terminal::enable_raw_mode()?;
 
         {
@@ -120,7 +126,7 @@ where
         }
 
         let (w, h) = terminal::size()?;
-        queue!(
+        execute!(
             self.write,
             cursor::MoveTo(w, h - 1),
             Clear(ClearType::CurrentLine),
