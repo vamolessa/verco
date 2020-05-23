@@ -1,9 +1,18 @@
 use std::{
+    fmt::Write,
     process::{Command, Stdio},
     task::Poll,
 };
 
-use crate::async_process::{AsyncChild, ChildOutput, Executor};
+use crossterm::{
+    handle_command,
+    style::{Print, SetForegroundColor},
+};
+
+use crate::{
+    async_process::{AsyncChild, ChildOutput, Executor},
+    tui_util::LOG_COLORS,
+};
 
 pub type ActionResult = ChildOutput;
 
@@ -70,6 +79,42 @@ impl ActionKind {
             Self::NewBranch => "new branch",
             Self::DeleteBranch => "delete branch",
             Self::CustomAction => "custom action",
+        }
+    }
+
+    pub fn can_select_output(self) -> bool {
+        match self {
+            Self::Log => true,
+            _ => false,
+        }
+    }
+
+    pub fn parse_raw_output(
+        self,
+        output: &str,
+        scroll_view_content: &mut String,
+    ) {
+        match self {
+            Self::Log => {
+                let mut buf = String::with_capacity(128);
+                for line in output.lines() {
+                    buf.clear();
+                    for (part, color) in line
+                        .splitn(LOG_COLORS.len(), '\x1e')
+                        .zip(LOG_COLORS.iter())
+                    {
+                        handle_command!(buf, SetForegroundColor(*color))
+                            .unwrap();
+                        handle_command!(buf, Print(part)).unwrap();
+                        buf.push(' ');
+                    }
+                    buf.push('\n');
+                    scroll_view_content.push_str(&buf[..]);
+                }
+            }
+            _ => {
+                scroll_view_content.push_str(output);
+            }
         }
     }
 }

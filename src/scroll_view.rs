@@ -9,23 +9,38 @@ use crossterm::{
 
 use std::io::Write;
 
-use crate::tui_util::{
-    move_cursor, AvailableSize, TerminalSize, SELECTED_BG_COLOR,
+use crate::{
+    action::ActionKind,
+    tui_util::{move_cursor, AvailableSize, TerminalSize, SELECTED_BG_COLOR},
 };
 
-#[derive(Default)]
 pub struct ScrollView {
     content: String,
     scroll: usize,
     cursor: Option<usize>,
 }
 
+impl Default for ScrollView {
+    fn default() -> Self {
+        Self {
+            content: String::with_capacity(1024 * 4),
+            scroll: 0,
+            cursor: None,
+        }
+    }
+}
+
 impl ScrollView {
-    pub fn set_content(&mut self, content: &str, has_cursor: bool) {
-        self.scroll = 0;
-        self.cursor = if has_cursor { Some(0) } else { None };
+    pub fn set_content(&mut self, content: &str, action_kind: ActionKind) {
         self.content.clear();
-        self.content.push_str(content);
+        action_kind.parse_raw_output(content, &mut self.content);
+
+        self.scroll = 0;
+        self.cursor = if action_kind.can_select_output() {
+            Some(0)
+        } else {
+            None
+        };
     }
 
     pub fn show<W>(
@@ -42,7 +57,7 @@ impl ScrollView {
             .content
             .lines()
             .skip(self.scroll)
-            .take(available_size.height - 1)
+            .take(available_size.height)
             .enumerate()
         {
             if Some(i) == self.cursor {
@@ -156,6 +171,9 @@ impl ScrollView {
                 ..
             } => {
                 self.scroll = 0;
+                if let Some(ref mut cursor) = self.cursor {
+                    *cursor = 0;
+                }
                 self.show(write, terminal_size)?;
                 Ok(true)
             }
@@ -170,6 +188,9 @@ impl ScrollView {
                     self.content_height(available_size) as i32
                         - available_size.height as i32,
                 ) as usize;
+                if let Some(ref mut cursor) = self.cursor {
+                    *cursor = self.content.lines().count();
+                }
                 self.show(write, terminal_size)?;
                 Ok(true)
             }

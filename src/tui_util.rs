@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crossterm::{
     cursor, queue,
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
@@ -5,14 +7,41 @@ use crossterm::{
     Result,
 };
 
-use std::io::Write;
-
-pub const SELECTED_BG_COLOR: Color = Color::DarkGrey;
+pub const SELECTED_BG_COLOR: Color = Color::Rgb {
+    r: 80,
+    g: 80,
+    b: 80,
+};
 pub const ENTRY_COLOR: Color = Color::Rgb {
     r: 255,
     g: 180,
     b: 100,
 };
+
+pub const LOG_COLORS: &[Color] = &[
+    Color::White,
+    Color::Rgb {
+        r: 211,
+        g: 153,
+        b: 33,
+    },
+    Color::Rgb {
+        r: 52,
+        g: 113,
+        b: 134,
+    },
+    Color::Rgb {
+        r: 137,
+        g: 151,
+        b: 29,
+    },
+    Color::Rgb {
+        r: 251,
+        g: 73,
+        b: 47,
+    },
+    Color::White,
+];
 
 const HEADER_COLOR: Color = Color::Black;
 const ACTION_COLOR: Color = Color::White;
@@ -183,6 +212,12 @@ pub fn move_cursor(
     entry_count: usize,
     delta: i32,
 ) {
+    if entry_count == 0 {
+        *scroll = 0;
+        *cursor = 0;
+        return;
+    }
+
     let previous_cursor = *cursor;
     let target_cursor = *cursor as i32 + delta;
     *cursor = if target_cursor < 0 {
