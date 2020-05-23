@@ -25,6 +25,7 @@ const HEADER_BG_CANCELED_COLOR: Color = Color::Yellow;
 const HEADER_BG_CANCELED_DARK_COLOR: Color = Color::DarkYellow;
 
 const HEADER_PREFIX: &str = "Verco @ ";
+const DIR_NAME_MAX_LENGTH: usize = 32;
 
 pub enum HeaderKind {
     Waiting,
@@ -39,9 +40,16 @@ pub struct Header<'a> {
 }
 
 impl<'a> Header<'a> {
-    pub fn length(&self) -> usize {
+    pub fn full_length(&self) -> usize {
         HEADER_PREFIX.len()
             + self.directory_name.len()
+            + 3
+            + self.action_name.len()
+    }
+
+    pub fn min_length(&self) -> usize {
+        HEADER_PREFIX.len()
+            + self.directory_name.len().min(DIR_NAME_MAX_LENGTH)
             + 3
             + self.action_name.len()
     }
@@ -76,14 +84,46 @@ where
         HeaderKind::Canceled => "canceled",
     };
 
+    let header_prefix;
+    let directory_name;
+
+    let terminal_width = terminal::size()?.0 as usize;
+    let mut padding = 0;
+
+    fn fit(
+        terminal_width: usize,
+        header_length: usize,
+        status: &str,
+        padding: &mut usize,
+    ) -> bool {
+        let needed_width = header_length + status.len() + 2;
+        if terminal_width >= needed_width {
+            *padding = terminal_width - needed_width;
+            true
+        } else {
+            false
+        }
+    }
+
+    if fit(terminal_width, header.full_length(), status, &mut padding) {
+        header_prefix = HEADER_PREFIX;
+        directory_name = header.directory_name;
+    } else if fit(terminal_width, header.min_length(), status, &mut padding) {
+        header_prefix = HEADER_PREFIX;
+        directory_name = &header.directory_name
+            [(header.directory_name.len() - DIR_NAME_MAX_LENGTH)..];
+    } else {
+        panic!("window too small");
+    }
+
     queue!(
         write,
         Clear(ClearType::All),
         cursor::MoveTo(0, 0),
         SetBackgroundColor(background_color),
         SetForegroundColor(HEADER_COLOR),
-        Print(HEADER_PREFIX),
-        Print(&header.directory_name),
+        Print(header_prefix),
+        Print(directory_name),
         Print(' '),
         SetBackgroundColor(background_dark_color),
         SetForegroundColor(ACTION_COLOR),
@@ -92,9 +132,7 @@ where
         Print(' '),
         SetBackgroundColor(background_color),
         SetForegroundColor(HEADER_COLOR),
-        Print(" ".repeat(
-            terminal::size()?.0 as usize - header.length() - status.len() - 2
-        )),
+        Print(" ".repeat(padding)),
         SetBackgroundColor(background_dark_color),
         SetForegroundColor(ACTION_COLOR),
         Print(' '),
