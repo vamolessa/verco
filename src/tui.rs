@@ -568,8 +568,11 @@ where
             self.show_header(app, HeaderKind::Error)?;
         }
 
-        self.scroll_view
-            .set_content(&result.output[..], self.current_action_kind);
+        self.scroll_view.set_content(
+            &result.output[..],
+            self.current_action_kind,
+            self.terminal_size,
+        );
         self.scroll_view.show(&mut self.write, self.terminal_size)
     }
 

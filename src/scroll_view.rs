@@ -33,16 +33,27 @@ impl Default for ScrollView {
 }
 
 impl ScrollView {
-    pub fn set_content(&mut self, content: &str, action_kind: ActionKind) {
-        self.action_kind = action_kind;
+    pub fn set_content(
+        &mut self,
+        content: &str,
+        action_kind: ActionKind,
+        terminal_size: TerminalSize,
+    ) {
         self.content.clear();
         self.content.push_str(content);
-        self.scroll = 0;
-        self.cursor = if action_kind.can_select_output() {
-            Some(0)
+
+        if self.action_kind != action_kind {
+            self.scroll = 0;
+            self.cursor = if action_kind.can_select_output() {
+                Some(0)
+            } else {
+                None
+            };
         } else {
-            None
-        };
+            self.scroll(AvailableSize::from_temrinal_size(terminal_size), 0);
+        }
+
+        self.action_kind = action_kind;
     }
 
     pub fn show<W>(
