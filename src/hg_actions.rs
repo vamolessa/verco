@@ -68,7 +68,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn get_revision_changed_files(
-        &mut self,
+        &self,
         target: &str,
     ) -> Result<Vec<Entry>, String> {
         let output = handle_command(
@@ -116,7 +116,7 @@ impl<'a> VersionControlActions for HgActions {
     fn log(&self, count: usize) -> Box<dyn ActionTask> {
         task(self, |command| {
             let count_str = format!("{}", count);
-            let template = "{label('green', if(topics, '[{topics}]'))} {label(ifeq(phase, 'secret', 'yellow', ifeq(phase, 'draft', 'yellow', 'red')), node|short)}{ifeq(branch, 'default', '', label('green', ' ({branch})'))}{bookmarks % ' {bookmark}{ifeq(bookmark, active, '*')}{bookmark}'}{label('yellow', tags % ' {tag}')} {label('magenta', author|person)} {desc|firstline|strip}";
+            let template = "\x1e{node|short}\x1e{date|shortdate}\x1e{author|person}\x1e{if(topics,'[{topics}] ')}{tags % '{tag} '}{branch}\x1e{desc|firstline|strip}";
             command
                 .arg("log")
                 .arg("--config")
@@ -125,9 +125,7 @@ impl<'a> VersionControlActions for HgActions {
                 .arg("--template")
                 .arg(template)
                 .arg("-l")
-                .arg(&count_str)
-                .arg("--color")
-                .arg("always");
+                .arg(&count_str);
         })
     }
 
@@ -138,7 +136,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn current_diff_selected(
-        &mut self,
+        &self,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {
         task(self, |command| {
@@ -172,7 +170,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn revision_diff_selected(
-        &mut self,
+        &self,
         target: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {
@@ -204,7 +202,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn commit_selected(
-        &mut self,
+        &self,
         message: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {

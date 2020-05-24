@@ -1,9 +1,19 @@
 use std::{
+    io::Write,
     process::{Command, Stdio},
     task::Poll,
 };
 
-use crate::async_process::{AsyncChild, ChildOutput, Executor};
+use crossterm::{
+    handle_command,
+    style::{Print, SetForegroundColor},
+    Result,
+};
+
+use crate::{
+    async_process::{AsyncChild, ChildOutput, Executor},
+    tui_util::{AvailableSize, LOG_COLORS},
+};
 
 pub type ActionResult = ChildOutput;
 
@@ -70,6 +80,44 @@ impl ActionKind {
             Self::NewBranch => "new branch",
             Self::DeleteBranch => "delete branch",
             Self::CustomAction => "custom action",
+        }
+    }
+
+    pub fn can_select_output(self) -> bool {
+        match self {
+            Self::Log | Self::LogCount => true,
+            _ => false,
+        }
+    }
+
+    pub fn line_formatter<W>(
+        self,
+    ) -> fn(&mut W, &str, AvailableSize) -> Result<()>
+    where
+        W: Write,
+    {
+        match self {
+            Self::Log | Self::LogCount => |write, line, available_size| {
+                let line = &line[..line.len().min(available_size.width - 1)];
+                for (part, color) in
+                    line.splitn(LOG_COLORS.len(), '\x1e').zip(LOG_COLORS.iter())
+                {
+                    handle_command!(write, SetForegroundColor(*color))?;
+                    handle_command!(write, Print(part))?;
+                    handle_command!(write, Print(' '))?;
+                }
+                Ok(())
+            },
+            _ => |write, line, _available_size| {
+                handle_command!(write, Print(line))
+            },
+        }
+    }
+
+    pub fn parse_target(self, line: &str) -> Option<&str> {
+        match self {
+            Self::Log | Self::LogCount => line.split('\x1e').nth(1),
+            _ => None,
         }
     }
 }

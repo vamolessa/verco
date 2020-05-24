@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crossterm::{
     cursor, queue,
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
@@ -5,13 +7,41 @@ use crossterm::{
     Result,
 };
 
-use std::io::Write;
-
+pub const SELECTED_BG_COLOR: Color = Color::Rgb {
+    r: 80,
+    g: 80,
+    b: 80,
+};
 pub const ENTRY_COLOR: Color = Color::Rgb {
     r: 255,
     g: 180,
     b: 100,
 };
+
+pub const LOG_COLORS: &[Color] = &[
+    Color::White,
+    Color::Rgb {
+        r: 211,
+        g: 153,
+        b: 33,
+    },
+    Color::Rgb {
+        r: 52,
+        g: 113,
+        b: 134,
+    },
+    Color::Rgb {
+        r: 137,
+        g: 151,
+        b: 29,
+    },
+    Color::Rgb {
+        r: 251,
+        g: 73,
+        b: 47,
+    },
+    Color::White,
+];
 
 const HEADER_COLOR: Color = Color::Black;
 const ACTION_COLOR: Color = Color::White;
@@ -59,6 +89,7 @@ pub fn show_header<W>(
     write: &mut W,
     header: Header,
     kind: HeaderKind,
+    terminal_size: TerminalSize,
 ) -> Result<()>
 where
     W: Write,
@@ -87,7 +118,7 @@ where
     let header_prefix;
     let directory_name;
 
-    let terminal_width = terminal::size()?.0 as usize;
+    let terminal_width = terminal_size.width as usize;
     let mut padding = 0;
 
     fn fit(
@@ -141,4 +172,73 @@ where
         ResetColor,
         cursor::MoveToNextLine(1),
     )
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct TerminalSize {
+    pub width: u16,
+    pub height: u16,
+}
+
+impl TerminalSize {
+    pub fn get() -> Result<Self> {
+        let size = terminal::size()?;
+        Ok(Self {
+            width: size.0,
+            height: size.1,
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct AvailableSize {
+    pub width: usize,
+    pub height: usize,
+}
+
+impl AvailableSize {
+    pub fn from_temrinal_size(terminal_size: TerminalSize) -> Self {
+        Self {
+            width: terminal_size.width as usize,
+            height: terminal_size.height as usize - 2,
+        }
+    }
+}
+
+pub fn move_cursor(
+    scroll: &mut usize,
+    cursor: &mut usize,
+    available_size: AvailableSize,
+    entry_count: usize,
+    delta: i32,
+) {
+    if entry_count == 0 {
+        *scroll = 0;
+        *cursor = 0;
+        return;
+    }
+
+    let previous_cursor = *cursor;
+    let target_cursor = *cursor as i32 + delta;
+    *cursor = if target_cursor < 0 {
+        if previous_cursor == 0 {
+            (target_cursor + entry_count as i32) as usize % entry_count
+        } else {
+            0
+        }
+    } else if target_cursor >= entry_count as i32 {
+        if previous_cursor == entry_count - 1 {
+            (target_cursor + entry_count as i32) as usize % entry_count
+        } else {
+            entry_count - 1
+        }
+    } else {
+        target_cursor as usize
+    };
+
+    if cursor < scroll {
+        *scroll = *cursor;
+    } else if *cursor >= *scroll + available_size.height - 1 {
+        *scroll = 1 + *cursor - available_size.height;
+    }
 }

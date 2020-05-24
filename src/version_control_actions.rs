@@ -25,7 +25,7 @@ pub trait VersionControlActions: Send {
 
     fn get_current_changed_files(&self) -> Result<Vec<Entry>, String>;
     fn get_revision_changed_files(
-        &mut self,
+        &self,
         target: &str,
     ) -> Result<Vec<Entry>, String>;
 
@@ -38,21 +38,21 @@ pub trait VersionControlActions: Send {
 
     fn current_diff_all(&self) -> Box<dyn ActionTask>;
     fn current_diff_selected(
-        &mut self,
+        &self,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask>;
 
     fn revision_changes(&self, target: &str) -> Box<dyn ActionTask>;
     fn revision_diff_all(&self, target: &str) -> Box<dyn ActionTask>;
     fn revision_diff_selected(
-        &mut self,
+        &self,
         target: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask>;
 
     fn commit_all(&self, message: &str) -> Box<dyn ActionTask>;
     fn commit_selected(
-        &mut self,
+        &self,
         message: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask>;
@@ -93,7 +93,9 @@ pub fn handle_command(command: &mut Command) -> Result<String, String> {
             if output.status.success() {
                 String::from_utf8(output.stdout).map_err(|e| e.to_string())
             } else {
-                String::from_utf8(output.stderr).map_err(|e| e.to_string()).and_then(|o| Err(o))
+                String::from_utf8(output.stderr)
+                    .map_err(|e| e.to_string())
+                    .and_then(|o| Err(o))
             }
         }
         Err(error) => Err(error.to_string()),
