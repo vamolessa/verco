@@ -68,7 +68,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn get_revision_changed_files(
-        &mut self,
+        &self,
         target: &str,
     ) -> Result<Vec<Entry>, String> {
         let output = handle_command(
@@ -138,7 +138,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn current_diff_selected(
-        &mut self,
+        &self,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {
         task(self, |command| {
@@ -172,7 +172,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn revision_diff_selected(
-        &mut self,
+        &self,
         target: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {
@@ -204,7 +204,7 @@ impl<'a> VersionControlActions for HgActions {
     }
 
     fn commit_selected(
-        &mut self,
+        &self,
         message: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {

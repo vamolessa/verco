@@ -33,6 +33,10 @@ impl Default for ScrollView {
 }
 
 impl ScrollView {
+    pub fn cursor(&self) -> Option<usize> {
+        self.cursor
+    }
+
     pub fn set_content(
         &mut self,
         content: &str,

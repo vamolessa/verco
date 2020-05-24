@@ -85,7 +85,7 @@ impl ActionKind {
 
     pub fn can_select_output(self) -> bool {
         match self {
-            Self::Log => true,
+            Self::Log | Self::LogCount => true,
             _ => false,
         }
     }
@@ -97,7 +97,7 @@ impl ActionKind {
         W: Write,
     {
         match self {
-            Self::Log => |write, line, available_size| {
+            Self::Log | Self::LogCount => |write, line, available_size| {
                 let line = &line[..line.len().min(available_size.width - 1)];
                 for (part, color) in
                     line.splitn(LOG_COLORS.len(), '\x1e').zip(LOG_COLORS.iter())
@@ -111,6 +111,13 @@ impl ActionKind {
             _ => |write, line, _available_size| {
                 handle_command!(write, Print(line))
             },
+        }
+    }
+
+    pub fn parse_target(self, line: &str) -> Option<&str> {
+        match self {
+            Self::Log | Self::LogCount => line.split('\x1e').nth(1),
+            _ => None,
         }
     }
 }

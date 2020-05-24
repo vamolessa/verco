@@ -69,7 +69,7 @@ impl VersionControlActions for GitActions {
     }
 
     fn get_revision_changed_files(
-        &mut self,
+        &self,
         target: &str,
     ) -> Result<Vec<Entry>, String> {
         let output = handle_command(
@@ -116,7 +116,6 @@ impl VersionControlActions for GitActions {
     fn log(&self, count: usize) -> Box<dyn ActionTask> {
         task(self, |command| {
             let count_str = format!("-{}", count);
-            //let template = "--format=format:%C(auto,yellow)%h %C(auto,blue)%>(10,trunc)%ad %C(auto,green)%<(10,trunc)%aN %C(auto)%d %C(auto,reset)%s";
             let template =
                 "--format=format:%x1e%h%x1e%as%x1e%<(10,trunc)%aN%x1e%D%x1e%s";
             command
@@ -126,9 +125,7 @@ impl VersionControlActions for GitActions {
                 .arg("--oneline")
                 .arg("--graph")
                 .arg(&count_str)
-                //.arg("--color")
                 .arg(template);
-            //.arg("--date=short");
         })
     }
 
@@ -139,7 +136,7 @@ impl VersionControlActions for GitActions {
     }
 
     fn current_diff_selected(
-        &mut self,
+        &self,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {
         task(self, |command| {
@@ -171,7 +168,7 @@ impl VersionControlActions for GitActions {
     }
 
     fn revision_diff_selected(
-        &mut self,
+        &self,
         target: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {
@@ -204,7 +201,7 @@ impl VersionControlActions for GitActions {
     }
 
     fn commit_selected(
-        &mut self,
+        &self,
         message: &str,
         entries: &Vec<Entry>,
     ) -> Box<dyn ActionTask> {
