@@ -243,7 +243,7 @@ where
                 s.show_action(app, action)
             }),
             ['l', 'c'] => self.action_context(ActionKind::LogCount, |s| {
-                if let Some(input) = s.handle_input(app, "logs to show (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "logs to show (ctrl+c to cancel)", None)? {
                     if let Ok(count) = input.trim().parse() {
                         let action = app.version_control.log(count);
                         s.show_action(app, action)
@@ -284,10 +284,7 @@ where
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
             ['D', 'C'] => self.action_context(ActionKind::RevisionChanges, |s| {
-                if let Some(target) = s.previous_target(app) {
-                    let action =  app.version_control.revision_changes(target);
-                    s.show_action(app, action)
-                } else if let Some(input) = s.handle_input(app, "show changes from (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "show changes from (ctrl+c to cancel)", s.previous_target(app))? {
                     let action =  app.version_control.revision_changes(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -295,10 +292,7 @@ where
                 }
             }),
             ['D', 'D'] => self.action_context(ActionKind::RevisionDiffAll, |s| {
-                if let Some(target) = s.previous_target(app) {
-                    let action =  app.version_control.revision_diff_all(target);
-                    s.show_action(app, action)
-                } else if let Some(input) = s.handle_input(app, "show diff from (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "show diff from (ctrl+c to cancel)", s.previous_target(app))? {
                     let action =  app.version_control.revision_diff_all(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -306,19 +300,7 @@ where
                 }
             }),
             ['D', 'S'] => self.action_context(ActionKind::RevisionDiffSelected, |s| {
-                if let Some(input) = s.previous_target(app) {
-                    match app.version_control.get_revision_changed_files(input) {
-                        Ok(mut entries) => {
-                            if s.show_select_ui(app, &mut entries)? {
-                                let action =  app.version_control.revision_diff_selected(input.trim(), &entries);
-                                s.show_action(app, action)
-                            } else {
-                                s.show_header(app, HeaderKind::Canceled)
-                            }
-                        }
-                        Err(error) => s.show_result(app, &ActionResult::from_err(error)),
-                    }
-                } else if let Some(input) = s.handle_input(app, "show diff from (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "show diff from (ctrl+c to cancel)", s.previous_target(app))? {
                     match app.version_control.get_revision_changed_files(input.trim()) {
                         Ok(mut entries) => {
                             if s.show_select_ui(app, &mut entries)? {
@@ -336,7 +318,7 @@ where
             }),
             ['c'] => Ok(HandleChordResult::Unhandled),
             ['c', 'c'] => self.action_context(ActionKind::CommitAll, |s| {
-                if let Some(input) = s.handle_input(app, "commit message (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "commit message (ctrl+c to cancel)", None)? {
                     let action =  app.version_control.commit_all(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -349,7 +331,7 @@ where
                         if s.show_select_ui(app, &mut entries)? {
                             s.show_header(app, HeaderKind::Waiting)?;
                             if let Some(input) =
-                                s.handle_input(app, "commit message (ctrl+c to cancel)")?
+                                s.handle_input(app, "commit message (ctrl+c to cancel)", None)?
                             {
                                 let action =  app.version_control.commit_selected(input.trim(), &entries);
                                 s.show_action(app, action)
@@ -364,7 +346,7 @@ where
                 }
             }),
             ['u'] => self.action_context(ActionKind::Update, |s| {
-                if let Some(input) = s.handle_input(app, "update to (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "update to (ctrl+c to cancel)", s.previous_target(app))? {
                     let action =  app.version_control.update(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -372,7 +354,7 @@ where
                 }
             }),
             ['m'] => self.action_context(ActionKind::Merge, |s| {
-                if let Some(input) = s.handle_input(app, "merge with (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "merge with (ctrl+c to cancel)", s.previous_target(app))? {
                     let action =  app.version_control.merge(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -424,7 +406,7 @@ where
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
             ['t', 'n'] => self.action_context(ActionKind::NewTag, |s| {
-                if let Some(input) = s.handle_input(app, "new tag name (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "new tag name (ctrl+c to cancel)", None)? {
                     let action =  app.version_control.create_tag(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -437,7 +419,7 @@ where
                 s.show_action(app, action)
             }),
             ['b', 'n'] => self.action_context(ActionKind::NewBranch, |s| {
-                if let Some(input) = s.handle_input(app, "new branch name (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "new branch name (ctrl+c to cancel)", None)? {
                     let action =  app.version_control.create_branch(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -445,7 +427,7 @@ where
                 }
             }),
             ['b', 'd'] => self.action_context(ActionKind::DeleteBranch, |s| {
-                if let Some(input) = s.handle_input(app, "branch to delete (ctrl+c to cancel)")? {
+                if let Some(input) = s.handle_input(app, "branch to delete (ctrl+c to cancel)", s.previous_target(app))? {
                     let action =  app.version_control.close_branch(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -564,6 +546,7 @@ where
         &mut self,
         app: &Application,
         prompt: &str,
+        initial: Option<&str>,
     ) -> Result<Option<String>> {
         self.show_header(app, HeaderKind::Waiting)?;
         execute!(
@@ -575,7 +558,12 @@ where
             cursor::Show,
         )?;
 
-        let res = match input::read_line() {
+        let initial = if let Some(initial) = initial {
+            initial
+        } else {
+            ""
+        };
+        let res = match input::read_line(initial) {
             Ok(line) => {
                 if line.len() > 0 {
                     Some(line)

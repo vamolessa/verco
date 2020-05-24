@@ -43,9 +43,9 @@ pub fn key_to_char(key: KeyEvent) -> Option<char> {
     }
 }
 
-pub fn read_line() -> Result<String, ReadlineError> {
+pub fn read_line(initial: &str) -> Result<String, ReadlineError> {
     let mut readline = Editor::<()>::new();
-    match readline.readline("") {
+    match readline.readline_with_initial("", (initial, "")) {
         Ok(line) => Ok(line),
         Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
             Ok("".into())
