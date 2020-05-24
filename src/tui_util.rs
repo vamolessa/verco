@@ -238,7 +238,7 @@ pub fn move_cursor(
 
     if cursor < scroll {
         *scroll = *cursor;
-    } else if *cursor >= *scroll + available_size.height {
-        *scroll = *cursor - available_size.height;
+    } else if *cursor >= *scroll + available_size.height - 1 {
+        *scroll = 1 + *cursor - available_size.height;
     }
 }

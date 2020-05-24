@@ -68,20 +68,24 @@ impl ScrollView {
     where
         W: Write,
     {
-        let line_formatter = self.action_kind.line_formatter::<W>();
-
-        let available_size = AvailableSize::from_temrinal_size(terminal_size);
         handle_command!(write, cursor::MoveTo(0, 1))?;
+
+        let line_formatter = self.action_kind.line_formatter();
+        let available_size = AvailableSize::from_temrinal_size(terminal_size);
+
         for (i, line) in self
             .content
             .lines()
+            .enumerate()
             .skip(self.scroll)
             .take(available_size.height)
-            .enumerate()
         {
             if let Some(cursor) = self.cursor {
                 if cursor == i {
-                    handle_command!(write, SetBackgroundColor(SELECTED_BG_COLOR))?;
+                    handle_command!(
+                        write,
+                        SetBackgroundColor(SELECTED_BG_COLOR)
+                    )?;
                 }
 
                 line_formatter(write, line, available_size)?;
@@ -94,6 +98,7 @@ impl ScrollView {
                 handle_command!(write, cursor::MoveToNextLine(1))?;
             }
         }
+
         handle_command!(write, Clear(ClearType::FromCursorDown))?;
 
         Ok(())
