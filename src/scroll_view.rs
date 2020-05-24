@@ -79,16 +79,19 @@ impl ScrollView {
             .take(available_size.height)
             .enumerate()
         {
-            if Some(i) == self.cursor {
-                handle_command!(write, SetBackgroundColor(SELECTED_BG_COLOR))?;
-            }
+            if let Some(cursor) = self.cursor {
+                if cursor == i {
+                    handle_command!(write, SetBackgroundColor(SELECTED_BG_COLOR))?;
+                }
 
-            handle_command!(write, Clear(ClearType::CurrentLine))?;
-            line_formatter(write, line, available_size)?;
-            handle_command!(write, cursor::MoveToNextLine(1))?;
-
-            if Some(i) == self.cursor {
+                line_formatter(write, line, available_size)?;
+                handle_command!(write, Clear(ClearType::UntilNewLine))?;
+                handle_command!(write, cursor::MoveToNextLine(1))?;
                 handle_command!(write, ResetColor)?;
+            } else {
+                handle_command!(write, Clear(ClearType::CurrentLine))?;
+                line_formatter(write, line, available_size)?;
+                handle_command!(write, cursor::MoveToNextLine(1))?;
             }
         }
         handle_command!(write, Clear(ClearType::FromCursorDown))?;
