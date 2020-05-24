@@ -210,10 +210,11 @@ impl ScrollView {
             } => {
                 self.scroll = 0.max(
                     self.content_height(available_size) as i32
-                        - available_size.height as i32,
+                        - available_size.height as i32
+                        - 1,
                 ) as usize;
                 if let Some(ref mut cursor) = self.cursor {
-                    *cursor = self.content.lines().count();
+                    *cursor = self.content.lines().count() - 1;
                 }
                 self.show(write, terminal_size)?;
                 Ok(true)
