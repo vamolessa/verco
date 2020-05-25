@@ -336,7 +336,6 @@ where
     select.draw_header(write, available_size)?;
     select.draw_all_entries(write, available_size)?;
 
-    let selected;
     loop {
         write.queue(cursor::MoveTo(0, 2))?;
         write.flush()?;
@@ -364,7 +363,9 @@ where
                         select.filter.clear();
                         on_filter_changed(&mut select, write, available_size)?;
                     } else {
-                        selected = false;
+                        for e in select.filtered_entries_mut() {
+                            e.selected = false;
+                        }
                         break;
                     }
                 }
@@ -372,7 +373,14 @@ where
                     code: KeyCode::Enter,
                     ..
                 } => {
-                    selected = select.filtered_entries().any(|e| e.selected);
+                    let cursor = select.cursor;
+                    if select.filtered_entries().count() == 0 {
+                        if let Some(e) =
+                            select.filtered_entries_mut().nth(cursor)
+                        {
+                            e.selected = true;
+                        }
+                    }
                     break;
                 }
                 KeyEvent {
@@ -525,7 +533,7 @@ where
         }
     }
 
-    Ok(selected)
+    Ok(select.filtered_entries().count() > 0)
 }
 
 fn on_filter_changed<W>(
