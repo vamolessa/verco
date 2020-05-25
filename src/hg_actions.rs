@@ -323,7 +323,7 @@ impl<'a> VersionControlActions for HgActions {
 
     fn list_branches(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
-            command.args(&["branches", "--color", "always"]);
+            command.args(&["branches", "--template", "{branch}\n"]);
         })
     }
 

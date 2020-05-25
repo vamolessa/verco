@@ -318,7 +318,7 @@ impl VersionControlActions for GitActions {
 
     fn list_branches(&self) -> Box<dyn ActionTask> {
         task(self, |command| {
-            command.args(&["branch", "--all", "--color"]);
+            command.args(&["branch", "--all", "--format=%(refname:short)"]);
         })
     }
 

@@ -85,7 +85,7 @@ impl ActionKind {
 
     pub fn can_select_output(self) -> bool {
         match self {
-            Self::Log | Self::LogCount => true,
+            Self::Log | Self::LogCount | Self::ListBranches => true,
             _ => false,
         }
     }
@@ -117,6 +117,7 @@ impl ActionKind {
     pub fn parse_target(self, line: &str) -> Option<&str> {
         match self {
             Self::Log | Self::LogCount => line.split('\x1e').nth(1),
+            Self::ListBranches => Some(line),
             _ => None,
         }
     }
