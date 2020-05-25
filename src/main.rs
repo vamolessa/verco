@@ -25,7 +25,5 @@ fn main() {
             custom_actions::CustomAction::load_custom_actions(),
         );
         tui::show_tui(application);
-    } else {
-        eprintln!("no repository found");
     }
 }
