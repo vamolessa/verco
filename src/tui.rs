@@ -83,7 +83,7 @@ where
     fn show_select_ui(
         &mut self,
         app: &Application,
-        entries: &mut Vec<Entry>,
+        entries: &mut [Entry],
     ) -> Result<bool> {
         self.show_header(app, HeaderKind::Waiting)?;
         select(&mut self.write, entries)
@@ -272,7 +272,7 @@ where
             ['d', 's'] => self.action_context(ActionKind::CurrentDiffSelected, |s| {
                 match app.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(app, &mut entries)? {
+                        if s.show_select_ui(app, &mut entries[..])? {
                             let action =  app.version_control.current_diff_selected(&entries);
                             s.show_action(app, action)
                         } else {
@@ -303,7 +303,7 @@ where
                 if let Some(input) = s.handle_input(app, "show diff from (ctrl+c to cancel)", s.previous_target(app))? {
                     match app.version_control.get_revision_changed_files(input.trim()) {
                         Ok(mut entries) => {
-                            if s.show_select_ui(app, &mut entries)? {
+                            if s.show_select_ui(app, &mut entries[..])? {
                                 let action =  app.version_control.revision_diff_selected(input.trim(), &entries);
                                 s.show_action(app, action)
                             } else {
@@ -328,7 +328,7 @@ where
             ['c', 's'] => self.action_context(ActionKind::CommitSelected, |s| {
                 match app.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(app, &mut entries)? {
+                        if s.show_select_ui(app, &mut entries[..])? {
                             s.show_header(app, HeaderKind::Waiting)?;
                             if let Some(input) =
                                 s.handle_input(app, "commit message (ctrl+c to cancel)", None)?
@@ -370,7 +370,7 @@ where
             ['r', 's'] => self.action_context(ActionKind::RevertSelected, |s| {
                 match app.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(app, &mut entries)? {
+                        if s.show_select_ui(app, &mut entries[..])? {
                             let action =  app.version_control.revert_selected(&entries);
                             s.show_action(app, action)
                         } else {
