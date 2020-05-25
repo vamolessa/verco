@@ -106,7 +106,7 @@ pub struct Entry {
 }
 
 struct Select<'a> {
-    entries: &'a mut Vec<Entry>,
+    entries: &'a mut [Entry],
     scroll: usize,
     cursor: usize,
     header_position: (u16, u16),
@@ -313,7 +313,7 @@ impl<'a> Select<'a> {
     }
 }
 
-pub fn select<W>(write: &mut W, entries: &mut Vec<Entry>) -> Result<bool>
+pub fn select<W>(write: &mut W, entries: &mut [Entry]) -> Result<bool>
 where
     W: Write,
 {
@@ -374,7 +374,8 @@ where
                     ..
                 } => {
                     let cursor = select.cursor;
-                    if select.filtered_entries().count() == 0 {
+                    if select.entries.iter().filter(|e| e.selected).count() == 0
+                    {
                         if let Some(e) =
                             select.filtered_entries_mut().nth(cursor)
                         {
@@ -533,7 +534,7 @@ where
         }
     }
 
-    Ok(select.filtered_entries().count() > 0)
+    Ok(select.entries.iter().filter(|e| e.selected).count() > 0)
 }
 
 fn on_filter_changed<W>(
