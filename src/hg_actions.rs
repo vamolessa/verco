@@ -116,7 +116,7 @@ impl<'a> VersionControlActions for HgActions {
     fn log(&self, count: usize) -> Box<dyn ActionTask> {
         task(self, |command| {
             let count_str = format!("{}", count);
-            let template = "\x1e{node|short}\x1e{date|shortdate}\x1e{author|person}\x1e{if(topics,'[{topics}] ')}{tags % '{tag} '}{branch}\x1e{desc|firstline|strip}";
+            let template = "\x1e{node|short}\x1e{date|shortdate}\x1e{author|person}\x1e{ifeq(phase,'secret','(secret) ','')}{ifeq(phase,'draft','(draft) ','')}{if(topics,'[{topics}] ')}{tags % '{tag} '}{branch}\x1e{desc|firstline|strip}";
             command
                 .arg("log")
                 .arg("--config")
