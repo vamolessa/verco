@@ -137,22 +137,16 @@ where
         )?;
         terminal::enable_raw_mode()?;
 
+        self.write.flush()?;
         self.terminal_size = TerminalSize::get()?;
 
         {
             self.current_action_kind = ActionKind::Help;
             let help = self.show_help(app)?;
             self.show_result(app, &help)?;
+            self.show_current_key_chord()?;
+            self.write.flush()?;
         }
-
-        execute!(
-            self.write,
-            cursor::MoveTo(
-                self.terminal_size.width,
-                self.terminal_size.height - 1
-            ),
-            Clear(ClearType::CurrentLine),
-        )?;
 
         loop {
             if app.poll_and_check_action(self.current_action_kind) {
