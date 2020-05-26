@@ -98,7 +98,13 @@ impl ActionKind {
     {
         match self {
             Self::Log | Self::LogCount => |write, line, available_size| {
-                let line = &line[..line.len().min(available_size.width - 1)];
+                let slice_end = line
+                    .char_indices()
+                    .take(available_size.width - 1)
+                    .last()
+                    .map(|(i, _)| i + 1)
+                    .unwrap_or(0);
+                let line = &line[..slice_end];
                 for (part, color) in
                     line.splitn(LOG_COLORS.len(), '\x1e').zip(LOG_COLORS.iter())
                 {

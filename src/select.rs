@@ -242,12 +242,17 @@ impl<'a> Select<'a> {
         for _ in cursor_x..ITEM_NAME_COLUMN {
             write.queue(Print(' '))?;
         }
-        let max_len =
-            (entry.filename.len()).min(available_size.width - ITEM_NAME_COLUMN);
-        let cursor_x = ITEM_NAME_COLUMN + max_len;
-        write.queue(Print(
-            &entry.filename[(entry.filename.len() - max_len as usize)..],
-        ))?;
+        let (char_count, slice_start) = entry
+            .filename
+            .char_indices()
+            .rev()
+            .enumerate()
+            .take(available_size.width - ITEM_NAME_COLUMN)
+            .last()
+            .map(|(i, (ci, _))| (i + 1, ci))
+            .unwrap_or((0, 0));
+        let cursor_x = ITEM_NAME_COLUMN + char_count;
+        write.queue(Print(&entry.filename[slice_start..]))?;
         for _ in cursor_x..available_size.width {
             write.queue(Print(' '))?;
         }
