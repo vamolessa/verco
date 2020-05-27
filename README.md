@@ -68,7 +68,14 @@ x | custom action
 ## Other Keybindings
 Key Sequence | Action
 --- | ---
+ctrl+c, esc | cancel input/filter/select or quit
 ctrl+j, ctrl+n, arrow down | move down one line
+ctrl+k, ctrl+p, arrow up | move up one line
+space | select entry when selecting
+enter | accept selection
+ctrl+f, / | enter filter mode when viewing action result
+ctrl+w | clear filter
+ctrl+h, backspace | pop one char from filter
 
 ## Custom Actions
 You can create simple custom actions to run in your repository folder by placing them in the file
