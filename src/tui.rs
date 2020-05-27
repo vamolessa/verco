@@ -102,6 +102,12 @@ where
         self.show_result(app, result)
     }
 
+    fn show_empty_entries(&mut self, app: &Application) -> Result<()> {
+        self.show_header(app, HeaderKind::Error)?;
+        self.write.queue(Print("nothing to select"))?;
+        Ok(())
+    }
+
     fn show_previous_action_result(&mut self, app: &Application) -> Result<()> {
         self.current_action_kind = self.previous_action_kind;
         let result = app.get_cached_action_result(self.current_action_kind);
@@ -286,11 +292,13 @@ where
             ['d', 's'] => self.action_context(ActionKind::CurrentDiffSelected, |s| {
                 match app.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(app, &mut entries[..])? {
+                        if entries.len() == 0 {
+                            s.show_empty_entries(app)
+                        } else if s.show_select_ui(app, &mut entries[..])? {
                             let action =  app.version_control.current_diff_selected(&entries);
                             s.show_action(app, action)
                         } else {
-                    s.show_previous_action_result(app)
+                            s.show_previous_action_result(app)
                         }
                     }
                     Err(error) => s.show_result(app, &ActionResult::from_err(error)),
@@ -317,11 +325,13 @@ where
                 if let Some(input) = s.handle_input(app, "show diff from", s.previous_target(app))? {
                     match app.version_control.get_revision_changed_files(input.trim()) {
                         Ok(mut entries) => {
-                            if s.show_select_ui(app, &mut entries[..])? {
+                            if entries.len() == 0 {
+                                s.show_empty_entries(app)
+                            } else if s.show_select_ui(app, &mut entries[..])? {
                                 let action =  app.version_control.revision_diff_selected(input.trim(), &entries);
                                 s.show_action(app, action)
                             } else {
-                    s.show_previous_action_result(app)
+                                s.show_previous_action_result(app)
                             }
                         }
                         Err(error) => s.show_result(app, &ActionResult::from_err(error)),
@@ -342,7 +352,9 @@ where
             ['c', 's'] => self.action_context(ActionKind::CommitSelected, |s| {
                 match app.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(app, &mut entries[..])? {
+                        if entries.len() == 0 {
+                            s.show_empty_entries(app)
+                        } else if s.show_select_ui(app, &mut entries[..])? {
                             s.show_header(app, HeaderKind::Waiting)?;
                             if let Some(input) =
                                 s.handle_input(app, "commit message", None)?
@@ -350,10 +362,10 @@ where
                                 let action =  app.version_control.commit_selected(input.trim(), &entries);
                                 s.show_action(app, action)
                             } else {
-                    s.show_previous_action_result(app)
+                                s.show_previous_action_result(app)
                             }
                         } else {
-                    s.show_previous_action_result(app)
+                            s.show_previous_action_result(app)
                         }
                     }
                     Err(error) => s.show_result(app, &ActionResult::from_err(error)),
@@ -384,11 +396,13 @@ where
             ['r', 's'] => self.action_context(ActionKind::RevertSelected, |s| {
                 match app.version_control.get_current_changed_files() {
                     Ok(mut entries) => {
-                        if s.show_select_ui(app, &mut entries[..])? {
+                        if entries.len() == 0 {
+                            s.show_empty_entries(app)
+                        } else if s.show_select_ui(app, &mut entries[..])? {
                             let action =  app.version_control.revert_selected(&entries);
                             s.show_action(app, action)
                         } else {
-                    s.show_previous_action_result(app)
+                            s.show_previous_action_result(app)
                         }
                     }
                     Err(error) => s.show_result(app, &ActionResult::from_err(error)),

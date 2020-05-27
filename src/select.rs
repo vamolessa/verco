@@ -271,7 +271,7 @@ where
                         for e in select.filtered_entries_mut() {
                             e.selected = false;
                         }
-                        break;
+                        return Ok(false);
                     }
                 }
                 KeyEvent {
@@ -287,7 +287,7 @@ where
                             e.selected = true;
                         }
                     }
-                    break;
+                    return Ok(true);
                 }
                 KeyEvent {
                     code: KeyCode::Char('j'),
@@ -433,6 +433,4 @@ where
             _ => (),
         }
     }
-
-    Ok(select.entries.iter().filter(|e| e.selected).count() > 0)
 }
