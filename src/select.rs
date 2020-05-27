@@ -15,7 +15,7 @@ use std::io::Write;
 use crate::{
     input,
     tui_util::{
-        move_cursor, AvailableSize, TerminalSize, ENTRY_COLOR,
+        fuzzy_matches, move_cursor, AvailableSize, TerminalSize, ENTRY_COLOR,
         SELECTED_BG_COLOR,
     },
 };
@@ -115,41 +115,16 @@ struct Select<'a> {
 
 impl<'a> Select<'a> {
     fn filtered_entries(&self) -> impl Iterator<Item = &Entry> {
-        let filter = &self.filter;
-        let filter_len = filter.len();
-        self.entries.iter().filter(move |e| {
-            let mut filter_index = 0;
-            for c in e.filename.chars() {
-                if filter_index >= filter_len {
-                    break;
-                }
-
-                if filter[filter_index] == c {
-                    filter_index += 1;
-                }
-            }
-
-            filter_index >= filter_len
-        })
+        self.entries
+            .iter()
+            .filter(move |e| fuzzy_matches(&e.filename[..], &self.filter[..]))
     }
 
     fn filtered_entries_mut(&mut self) -> impl Iterator<Item = &mut Entry> {
         let filter = &self.filter;
-        let filter_len = filter.len();
-        self.entries.iter_mut().filter(move |e| {
-            let mut filter_index = 0;
-            for c in e.filename.chars() {
-                if filter_index >= filter_len {
-                    break;
-                }
-
-                if filter[filter_index] == c {
-                    filter_index += 1;
-                }
-            }
-
-            filter_index >= filter_len
-        })
+        self.entries
+            .iter_mut()
+            .filter(move |e| fuzzy_matches(&e.filename[..], &filter[..]))
     }
 
     fn move_cursor<W>(
@@ -277,7 +252,7 @@ impl<'a> Select<'a> {
             cursor::MoveTo(self.header_position.0, self.header_position.1),
             SetForegroundColor(ENTRY_COLOR),
             SetAttribute(Attribute::Bold),
-            Print("ctrl+j/ctrl+k"),
+            Print("ctrl+n/ctrl+p"),
             SetAttribute(Attribute::Reset),
             SetForegroundColor(ENTRY_COLOR),
             Print(" move, "),
@@ -312,8 +287,8 @@ impl<'a> Select<'a> {
         for c in &self.filter {
             write.queue(Print(c))?;
         }
-        queue!(write, cursor::MoveToNextLine(1), ResetColor)?;
 
+        queue!(write, cursor::MoveToNextLine(1), ResetColor)?;
         Ok(())
     }
 }
@@ -506,8 +481,14 @@ where
                 KeyEvent {
                     code: KeyCode::Char('h'),
                     modifiers: KeyModifiers::CONTROL,
+                }
+                | KeyEvent {
+                    code: KeyCode::Backspace,
+                    ..
                 } => {
-                    select.filter.swap_remove(select.filter.len() - 1);
+                    if select.filter.len() > 0 {
+                        select.filter.remove(select.filter.len() - 1);
+                    }
                     on_filter_changed(&mut select, write, available_size)?;
                 }
                 KeyEvent {
@@ -515,17 +496,6 @@ where
                     modifiers: KeyModifiers::CONTROL,
                 } => {
                     select.filter.clear();
-                    on_filter_changed(&mut select, write, available_size)?;
-                }
-                KeyEvent {
-                    code: KeyCode::Backspace,
-                    modifiers,
-                } => {
-                    if modifiers == KeyModifiers::CONTROL {
-                        select.filter.clear();
-                    } else if select.filter.len() > 0 {
-                        select.filter.swap_remove(select.filter.len() - 1);
-                    }
                     on_filter_changed(&mut select, write, available_size)?;
                 }
                 key_event => {

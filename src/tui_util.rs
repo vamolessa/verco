@@ -242,3 +242,19 @@ pub fn move_cursor(
         *scroll = 1 + *cursor - available_size.height;
     }
 }
+
+pub fn fuzzy_matches(text: &str, pattern: &[char]) -> bool {
+    let pattern_len = pattern.len();
+    let mut pattern_index = 0;
+    for c in text.chars() {
+        if pattern_index >= pattern_len {
+            break;
+        }
+
+        if pattern[pattern_index] == c {
+            pattern_index += 1;
+        }
+    }
+
+    pattern_index >= pattern_len
+}

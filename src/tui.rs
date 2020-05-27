@@ -170,6 +170,20 @@ where
                     code: KeyCode::Char('c'),
                     modifiers: KeyModifiers::CONTROL,
                 }) => {
+                    let esc_key_event = KeyEvent {
+                        code: KeyCode::Esc,
+                        modifiers: KeyModifiers::NONE,
+                    };
+
+                    if self.scroll_view.update(
+                        &mut self.write,
+                        esc_key_event,
+                        self.terminal_size,
+                    )? {
+                        self.write.flush()?;
+                        continue;
+                    }
+
                     if self.current_key_chord.len() == 0 {
                         break;
                     }
@@ -181,7 +195,7 @@ where
                 Event::Key(key_event) => {
                     if self.scroll_view.update(
                         &mut self.write,
-                        &key_event,
+                        key_event,
                         self.terminal_size,
                     )? {
                         self.write.flush()?;

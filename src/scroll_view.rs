@@ -1,8 +1,8 @@
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
-    handle_command,
-    style::{ResetColor, SetBackgroundColor},
+    handle_command, queue,
+    style::{Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{Clear, ClearType},
     Result,
 };
@@ -11,7 +11,11 @@ use std::io::Write;
 
 use crate::{
     action::ActionKind,
-    tui_util::{move_cursor, AvailableSize, TerminalSize, SELECTED_BG_COLOR},
+    input,
+    tui_util::{
+        fuzzy_matches, move_cursor, AvailableSize, TerminalSize, ENTRY_COLOR,
+        SELECTED_BG_COLOR,
+    },
 };
 
 pub struct ScrollView {
@@ -19,6 +23,8 @@ pub struct ScrollView {
     content: String,
     scroll: usize,
     cursor: Option<usize>,
+    is_filtering: bool,
+    filter: Vec<char>,
 }
 
 impl Default for ScrollView {
@@ -28,6 +34,8 @@ impl Default for ScrollView {
             content: String::with_capacity(1024 * 4),
             scroll: 0,
             cursor: None,
+            is_filtering: false,
+            filter: Vec::new(),
         }
     }
 }
@@ -45,6 +53,9 @@ impl ScrollView {
     ) {
         self.content.clear();
         self.content.push_str(content);
+
+        self.is_filtering = false;
+        self.filter.clear();
 
         if self.action_kind != action_kind {
             self.scroll = 0;
@@ -68,14 +79,32 @@ impl ScrollView {
     where
         W: Write,
     {
-        handle_command!(write, cursor::MoveTo(0, 1))?;
-
         let line_formatter = self.action_kind.line_formatter();
         let available_size = AvailableSize::from_temrinal_size(terminal_size);
 
+        let width = available_size.width as u16;
+        let filter_text = "filter: ";
+        let filter_len = filter_text.len() + self.filter.len();
+
+        queue!(
+            write,
+            cursor::MoveTo(width - width.min(filter_len as u16), 1),
+            Clear(ClearType::CurrentLine),
+            SetForegroundColor(ENTRY_COLOR),
+        )?;
+
+        if self.is_filtering {
+            handle_command!(write, Print(filter_text))?;
+        }
+
+        for c in &self.filter {
+            handle_command!(write, Print(c))?;
+        }
+
+        queue!(write, cursor::MoveToNextLine(1), ResetColor)?;
+
         for (i, line) in self
-            .content
-            .lines()
+            .filtered_lines()
             .enumerate()
             .skip(self.scroll)
             .take(available_size.height)
@@ -107,7 +136,7 @@ impl ScrollView {
     pub fn update<W>(
         &mut self,
         write: &mut W,
-        key_event: &KeyEvent,
+        key_event: KeyEvent,
         terminal_size: TerminalSize,
     ) -> Result<bool>
     where
@@ -161,10 +190,6 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::PageDown,
                 ..
-            }
-            | KeyEvent {
-                code: KeyCode::Char(' '),
-                ..
             } => {
                 self.scroll(available_size, available_size.height as i32 / 2);
                 self.show(write, terminal_size)?;
@@ -208,45 +233,121 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::End, ..
             } => {
-                self.scroll = 0.max(
-                    self.content_height(available_size) as i32
-                        - available_size.height as i32,
-                ) as usize;
+                let content_height = self.content_height(available_size);
+                self.scroll = 0
+                    .max(content_height as i32 - available_size.height as i32)
+                    as usize;
+
                 if let Some(ref mut cursor) = self.cursor {
-                    *cursor = self.content.lines().count() - 1;
+                    *cursor = content_height - 1;
                 }
                 self.show(write, terminal_size)?;
                 Ok(true)
             }
-            _ => Ok(false),
+            KeyEvent {
+                code: KeyCode::Char(' '),
+                ..
+            } => {
+                self.is_filtering = !self.is_filtering;
+                self.on_filter_changed(write, terminal_size)?;
+                Ok(true)
+            }
+            KeyEvent {
+                code: KeyCode::Char('h'),
+                modifiers: KeyModifiers::CONTROL,
+            }
+            | KeyEvent {
+                code: KeyCode::Backspace,
+                ..
+            } => {
+                if self.filter.len() > 0 {
+                    self.filter.remove(self.filter.len() - 1);
+                }
+                self.on_filter_changed(write, terminal_size)?;
+                Ok(true)
+            }
+            KeyEvent {
+                code: KeyCode::Char('w'),
+                modifiers: KeyModifiers::CONTROL,
+            } => {
+                self.filter.clear();
+                self.on_filter_changed(write, terminal_size)?;
+                Ok(true)
+            }
+            KeyEvent {
+                code: KeyCode::Esc, ..
+            }
+            | KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+            } => {
+                if self.is_filtering {
+                    self.is_filtering = false;
+                    self.filter.clear();
+                    self.on_filter_changed(write, terminal_size)?;
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            key_event => {
+                if let (true, Some(c)) =
+                    (self.is_filtering, input::key_to_char(key_event))
+                {
+                    self.filter.push(c);
+                    self.on_filter_changed(write, terminal_size)?;
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
         }
     }
 
-    fn content_height(&self, available_size: AvailableSize) -> usize {
-        let width = available_size.width;
+    fn filtered_lines(&self) -> impl Iterator<Item = &str> {
         self.content
             .lines()
-            .map(|l| (l.len() + width - 1) / width)
-            .sum()
+            .filter(move |line| fuzzy_matches(line, &self.filter[..]))
+    }
+
+    fn content_height(&self, available_size: AvailableSize) -> usize {
+        if self.cursor.is_some() {
+            self.filtered_lines().count()
+        } else {
+            let width = available_size.width;
+            self.filtered_lines()
+                .map(|l| (l.len() + width - 1) / width)
+                .sum()
+        }
     }
 
     fn scroll(&mut self, available_size: AvailableSize, delta: i32) {
+        let content_height = self.content_height(available_size);
         if let Some(ref mut cursor) = self.cursor {
-            let line_count = self.content.lines().count();
             move_cursor(
                 &mut self.scroll,
                 cursor,
                 available_size,
-                line_count,
+                content_height,
                 delta,
             );
         } else {
             self.scroll = (self.scroll as i32 + delta)
-                .min(
-                    self.content_height(available_size) as i32
-                        - available_size.height as i32,
-                )
+                .min(content_height as i32 - available_size.height as i32)
                 .max(0) as usize;
         }
+    }
+
+    fn on_filter_changed<W>(
+        &mut self,
+        writer: &mut W,
+        terminal_size: TerminalSize,
+    ) -> Result<()>
+    where
+        W: Write,
+    {
+        self.scroll = 0;
+        self.cursor = self.cursor.map(|_| 0);
+        self.show(writer, terminal_size)
     }
 }
