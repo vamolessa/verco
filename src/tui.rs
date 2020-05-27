@@ -609,7 +609,8 @@ where
             self.current_action_kind,
             self.terminal_size,
         );
-        self.scroll_view.draw_content(&mut self.write, self.terminal_size)
+        self.scroll_view
+            .draw_content(&mut self.write, self.terminal_size)
     }
 
     fn show_current_key_chord(&mut self) -> Result<()> {
