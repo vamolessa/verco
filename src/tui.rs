@@ -102,6 +102,12 @@ where
         self.show_result(app, result)
     }
 
+    fn show_previous_action_result(&mut self, app: &Application) -> Result<()> {
+        self.current_action_kind = self.previous_action_kind;
+        let result = app.get_cached_action_result(self.current_action_kind);
+        self.show_result(app, result)
+    }
+
     fn action_context<F>(
         &mut self,
         action: ActionKind,
@@ -264,7 +270,7 @@ where
                         )
                     }
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['e'] => Ok(HandleChordResult::Unhandled),
@@ -284,7 +290,7 @@ where
                             let action =  app.version_control.current_diff_selected(&entries);
                             s.show_action(app, action)
                         } else {
-                            s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                         }
                     }
                     Err(error) => s.show_result(app, &ActionResult::from_err(error)),
@@ -296,7 +302,7 @@ where
                     let action =  app.version_control.revision_changes(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['D', 'D'] => self.action_context(ActionKind::RevisionDiffAll, |s| {
@@ -304,7 +310,7 @@ where
                     let action =  app.version_control.revision_diff_all(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['D', 'S'] => self.action_context(ActionKind::RevisionDiffSelected, |s| {
@@ -315,13 +321,13 @@ where
                                 let action =  app.version_control.revision_diff_selected(input.trim(), &entries);
                                 s.show_action(app, action)
                             } else {
-                                s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                             }
                         }
                         Err(error) => s.show_result(app, &ActionResult::from_err(error)),
                     }
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['c'] => Ok(HandleChordResult::Unhandled),
@@ -330,7 +336,7 @@ where
                     let action =  app.version_control.commit_all(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['c', 's'] => self.action_context(ActionKind::CommitSelected, |s| {
@@ -344,10 +350,10 @@ where
                                 let action =  app.version_control.commit_selected(input.trim(), &entries);
                                 s.show_action(app, action)
                             } else {
-                                s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                             }
                         } else {
-                            s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                         }
                     }
                     Err(error) => s.show_result(app, &ActionResult::from_err(error)),
@@ -358,7 +364,7 @@ where
                     let action =  app.version_control.update(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['m'] => self.action_context(ActionKind::Merge, |s| {
@@ -366,7 +372,7 @@ where
                     let action =  app.version_control.merge(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['R'] => Ok(HandleChordResult::Unhandled),
@@ -382,7 +388,7 @@ where
                             let action =  app.version_control.revert_selected(&entries);
                             s.show_action(app, action)
                         } else {
-                            s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                         }
                     }
                     Err(error) => s.show_result(app, &ActionResult::from_err(error)),
@@ -418,7 +424,7 @@ where
                     let action =  app.version_control.create_tag(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['b'] => Ok(HandleChordResult::Unhandled),
@@ -431,7 +437,7 @@ where
                     let action =  app.version_control.create_branch(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['b', 'd'] => self.action_context(ActionKind::DeleteBranch, |s| {
@@ -439,7 +445,7 @@ where
                     let action =  app.version_control.close_branch(input.trim());
                     s.show_action(app, action)
                 } else {
-                    s.show_header(app, HeaderKind::Canceled)
+                    s.show_previous_action_result(app)
                 }
             }),
             ['x'] => self.action_context(ActionKind::CustomAction, |s| {
@@ -491,7 +497,7 @@ where
                     code: KeyCode::Char('c'),
                     modifiers: KeyModifiers::CONTROL,
                 }) => {
-                    return self.show_header(app, HeaderKind::Canceled);
+                    return self.show_previous_action_result(app);
                 }
                 Event::Key(key_event) => {
                     if let Some(c) = input::key_to_char(key_event) {
@@ -541,7 +547,7 @@ where
                         }
                     }
 
-                    self.show_header(app, HeaderKind::Canceled)?;
+                    self.show_header(app, HeaderKind::Error)?;
                     self.write.queue(Print("no match found"))?;
                     return Ok(());
                 }
