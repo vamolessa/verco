@@ -410,7 +410,7 @@ checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
 
 [[package]]
 name = "verco"
-version = "5.2.1"
+version = "5.3.0"
 dependencies = [
  "crossterm",
  "ctrlc",

@@ -1,11 +1,8 @@
 use crossterm::{
     cursor,
     event::{self, KeyCode, KeyEvent, KeyModifiers},
-    queue,
-    style::{
-        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor,
-        SetForegroundColor,
-    },
+    handle_command,
+    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{Clear, ClearType},
     QueueableCommand, Result,
 };
@@ -15,8 +12,8 @@ use std::io::Write;
 use crate::{
     input,
     tui_util::{
-        fuzzy_matches, move_cursor, AvailableSize, TerminalSize, ENTRY_COLOR,
-        SELECTED_BG_COLOR,
+        draw_filter_bar, fuzzy_matches, move_cursor, AvailableSize,
+        TerminalSize, SELECTED_BG_COLOR,
     },
 };
 
@@ -109,7 +106,6 @@ struct Select<'a> {
     entries: &'a mut [Entry],
     scroll: usize,
     cursor: usize,
-    header_position: (u16, u16),
     filter: Vec<char>,
 }
 
@@ -145,9 +141,7 @@ impl<'a> Select<'a> {
             delta,
         );
 
-        self.draw_all_entries(write, available_size)?;
-
-        Ok(())
+        self.draw_all_entries(write, available_size)
     }
 
     fn draw_all_entries<W>(
@@ -158,137 +152,72 @@ impl<'a> Select<'a> {
     where
         W: Write,
     {
-        queue!(
-            write,
-            Clear(ClearType::FromCursorDown),
-            cursor::MoveTo(0, 2)
-        )?;
+        handle_command!(write, cursor::MoveTo(0, 1))?;
+        handle_command!(write, ResetColor)?;
 
-        let end_index = self
+        for (i, entry) in self
             .filtered_entries()
-            .count()
-            .min(self.scroll + available_size.height);
-        for i in self.scroll..end_index {
-            self.draw_entry(write, i, available_size)?;
-        }
-        Ok(())
-    }
-
-    fn draw_entry<W>(
-        &self,
-        write: &mut W,
-        index: usize,
-        available_size: AvailableSize,
-    ) -> Result<()>
-    where
-        W: Write,
-    {
-        write
-            .queue(cursor::MoveTo(0, 2 + index as u16 - self.scroll as u16))?;
-
-        if index == self.cursor {
-            write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
-        } else {
-            write.queue(ResetColor)?;
-        }
-
-        let entry = match self.filtered_entries().nth(index) {
-            Some(entry) => entry,
-            None => return Ok(()),
-        };
-
-        let select_char = if entry.selected { '+' } else { ' ' };
-        let state_name = format!("{:?}", entry.state);
-
-        write
-            .queue(Print(select_char))?
-            .queue(Print(' '))?
-            .queue(SetForegroundColor(entry.state.color()))?
-            .queue(Print(&state_name))?
-            .queue(ResetColor)?;
-
-        if index == self.cursor {
-            write.queue(SetBackgroundColor(SELECTED_BG_COLOR))?;
-        } else {
-            write.queue(ResetColor)?;
-        }
-
-        let cursor_x = 2 + state_name.len();
-        for _ in cursor_x..ITEM_NAME_COLUMN {
-            write.queue(Print(' '))?;
-        }
-        let (char_count, slice_start) = entry
-            .filename
-            .char_indices()
-            .rev()
             .enumerate()
-            .take(available_size.width - ITEM_NAME_COLUMN)
-            .last()
-            .map(|(i, (ci, _))| (i + 1, ci))
-            .unwrap_or((0, 0));
-        let cursor_x = ITEM_NAME_COLUMN + char_count;
-        write.queue(Print(&entry.filename[slice_start..]))?;
-        for _ in cursor_x..available_size.width {
-            write.queue(Print(' '))?;
+            .skip(self.scroll)
+            .take(available_size.height)
+        {
+            if i == self.cursor {
+                handle_command!(write, SetBackgroundColor(SELECTED_BG_COLOR))?;
+            } else {
+                handle_command!(write, ResetColor)?;
+            }
+
+            let select_char = if entry.selected { '+' } else { ' ' };
+            let state_name = format!("{:?}", entry.state);
+
+            handle_command!(write, Print(select_char))?;
+            handle_command!(write, Print(' '))?;
+            handle_command!(write, SetForegroundColor(entry.state.color()))?;
+            handle_command!(write, Print(&state_name))?;
+            handle_command!(write, ResetColor)?;
+
+            if i == self.cursor {
+                handle_command!(write, SetBackgroundColor(SELECTED_BG_COLOR))?;
+            } else {
+                handle_command!(write, ResetColor)?;
+            }
+
+            let cursor_x = 2 + state_name.len();
+            for _ in cursor_x..ITEM_NAME_COLUMN {
+                handle_command!(write, Print(' '))?;
+            }
+            let slice_start = entry
+                .filename
+                .char_indices()
+                .rev()
+                .take(available_size.width - ITEM_NAME_COLUMN)
+                .last()
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+
+            handle_command!(write, Print(&entry.filename[slice_start..]))?;
+            handle_command!(write, Clear(ClearType::UntilNewLine))?;
+            handle_command!(write, cursor::MoveToNextLine(1))?;
         }
-        write.queue(ResetColor)?;
+
+        handle_command!(write, ResetColor)?;
+        handle_command!(write, Clear(ClearType::FromCursorDown))?;
+        draw_filter_bar(write, &self.filter[..], false)?;
+
         Ok(())
     }
 
-    fn draw_header<W>(
-        &self,
+    fn on_filter_changed<W>(
+        &mut self,
         write: &mut W,
         available_size: AvailableSize,
     ) -> Result<()>
     where
         W: Write,
     {
-        let width = available_size.width as u16;
-        let filter_text = "filter: ";
-        let filter_len = filter_text.len() + self.filter.len();
-
-        queue!(
-            write,
-            cursor::MoveTo(self.header_position.0, self.header_position.1),
-            SetForegroundColor(ENTRY_COLOR),
-            SetAttribute(Attribute::Bold),
-            Print("ctrl+n/ctrl+p"),
-            SetAttribute(Attribute::Reset),
-            SetForegroundColor(ENTRY_COLOR),
-            Print(" move, "),
-            SetAttribute(Attribute::Bold),
-            Print("space"),
-            SetAttribute(Attribute::Reset),
-            SetForegroundColor(ENTRY_COLOR),
-            Print(" (de)select, "),
-            SetAttribute(Attribute::Bold),
-            Print("ctrl+a"),
-            SetAttribute(Attribute::Reset),
-            SetForegroundColor(ENTRY_COLOR),
-            Print(" (de)select all, "),
-            SetAttribute(Attribute::Bold),
-            Print("enter"),
-            SetAttribute(Attribute::Reset),
-            SetForegroundColor(ENTRY_COLOR),
-            Print(" continue, "),
-            SetAttribute(Attribute::Bold),
-            Print("ctrl+c"),
-            SetAttribute(Attribute::Reset),
-            SetForegroundColor(ENTRY_COLOR),
-            Print(" cancel"),
-            Clear(ClearType::UntilNewLine),
-            cursor::MoveToColumn(width - width.min(filter_len as u16)),
-        )?;
-
-        if self.filter.len() > 0 {
-            write.queue(Print(filter_text))?;
-        }
-
-        for c in &self.filter {
-            write.queue(Print(c))?;
-        }
-
-        queue!(write, cursor::MoveToNextLine(1), ResetColor)?;
+        self.cursor = 0;
+        self.scroll = 0;
+        self.draw_all_entries(write, available_size)?;
         Ok(())
     }
 }
@@ -301,19 +230,15 @@ where
         return Ok(false);
     }
 
-    write.flush()?;
-
     let mut select = Select {
         entries,
         scroll: 0,
         cursor: 0,
-        header_position: cursor::position()?,
         filter: Vec::new(),
     };
 
     let mut available_size =
         AvailableSize::from_temrinal_size(TerminalSize::get()?);
-    select.draw_header(write, available_size)?;
     select.draw_all_entries(write, available_size)?;
 
     loop {
@@ -341,7 +266,7 @@ where
                 } => {
                     if select.filter.len() > 0 {
                         select.filter.clear();
-                        on_filter_changed(&mut select, write, available_size)?;
+                        select.on_filter_changed(write, available_size)?;
                     } else {
                         for e in select.filtered_entries_mut() {
                             e.selected = false;
@@ -465,7 +390,7 @@ where
                     if let Some(e) = select.filtered_entries_mut().nth(cursor) {
                         e.selected = !e.selected;
                     }
-                    select.draw_entry(write, select.cursor, available_size)?;
+                    select.draw_all_entries(write, available_size)?;
                 }
                 KeyEvent {
                     code: KeyCode::Char('a'),
@@ -489,19 +414,19 @@ where
                     if select.filter.len() > 0 {
                         select.filter.remove(select.filter.len() - 1);
                     }
-                    on_filter_changed(&mut select, write, available_size)?;
+                    select.on_filter_changed(write, available_size)?;
                 }
                 KeyEvent {
                     code: KeyCode::Char('w'),
                     modifiers: KeyModifiers::CONTROL,
                 } => {
                     select.filter.clear();
-                    on_filter_changed(&mut select, write, available_size)?;
+                    select.on_filter_changed(write, available_size)?;
                 }
                 key_event => {
                     if let Some(c) = input::key_to_char(key_event) {
                         select.filter.push(c);
-                        on_filter_changed(&mut select, write, available_size)?;
+                        select.on_filter_changed(write, available_size)?;
                     }
                 }
             },
@@ -510,19 +435,4 @@ where
     }
 
     Ok(select.entries.iter().filter(|e| e.selected).count() > 0)
-}
-
-fn on_filter_changed<W>(
-    select: &mut Select,
-    write: &mut W,
-    available_size: AvailableSize,
-) -> Result<()>
-where
-    W: Write,
-{
-    select.cursor = 0;
-    select.scroll = 0;
-    select.draw_header(write, available_size)?;
-    select.draw_all_entries(write, available_size)?;
-    Ok(())
 }

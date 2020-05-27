@@ -1,8 +1,8 @@
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
-    handle_command, queue,
-    style::{Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+    handle_command,
+    style::{ResetColor, SetBackgroundColor},
     terminal::{Clear, ClearType},
     Result,
 };
@@ -13,8 +13,8 @@ use crate::{
     action::ActionKind,
     input,
     tui_util::{
-        fuzzy_matches, move_cursor, AvailableSize, TerminalSize, ENTRY_COLOR,
-        SELECTED_BG_COLOR,
+        draw_filter_bar, fuzzy_matches, move_cursor, AvailableSize,
+        TerminalSize, SELECTED_BG_COLOR,
     },
 };
 
@@ -71,7 +71,7 @@ impl ScrollView {
         self.action_kind = action_kind;
     }
 
-    pub fn show<W>(
+    pub fn draw_content<W>(
         &self,
         write: &mut W,
         terminal_size: TerminalSize,
@@ -82,26 +82,8 @@ impl ScrollView {
         let line_formatter = self.action_kind.line_formatter();
         let available_size = AvailableSize::from_temrinal_size(terminal_size);
 
-        let width = available_size.width as u16;
-        let filter_text = "filter: ";
-        let filter_len = filter_text.len() + self.filter.len();
-
-        queue!(
-            write,
-            cursor::MoveTo(width - width.min(filter_len as u16), 1),
-            Clear(ClearType::CurrentLine),
-            SetForegroundColor(ENTRY_COLOR),
-        )?;
-
-        if self.is_filtering {
-            handle_command!(write, Print(filter_text))?;
-        }
-
-        for c in &self.filter {
-            handle_command!(write, Print(c))?;
-        }
-
-        queue!(write, cursor::MoveToNextLine(1), ResetColor)?;
+        handle_command!(write, cursor::MoveTo(0, 1))?;
+        handle_command!(write, ResetColor)?;
 
         for (i, line) in self
             .filtered_lines()
@@ -129,6 +111,7 @@ impl ScrollView {
         }
 
         handle_command!(write, Clear(ClearType::FromCursorDown))?;
+        draw_filter_bar(write, &self.filter[..], self.is_filtering)?;
 
         Ok(())
     }
@@ -164,9 +147,9 @@ impl ScrollView {
                 code: KeyCode::Char('\n'),
                 ..
             } => {
+                self.is_filtering = false;
                 self.scroll(available_size, 1);
-                self.show(write, terminal_size)?;
-                Ok(true)
+                self.draw_content(write, terminal_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('k'),
@@ -179,9 +162,9 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::Up, ..
             } => {
+                self.is_filtering = false;
                 self.scroll(available_size, -1);
-                self.show(write, terminal_size)?;
-                Ok(true)
+                self.draw_content(write, terminal_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('d'),
@@ -191,9 +174,9 @@ impl ScrollView {
                 code: KeyCode::PageDown,
                 ..
             } => {
+                self.is_filtering = false;
                 self.scroll(available_size, available_size.height as i32 / 2);
-                self.show(write, terminal_size)?;
-                Ok(true)
+                self.draw_content(write, terminal_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('u'),
@@ -203,9 +186,9 @@ impl ScrollView {
                 code: KeyCode::PageUp,
                 ..
             } => {
+                self.is_filtering = false;
                 self.scroll(available_size, available_size.height as i32 / -2);
-                self.show(write, terminal_size)?;
-                Ok(true)
+                self.draw_content(write, terminal_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('g'),
@@ -219,12 +202,12 @@ impl ScrollView {
                 code: KeyCode::Home,
                 ..
             } => {
+                self.is_filtering = false;
                 self.scroll = 0;
                 if let Some(ref mut cursor) = self.cursor {
                     *cursor = 0;
                 }
-                self.show(write, terminal_size)?;
-                Ok(true)
+                self.draw_content(write, terminal_size)?;
             }
             KeyEvent {
                 code: KeyCode::Char('e'),
@@ -233,6 +216,7 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::End, ..
             } => {
+                self.is_filtering = false;
                 let content_height = self.content_height(available_size);
                 self.scroll = 0
                     .max(content_height as i32 - available_size.height as i32)
@@ -241,16 +225,20 @@ impl ScrollView {
                 if let Some(ref mut cursor) = self.cursor {
                     *cursor = content_height - 1;
                 }
-                self.show(write, terminal_size)?;
-                Ok(true)
+                self.draw_content(write, terminal_size)?;
             }
             KeyEvent {
-                code: KeyCode::Char(' '),
+                code: KeyCode::Char('/'),
                 ..
+            }
+            | KeyEvent {
+                code: KeyCode::Char('f'),
+                modifiers: KeyModifiers::CONTROL,
             } => {
-                self.is_filtering = !self.is_filtering;
-                self.on_filter_changed(write, terminal_size)?;
-                Ok(true)
+                if !self.is_filtering {
+                    self.is_filtering = true;
+                    self.on_filter_changed(write, terminal_size)?;
+                }
             }
             KeyEvent {
                 code: KeyCode::Char('h'),
@@ -264,7 +252,6 @@ impl ScrollView {
                     self.filter.remove(self.filter.len() - 1);
                 }
                 self.on_filter_changed(write, terminal_size)?;
-                Ok(true)
             }
             KeyEvent {
                 code: KeyCode::Char('w'),
@@ -272,7 +259,6 @@ impl ScrollView {
             } => {
                 self.filter.clear();
                 self.on_filter_changed(write, terminal_size)?;
-                Ok(true)
             }
             KeyEvent {
                 code: KeyCode::Esc, ..
@@ -281,27 +267,29 @@ impl ScrollView {
                 code: KeyCode::Char('c'),
                 modifiers: KeyModifiers::CONTROL,
             } => {
-                if self.is_filtering {
+                if self.is_filtering || self.filter.len() > 0 {
                     self.is_filtering = false;
                     self.filter.clear();
                     self.on_filter_changed(write, terminal_size)?;
-                    Ok(true)
                 } else {
-                    Ok(false)
+                    return Ok(false);
                 }
             }
             key_event => {
-                if let (true, Some(c)) =
-                    (self.is_filtering, input::key_to_char(key_event))
-                {
+                if !self.is_filtering {
+                    return Ok(false);
+                }
+
+                if let Some(c) = input::key_to_char(key_event) {
                     self.filter.push(c);
                     self.on_filter_changed(write, terminal_size)?;
-                    Ok(true)
                 } else {
-                    Ok(false)
+                    return Ok(false);
                 }
             }
         }
+
+        Ok(true)
     }
 
     fn filtered_lines(&self) -> impl Iterator<Item = &str> {
@@ -348,6 +336,6 @@ impl ScrollView {
     {
         self.scroll = 0;
         self.cursor = self.cursor.map(|_| 0);
-        self.show(writer, terminal_size)
+        self.draw_content(writer, terminal_size)
     }
 }

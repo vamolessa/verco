@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crossterm::{
-    cursor, queue,
+    cursor, handle_command, queue,
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{self, Clear, ClearType},
     Result,
@@ -53,6 +53,18 @@ const HEADER_BG_ERROR_COLOR: Color = Color::Red;
 const HEADER_BG_ERROR_DARK_COLOR: Color = Color::DarkRed;
 const HEADER_BG_CANCELED_COLOR: Color = Color::Yellow;
 const HEADER_BG_CANCELED_DARK_COLOR: Color = Color::DarkYellow;
+
+const FILTER_COLOR: Color = Color::Black;
+const FILTER_ACTIVE_BG_COLOR: Color = Color::Rgb {
+    r: 255,
+    g: 180,
+    b: 100,
+};
+const FILTER_INACTIVE_BG_COLOR: Color = Color::Rgb {
+    r: 180,
+    g: 90,
+    b: 50,
+};
 
 const HEADER_PREFIX: &str = "Verco @ ";
 const DIR_NAME_MAX_LENGTH: usize = 32;
@@ -257,4 +269,38 @@ pub fn fuzzy_matches(text: &str, pattern: &[char]) -> bool {
     }
 
     pattern_index >= pattern_len
+}
+
+pub fn draw_filter_bar<W>(
+    write: &mut W,
+    filter: &[char],
+    active: bool,
+) -> Result<()>
+where
+    W: Write,
+{
+    if !active && filter.len() == 0 {
+        return Ok(());
+    }
+
+    let bg_color = if active {
+        FILTER_ACTIVE_BG_COLOR
+    } else {
+        FILTER_INACTIVE_BG_COLOR
+    };
+
+    queue!(
+        write,
+        cursor::MoveTo(0, 9999),
+        SetBackgroundColor(bg_color),
+        SetForegroundColor(FILTER_COLOR),
+        Print('/'),
+    )?;
+
+    for c in filter {
+        handle_command!(write, Print(c))?;
+    }
+
+    queue!(write, Clear(ClearType::UntilNewLine), ResetColor)?;
+    Ok(())
 }

@@ -251,7 +251,7 @@ where
                 s.show_action(app, action)
             }),
             ['l', 'c'] => self.action_context(ActionKind::LogCount, |s| {
-                if let Some(input) = s.handle_input(app, "logs to show (ctrl+c to cancel)", None)? {
+                if let Some(input) = s.handle_input(app, "logs to show", None)? {
                     if let Ok(count) = input.trim().parse() {
                         let action = app.version_control.log(count);
                         s.show_action(app, action)
@@ -292,7 +292,7 @@ where
             }),
             ['D'] => Ok(HandleChordResult::Unhandled),
             ['D', 'C'] => self.action_context(ActionKind::RevisionChanges, |s| {
-                if let Some(input) = s.handle_input(app, "show changes from (ctrl+c to cancel)", s.previous_target(app))? {
+                if let Some(input) = s.handle_input(app, "show changes from", s.previous_target(app))? {
                     let action =  app.version_control.revision_changes(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -300,7 +300,7 @@ where
                 }
             }),
             ['D', 'D'] => self.action_context(ActionKind::RevisionDiffAll, |s| {
-                if let Some(input) = s.handle_input(app, "show diff from (ctrl+c to cancel)", s.previous_target(app))? {
+                if let Some(input) = s.handle_input(app, "show diff from", s.previous_target(app))? {
                     let action =  app.version_control.revision_diff_all(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -308,7 +308,7 @@ where
                 }
             }),
             ['D', 'S'] => self.action_context(ActionKind::RevisionDiffSelected, |s| {
-                if let Some(input) = s.handle_input(app, "show diff from (ctrl+c to cancel)", s.previous_target(app))? {
+                if let Some(input) = s.handle_input(app, "show diff from", s.previous_target(app))? {
                     match app.version_control.get_revision_changed_files(input.trim()) {
                         Ok(mut entries) => {
                             if s.show_select_ui(app, &mut entries[..])? {
@@ -326,7 +326,7 @@ where
             }),
             ['c'] => Ok(HandleChordResult::Unhandled),
             ['c', 'c'] => self.action_context(ActionKind::CommitAll, |s| {
-                if let Some(input) = s.handle_input(app, "commit message (ctrl+c to cancel)", None)? {
+                if let Some(input) = s.handle_input(app, "commit message", None)? {
                     let action =  app.version_control.commit_all(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -339,7 +339,7 @@ where
                         if s.show_select_ui(app, &mut entries[..])? {
                             s.show_header(app, HeaderKind::Waiting)?;
                             if let Some(input) =
-                                s.handle_input(app, "commit message (ctrl+c to cancel)", None)?
+                                s.handle_input(app, "commit message", None)?
                             {
                                 let action =  app.version_control.commit_selected(input.trim(), &entries);
                                 s.show_action(app, action)
@@ -354,7 +354,7 @@ where
                 }
             }),
             ['u'] => self.action_context(ActionKind::Update, |s| {
-                if let Some(input) = s.handle_input(app, "update to (ctrl+c to cancel)", s.previous_target(app))? {
+                if let Some(input) = s.handle_input(app, "update to", s.previous_target(app))? {
                     let action =  app.version_control.update(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -362,7 +362,7 @@ where
                 }
             }),
             ['m'] => self.action_context(ActionKind::Merge, |s| {
-                if let Some(input) = s.handle_input(app, "merge with (ctrl+c to cancel)", s.previous_target(app))? {
+                if let Some(input) = s.handle_input(app, "merge with", s.previous_target(app))? {
                     let action =  app.version_control.merge(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -414,7 +414,7 @@ where
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
             ['t', 'n'] => self.action_context(ActionKind::NewTag, |s| {
-                if let Some(input) = s.handle_input(app, "new tag name (ctrl+c to cancel)", None)? {
+                if let Some(input) = s.handle_input(app, "new tag name", None)? {
                     let action =  app.version_control.create_tag(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -427,7 +427,7 @@ where
                 s.show_action(app, action)
             }),
             ['b', 'n'] => self.action_context(ActionKind::NewBranch, |s| {
-                if let Some(input) = s.handle_input(app, "new branch name (ctrl+c to cancel)", None)? {
+                if let Some(input) = s.handle_input(app, "new branch name", None)? {
                     let action =  app.version_control.create_branch(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -435,7 +435,7 @@ where
                 }
             }),
             ['b', 'd'] => self.action_context(ActionKind::DeleteBranch, |s| {
-                if let Some(input) = s.handle_input(app, "branch to delete (ctrl+c to cancel)", s.previous_target(app))? {
+                if let Some(input) = s.handle_input(app, "branch to delete", s.previous_target(app))? {
                     let action =  app.version_control.close_branch(input.trim());
                     s.show_action(app, action)
                 } else {
@@ -603,7 +603,7 @@ where
             self.current_action_kind,
             self.terminal_size,
         );
-        self.scroll_view.show(&mut self.write, self.terminal_size)
+        self.scroll_view.draw_content(&mut self.write, self.terminal_size)
     }
 
     fn show_current_key_chord(&mut self) -> Result<()> {
