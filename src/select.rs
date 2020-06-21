@@ -277,6 +277,10 @@ where
                 KeyEvent {
                     code: KeyCode::Enter,
                     ..
+                }
+                | KeyEvent {
+                    code: KeyCode::Char('m'),
+                    modifiers: KeyModifiers::CONTROL,
                 } => {
                     let cursor = select.cursor;
                     if select.entries.iter().filter(|e| e.selected).count() == 0

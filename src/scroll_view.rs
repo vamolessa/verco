@@ -138,14 +138,6 @@ impl ScrollView {
             | KeyEvent {
                 code: KeyCode::Down,
                 ..
-            }
-            | KeyEvent {
-                code: KeyCode::Enter,
-                ..
-            }
-            | KeyEvent {
-                code: KeyCode::Char('\n'),
-                ..
             } => {
                 self.is_filtering = false;
                 self.scroll(available_size, 1);
