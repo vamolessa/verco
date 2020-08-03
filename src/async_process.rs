@@ -90,11 +90,7 @@ impl ChildOutput {
         match child.wait_with_output() {
             Ok(out) => {
                 success = out.status.success();
-                let bytes = if success {
-                    out.stdout
-                } else {
-                    out.stderr
-                };
+                let bytes = if success { out.stdout } else { out.stderr };
                 output = String::from_utf8_lossy(&bytes[..]).into_owned();
             }
             Err(error) => {
