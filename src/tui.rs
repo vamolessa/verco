@@ -464,6 +464,7 @@ where
             }),
             ['x'] => self.action_context(ActionKind::CustomAction, |s| {
                 if app.custom_actions.len() > 0 {
+                    s.show_header(app, HeaderKind::Ok)?;
                     for c in &app.custom_actions {
                         s.write
                             .queue(SetForegroundColor(ENTRY_COLOR))?

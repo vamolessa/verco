@@ -84,26 +84,22 @@ impl ChildOutput {
     }
 
     pub fn from_child(child: Child) -> Self {
-        let mut success;
-        let output = match child.wait_with_output() {
-            Ok(output) => {
-                success = output.status.success();
+        let success;
+        let output;
+
+        match child.wait_with_output() {
+            Ok(out) => {
+                success = out.status.success();
                 let bytes = if success {
-                    output.stdout
+                    out.stdout
                 } else {
-                    output.stderr
+                    out.stderr
                 };
-                match String::from_utf8(bytes) {
-                    Ok(output) => output,
-                    Err(error) => {
-                        success = false;
-                        error.to_string()
-                    }
-                }
+                output = String::from_utf8_lossy(&bytes[..]).into_owned();
             }
             Err(error) => {
                 success = false;
-                error.to_string()
+                output = error.to_string();
             }
         };
 
