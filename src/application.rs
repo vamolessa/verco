@@ -47,6 +47,10 @@ impl Application {
         }
     }
 
+    pub fn set_cached_action_result(&mut self, kind: ActionKind, result: ActionResult) {
+        self.action_results.insert(kind, result);
+    }
+
     pub fn poll_and_check_action(&mut self, kind: ActionKind) -> bool {
         let mut just_finished = false;
         for i in (0..self.pending_actions.len()).rev() {

@@ -20,7 +20,7 @@ impl CustomAction {
 
     fn try_load_custom_actions() -> io::Result<Vec<CustomAction>> {
         let mut path = env::current_dir()?;
-        path.push(".verco/custom_actions.txt");
+        path.push(concat!(".", env!("CARGO_PKG_NAME"), "/custom_actions.txt"));
         if !path.exists() {
             return Ok(Vec::new());
         }

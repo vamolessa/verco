@@ -64,7 +64,7 @@ const FILTER_INACTIVE_BG_COLOR: Color = Color::Rgb {
     b: 50,
 };
 
-const HEADER_PREFIX: &str = "Verco @ ";
+const HEADER_PREFIX: &str = concat!(env!("CARGO_PKG_NAME"), " @ ");
 const DIR_NAME_MAX_LENGTH: usize = 32;
 
 pub enum HeaderKind {

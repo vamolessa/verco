@@ -25,6 +25,7 @@ use crate::{
     tui_util::{show_header, Header, HeaderKind, TerminalSize, ENTRY_COLOR},
 };
 
+const BIN_NAME: &'static str = env!("CARGO_PKG_NAME");
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub fn show_tui(mut app: Application) {
@@ -158,6 +159,8 @@ where
             self.show_result(app, &help)?;
             self.show_current_key_chord()?;
             self.write.flush()?;
+
+            app.set_cached_action_result(ActionKind::Help, help);
         }
 
         loop {
@@ -257,13 +260,16 @@ where
                 let action = app.version_control.status();
                 s.show_action(app, action)
             }),
-            ['l'] => Ok(HandleChordResult::Unhandled),
-            ['l', 'l'] => self.action_context(ActionKind::Log, |s| {
-                let action = app.version_control.log(s.terminal_size.height as usize);
+            ['l'] => self.action_context(ActionKind::Log, |s| {
+                let action =
+                    app.version_control.log(s.terminal_size.height as usize);
                 s.show_action(app, action)
             }),
-            ['l', 'c'] => self.action_context(ActionKind::LogCount, |s| {
-                if let Some(input) = s.handle_input(app, "logs to show", None)? {
+            ['L'] => Ok(HandleChordResult::Unhandled),
+            ['L', 'C'] => self.action_context(ActionKind::LogCount, |s| {
+                if let Some(input) =
+                    s.handle_input(app, "logs to show", None)?
+                {
                     if let Ok(count) = input.trim().parse() {
                         let action = app.version_control.log(count);
                         s.show_action(app, action)
@@ -280,108 +286,165 @@ where
                 }
             }),
             ['e'] => Ok(HandleChordResult::Unhandled),
-            ['e', 'e'] => self.action_context(ActionKind::CurrentFullRevision, |s| {
-                let action =  app.version_control.current_export();
-                s.show_action(app, action)
-            }),
+            ['e', 'e'] => {
+                self.action_context(ActionKind::CurrentFullRevision, |s| {
+                    let action = app.version_control.current_export();
+                    s.show_action(app, action)
+                })
+            }
             ['d'] => Ok(HandleChordResult::Unhandled),
-            ['d', 'd'] => self.action_context(ActionKind::CurrentDiffAll, |s| {
-                let action =  app.version_control.current_diff_all();
-                s.show_action(app, action)
-            }),
-            ['d', 's'] => self.action_context(ActionKind::CurrentDiffSelected, |s| {
-                match app.version_control.get_current_changed_files() {
-                    Ok(mut entries) => {
-                        if entries.len() == 0 {
-                            s.show_empty_entries(app)
-                        } else if s.show_select_ui(app, &mut entries[..])? {
-                            let action =  app.version_control.current_diff_selected(&entries);
-                            s.show_action(app, action)
-                        } else {
-                            s.show_previous_action_result(app)
-                        }
-                    }
-                    Err(error) => s.show_result(app, &ActionResult::from_err(error)),
-                }
-            }),
-            ['D'] => Ok(HandleChordResult::Unhandled),
-            ['D', 'C'] => self.action_context(ActionKind::RevisionChanges, |s| {
-                if let Some(input) = s.handle_input(app, "show changes from", s.previous_target(app))? {
-                    let action =  app.version_control.revision_changes(input.trim());
+            ['d', 'd'] => {
+                self.action_context(ActionKind::CurrentDiffAll, |s| {
+                    let action = app.version_control.current_diff_all();
                     s.show_action(app, action)
-                } else {
-                    s.show_previous_action_result(app)
-                }
-            }),
-            ['D', 'D'] => self.action_context(ActionKind::RevisionDiffAll, |s| {
-                if let Some(input) = s.handle_input(app, "show diff from", s.previous_target(app))? {
-                    let action =  app.version_control.revision_diff_all(input.trim());
-                    s.show_action(app, action)
-                } else {
-                    s.show_previous_action_result(app)
-                }
-            }),
-            ['D', 'S'] => self.action_context(ActionKind::RevisionDiffSelected, |s| {
-                if let Some(input) = s.handle_input(app, "show diff from", s.previous_target(app))? {
-                    match app.version_control.get_revision_changed_files(input.trim()) {
+                })
+            }
+            ['d', 's'] => {
+                self.action_context(ActionKind::CurrentDiffSelected, |s| {
+                    match app.version_control.get_current_changed_files() {
                         Ok(mut entries) => {
                             if entries.len() == 0 {
                                 s.show_empty_entries(app)
                             } else if s.show_select_ui(app, &mut entries[..])? {
-                                let action =  app.version_control.revision_diff_selected(input.trim(), &entries);
+                                let action = app
+                                    .version_control
+                                    .current_diff_selected(&entries);
                                 s.show_action(app, action)
                             } else {
                                 s.show_previous_action_result(app)
                             }
                         }
-                        Err(error) => s.show_result(app, &ActionResult::from_err(error)),
+                        Err(error) => {
+                            s.show_result(app, &ActionResult::from_err(error))
+                        }
                     }
-                } else {
-                    s.show_previous_action_result(app)
-                }
-            }),
+                })
+            }
+            ['D'] => Ok(HandleChordResult::Unhandled),
+            ['D', 'C'] => {
+                self.action_context(ActionKind::RevisionChanges, |s| {
+                    if let Some(input) = s.handle_input(
+                        app,
+                        "show changes from",
+                        s.previous_target(app),
+                    )? {
+                        let action =
+                            app.version_control.revision_changes(input.trim());
+                        s.show_action(app, action)
+                    } else {
+                        s.show_previous_action_result(app)
+                    }
+                })
+            }
+            ['D', 'D'] => {
+                self.action_context(ActionKind::RevisionDiffAll, |s| {
+                    if let Some(input) = s.handle_input(
+                        app,
+                        "show diff from",
+                        s.previous_target(app),
+                    )? {
+                        let action =
+                            app.version_control.revision_diff_all(input.trim());
+                        s.show_action(app, action)
+                    } else {
+                        s.show_previous_action_result(app)
+                    }
+                })
+            }
+            ['D', 'S'] => {
+                self.action_context(ActionKind::RevisionDiffSelected, |s| {
+                    if let Some(input) = s.handle_input(
+                        app,
+                        "show diff from",
+                        s.previous_target(app),
+                    )? {
+                        match app
+                            .version_control
+                            .get_revision_changed_files(input.trim())
+                        {
+                            Ok(mut entries) => {
+                                if entries.len() == 0 {
+                                    s.show_empty_entries(app)
+                                } else if s
+                                    .show_select_ui(app, &mut entries[..])?
+                                {
+                                    let action = app
+                                        .version_control
+                                        .revision_diff_selected(
+                                            input.trim(),
+                                            &entries,
+                                        );
+                                    s.show_action(app, action)
+                                } else {
+                                    s.show_previous_action_result(app)
+                                }
+                            }
+                            Err(error) => s.show_result(
+                                app,
+                                &ActionResult::from_err(error),
+                            ),
+                        }
+                    } else {
+                        s.show_previous_action_result(app)
+                    }
+                })
+            }
             ['c'] => Ok(HandleChordResult::Unhandled),
             ['c', 'c'] => self.action_context(ActionKind::CommitAll, |s| {
-                if let Some(input) = s.handle_input(app, "commit message", None)? {
-                    let action =  app.version_control.commit_all(input.trim());
+                if let Some(input) =
+                    s.handle_input(app, "commit message", None)?
+                {
+                    let action = app.version_control.commit_all(input.trim());
                     s.show_action(app, action)
                 } else {
                     s.show_previous_action_result(app)
                 }
             }),
-            ['c', 's'] => self.action_context(ActionKind::CommitSelected, |s| {
-                match app.version_control.get_current_changed_files() {
-                    Ok(mut entries) => {
-                        if entries.len() == 0 {
-                            s.show_empty_entries(app)
-                        } else if s.show_select_ui(app, &mut entries[..])? {
-                            s.show_header(app, HeaderKind::Waiting)?;
-                            if let Some(input) =
-                                s.handle_input(app, "commit message", None)?
-                            {
-                                let action =  app.version_control.commit_selected(input.trim(), &entries);
-                                s.show_action(app, action)
+            ['c', 's'] => {
+                self.action_context(ActionKind::CommitSelected, |s| {
+                    match app.version_control.get_current_changed_files() {
+                        Ok(mut entries) => {
+                            if entries.len() == 0 {
+                                s.show_empty_entries(app)
+                            } else if s.show_select_ui(app, &mut entries[..])? {
+                                s.show_header(app, HeaderKind::Waiting)?;
+                                if let Some(input) =
+                                    s.handle_input(app, "commit message", None)?
+                                {
+                                    let action =
+                                        app.version_control.commit_selected(
+                                            input.trim(),
+                                            &entries,
+                                        );
+                                    s.show_action(app, action)
+                                } else {
+                                    s.show_previous_action_result(app)
+                                }
                             } else {
                                 s.show_previous_action_result(app)
                             }
-                        } else {
-                            s.show_previous_action_result(app)
+                        }
+                        Err(error) => {
+                            s.show_result(app, &ActionResult::from_err(error))
                         }
                     }
-                    Err(error) => s.show_result(app, &ActionResult::from_err(error)),
-                }
-            }),
+                })
+            }
             ['u'] => self.action_context(ActionKind::Update, |s| {
-                if let Some(input) = s.handle_input(app, "update to", s.previous_target(app))? {
-                    let action =  app.version_control.update(input.trim());
+                if let Some(input) =
+                    s.handle_input(app, "update to", s.previous_target(app))?
+                {
+                    let action = app.version_control.update(input.trim());
                     s.show_action(app, action)
                 } else {
                     s.show_previous_action_result(app)
                 }
             }),
             ['m'] => self.action_context(ActionKind::Merge, |s| {
-                if let Some(input) = s.handle_input(app, "merge with", s.previous_target(app))? {
-                    let action =  app.version_control.merge(input.trim());
+                if let Some(input) =
+                    s.handle_input(app, "merge with", s.previous_target(app))?
+                {
+                    let action = app.version_control.merge(input.trim());
                     s.show_action(app, action)
                 } else {
                     s.show_previous_action_result(app)
@@ -389,53 +452,67 @@ where
             }),
             ['R'] => Ok(HandleChordResult::Unhandled),
             ['R', 'A'] => self.action_context(ActionKind::RevertAll, |s| {
-                let action =  app.version_control.revert_all();
+                let action = app.version_control.revert_all();
                 s.show_action(app, action)
             }),
             ['r'] => Ok(HandleChordResult::Unhandled),
-            ['r', 's'] => self.action_context(ActionKind::RevertSelected, |s| {
-                match app.version_control.get_current_changed_files() {
-                    Ok(mut entries) => {
-                        if entries.len() == 0 {
-                            s.show_empty_entries(app)
-                        } else if s.show_select_ui(app, &mut entries[..])? {
-                            let action =  app.version_control.revert_selected(&entries);
-                            s.show_action(app, action)
-                        } else {
-                            s.show_previous_action_result(app)
+            ['r', 's'] => {
+                self.action_context(ActionKind::RevertSelected, |s| {
+                    match app.version_control.get_current_changed_files() {
+                        Ok(mut entries) => {
+                            if entries.len() == 0 {
+                                s.show_empty_entries(app)
+                            } else if s.show_select_ui(app, &mut entries[..])? {
+                                let action = app
+                                    .version_control
+                                    .revert_selected(&entries);
+                                s.show_action(app, action)
+                            } else {
+                                s.show_previous_action_result(app)
+                            }
+                        }
+                        Err(error) => {
+                            s.show_result(app, &ActionResult::from_err(error))
                         }
                     }
-                    Err(error) => s.show_result(app, &ActionResult::from_err(error)),
-                }
-            }),
-            ['r', 'r'] => self.action_context(ActionKind::UnresolvedConflicts, |s| {
-                let action =  app.version_control.conflicts();
-                s.show_action(app, action)
-            }),
-            ['r', 'o'] => self.action_context(ActionKind::MergeTakingOther, |s| {
-                let action =  app.version_control.take_other();
-                s.show_action(app, action)
-            }),
-            ['r', 'l'] => self.action_context(ActionKind::MergeTakingLocal, |s| {
-                let action =  app.version_control.take_local();
-                s.show_action(app, action)
-            }),
+                })
+            }
+            ['r', 'r'] => {
+                self.action_context(ActionKind::UnresolvedConflicts, |s| {
+                    let action = app.version_control.conflicts();
+                    s.show_action(app, action)
+                })
+            }
+            ['r', 'o'] => {
+                self.action_context(ActionKind::MergeTakingOther, |s| {
+                    let action = app.version_control.take_other();
+                    s.show_action(app, action)
+                })
+            }
+            ['r', 'l'] => {
+                self.action_context(ActionKind::MergeTakingLocal, |s| {
+                    let action = app.version_control.take_local();
+                    s.show_action(app, action)
+                })
+            }
             ['f'] => self.action_context(ActionKind::Fetch, |s| {
-                let action =  app.version_control.fetch();
+                let action = app.version_control.fetch();
                 s.show_action(app, action)
             }),
             ['p'] => self.action_context(ActionKind::Pull, |s| {
-                let action =  app.version_control.pull();
+                let action = app.version_control.pull();
                 s.show_action(app, action)
             }),
             ['P'] => self.action_context(ActionKind::Push, |s| {
-                let action =  app.version_control.push();
+                let action = app.version_control.push();
                 s.show_action(app, action)
             }),
             ['t'] => Ok(HandleChordResult::Unhandled),
             ['t', 'n'] => self.action_context(ActionKind::NewTag, |s| {
-                if let Some(input) = s.handle_input(app, "new tag name", None)? {
-                    let action =  app.version_control.create_tag(input.trim());
+                if let Some(input) =
+                    s.handle_input(app, "new tag name", None)?
+                {
+                    let action = app.version_control.create_tag(input.trim());
                     s.show_action(app, action)
                 } else {
                     s.show_previous_action_result(app)
@@ -443,20 +520,27 @@ where
             }),
             ['b'] => Ok(HandleChordResult::Unhandled),
             ['b', 'b'] => self.action_context(ActionKind::ListBranches, |s| {
-                let action =  app.version_control.list_branches();
+                let action = app.version_control.list_branches();
                 s.show_action(app, action)
             }),
             ['b', 'n'] => self.action_context(ActionKind::NewBranch, |s| {
-                if let Some(input) = s.handle_input(app, "new branch name", None)? {
-                    let action =  app.version_control.create_branch(input.trim());
+                if let Some(input) =
+                    s.handle_input(app, "new branch name", None)?
+                {
+                    let action =
+                        app.version_control.create_branch(input.trim());
                     s.show_action(app, action)
                 } else {
                     s.show_previous_action_result(app)
                 }
             }),
             ['b', 'd'] => self.action_context(ActionKind::DeleteBranch, |s| {
-                if let Some(input) = s.handle_input(app, "branch to delete", s.previous_target(app))? {
-                    let action =  app.version_control.close_branch(input.trim());
+                if let Some(input) = s.handle_input(
+                    app,
+                    "branch to delete",
+                    s.previous_target(app),
+                )? {
+                    let action = app.version_control.close_branch(input.trim());
                     s.show_action(app, action)
                 } else {
                     s.show_previous_action_result(app)
@@ -486,7 +570,11 @@ where
                         ResetColor,
                         Print("no commands available"),
                         cursor::MoveToNextLine(2),
-                        Print("create custom actions by placing them inside '.verco/custom_actions.txt'"),
+                        Print(concat!(
+                            "create custom actions by placing them inside '.",
+                            env!("CARGO_PKG_NAME"),
+                            "/custom_actions.txt'"
+                        )),
                     )?;
                 }
                 Ok(())
@@ -651,7 +739,8 @@ where
 
         queue!(
             &mut write,
-            Print("Verco "),
+            Print(BIN_NAME),
+            Print(' '),
             Print(VERSION),
             cursor::MoveToNextLine(2),
         )?;
@@ -670,8 +759,8 @@ where
         write.queue(cursor::MoveToNextLine(1))?;
 
         Self::show_help_action(&mut write, "s", ActionKind::Status)?;
-        Self::show_help_action(&mut write, "ll", ActionKind::Log)?;
-        Self::show_help_action(&mut write, "lc", ActionKind::LogCount)?;
+        Self::show_help_action(&mut write, "l", ActionKind::Log)?;
+        Self::show_help_action(&mut write, "LC", ActionKind::LogCount)?;
 
         Self::show_help_action(
             &mut write,
