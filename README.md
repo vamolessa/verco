@@ -41,8 +41,8 @@ Key Sequence | Action
 h | help
 q | quit
 s | status
-ll | log
-lc | log count
+l | log
+LC | log count
 dd | current diff all
 ds | current diff selected
 DC | revision changes
