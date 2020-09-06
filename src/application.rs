@@ -47,7 +47,11 @@ impl Application {
         }
     }
 
-    pub fn set_cached_action_result(&mut self, kind: ActionKind, result: ActionResult) {
+    pub fn set_cached_action_result(
+        &mut self,
+        kind: ActionKind,
+        result: ActionResult,
+    ) {
         self.action_results.insert(kind, result);
     }
 
