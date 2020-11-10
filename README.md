@@ -4,9 +4,9 @@
 A simple Git/Hg tui client focused on keyboard shortcuts
 
 ## Screenshots
-![log screen](.github/screenshots/log.png)
+![log screen](page/screenshots/log.png)
 
-![verco workflow](.github/screenshots/workflow.gif)
+![verco workflow](page/screenshots/workflow.gif)
 
 ## Platforms
 
