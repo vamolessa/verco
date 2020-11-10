@@ -36,6 +36,7 @@ In a terminal in a repository folder, run the `verco` command.
 It will launch `verco`'s tui and you'll be able to interface with git/hg.
 
 ## Actions
+
 Key Sequence | Action
 --- | ---
 h | help
@@ -66,6 +67,7 @@ bd | delete branch
 x | custom action
 
 ## Other Keybindings
+
 Key Sequence | Action
 --- | ---
 ctrl+c, esc | cancel input/filter/select or quit
