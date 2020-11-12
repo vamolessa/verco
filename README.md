@@ -10,7 +10,7 @@ A simple Git/Hg tui client focused on keyboard shortcuts
 
 ## Platforms
 
-This project uses Cargo and pure Rust stable so it should work on Windows, Mac and Linux.
+This project uses Cargo and pure Rust stable and works on latest versions of Windows, Mac and Linux.
 
 It depends on:
 - [crossterm](https://crates.io/crates/crossterm)
