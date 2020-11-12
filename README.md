@@ -2,6 +2,7 @@
 
 # verco
 A simple Git/Hg tui client focused on keyboard shortcuts
+another change
 
 ## Screenshots
 ![log screen](page/screenshots/log.png)
