@@ -10,7 +10,7 @@ description = "A simple Git/Hg version control client based on keyboard shortcut
 license = "MIT"
 
 documentation = "https://github.com/vamolessa/verco"
-homepage = "vamolessa.github.com/verco"
+homepage = "https://vamolessa.github.com/verco"
 repository = "https://github.com/vamolessa/verco"
 readme = "README.md"
 keywords = ["version-control", "tool", "git", "hg", "cli"]
