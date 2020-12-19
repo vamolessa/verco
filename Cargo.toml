@@ -1,7 +1,7 @@
 [package]
 name = "verco"
-version = "5.5.1"
-authors = ["Matheus Lessa <matheuslessarodrigues@gmail.com>"]
+version = "5.5.2"
+authors = ["Matheus Lessa <vamolessa@mm.st>"]
 edition = "2018"
 exclude = [
     "images/*",
@@ -9,9 +9,9 @@ exclude = [
 description = "A simple Git/Hg version control client based on keyboard shortcuts"
 license = "MIT"
 
-documentation = "https://github.com/matheuslessarodrigues/verco"
-homepage = "https://github.com/matheuslessarodrigues/verco"
-repository = "https://github.com/matheuslessarodrigues/verco"
+documentation = "https://github.com/vamolessa/verco"
+homepage = "vamolessa.github.com/verco"
+repository = "https://github.com/vamolessa/verco"
 readme = "README.md"
 keywords = ["version-control", "tool", "git", "hg", "cli"]
 categories = ["command-line-utilities"]
