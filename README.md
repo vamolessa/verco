@@ -1,4 +1,4 @@
-![Rust](https://github.com/matheuslessarodrigues/verco/workflows/Rust/badge.svg)
+![Rust](https://github.com/vamolessa/verco/workflows/Rust/badge.svg)
 
 # verco
 A simple Git/Hg tui client focused on keyboard shortcuts

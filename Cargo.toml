@@ -1,6 +1,6 @@
 [package]
 name = "verco"
-version = "5.5.2"
+version = "5.5.3"
 authors = ["Matheus Lessa <vamolessa@mm.st>"]
 edition = "2018"
 exclude = [
