@@ -30,6 +30,15 @@ cargo install verco
 
 You'll be able to open `verco` from whichever directory you in.
 
+### Packaging status
+
+#### Fedora ([COPR](https://copr.fedorainfracloud.org/coprs/atim/verco/))
+
+```
+sudo dnf copr enable atim/verco -y
+sudo dnf install verco
+```
+
 ## Usage
 
 In a terminal in a repository folder, run the `verco` command.
