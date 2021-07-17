@@ -7,7 +7,8 @@ exclude = [
     "images/*",
 ]
 description = "A simple Git/Hg version control client based on keyboard shortcuts"
-license = "MIT"
+license = "GPL-3.0"
+resolver = "2"
 
 documentation = "https://github.com/vamolessa/verco"
 homepage = "https://vamolessa.github.com/verco"
@@ -18,9 +19,12 @@ categories = ["command-line-utilities"]
 
 [[bin]]
 name = "verco"
-path = "src/main.rs"
+path = "next/main.rs"
 
 [dependencies]
 crossterm = "0.17.5"
 ctrlc = "3.1.4"
 rustyline = "6.1.1"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winbase", "winerror", "winuser", "errhandlingapi", "stringapiset", "winnls", "consoleapi", "processenv", "handleapi", "synchapi", "ioapiset", "namedpipeapi"] }
