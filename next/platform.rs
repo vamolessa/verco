@@ -22,14 +22,15 @@ pub enum Key {
     Esc,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum ProcessTag {
     None, // TODO: something
 }
 
-#[derive(Clone, Copy)]
-pub struct ProcessHandle(pub usize);
+#[derive(Debug, Clone, Copy)]
+pub struct ProcessHandle(pub u32);
 
+#[derive(Debug)]
 pub enum PlatformEvent {
     Resize(u16, u16),
     Key(Key),

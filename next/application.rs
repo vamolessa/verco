@@ -1,4 +1,7 @@
-use std::{env, fs, io, panic, path::Path};
+use std::{
+    io,
+    process::{Command, Stdio},
+};
 
 use crate::{
     platform::{
@@ -40,6 +43,32 @@ impl Application {
         events: &[PlatformEvent],
         requests: &mut Vec<PlatformRequest>,
     ) -> bool {
+        for event in events {
+            match event {
+                PlatformEvent::Key(Key::Esc) => return false,
+                PlatformEvent::Key(Key::Ctrl('l')) => {
+                    let mut command = Command::new("cmd");
+                    command.args(&["/C", "dir"]);
+                    command.stdin(Stdio::piped());
+                    command.stdout(Stdio::piped());
+                    command.stderr(Stdio::null());
+
+                    requests.push(PlatformRequest::SpawnProcess {
+                        tag: ProcessTag::None,
+                        command,
+                        buf_len: 1024,
+                    });
+                }
+                PlatformEvent::ProcessOutput { tag, buf } => {
+                    let output = String::from_utf8_lossy(&buf);
+                    eprintln!("output:\n{}", output);
+                }
+                _ => {
+                    dbg!(event);
+                }
+            }
+        }
+
         true
     }
 }
