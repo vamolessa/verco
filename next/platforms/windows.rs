@@ -111,8 +111,6 @@ pub fn main() {
 
     let mut processes: Vec<AsyncProcess> = Vec::new();
 
-    let mut requests = Vec::new();
-
     let mut timeout = Some(Duration::ZERO);
     loop {
         let mut wait_handles_len = 1;
@@ -161,11 +159,11 @@ pub fn main() {
                 timeout = Some(Duration::ZERO);
             }
             None => {
-                if !application.update(&events, &mut requests) {
+                if !application.update(&events) {
                     break;
                 }
 
-                for request in requests.drain(..) {
+                for request in application.drain_platform_requests() {
                     match request {
                         PlatformRequest::SpawnProcess {
                             tag,

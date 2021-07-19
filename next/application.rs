@@ -1,6 +1,11 @@
 use std::{
+    cell::RefCell,
+    future::Future,
     io,
+    pin::Pin,
     process::{Command, Stdio},
+    sync::Arc,
+    task,
 };
 
 use crate::{
@@ -15,11 +20,26 @@ enum ProcessTaskStatus {
     Ok,
     Err,
 }
-use std::{future::Future, pin::Pin, task};
+
 struct ProcessTask {
     pub handle: Option<ProcessHandle>,
     pub buf: Vec<u8>,
     pub status: ProcessTaskStatus,
+}
+impl ProcessTask {
+    pub fn new() -> Self {
+        Self {
+            handle: None,
+            buf: Vec::new(),
+            status: ProcessTaskStatus::Pending,
+        }
+    }
+
+    pub fn dispose(&mut self) {
+        self.handle = None;
+        self.buf.clear();
+        self.status = ProcessTaskStatus::Pending;
+    }
 }
 impl Future for ProcessTask {
     type Output = Result<String, ()>;
@@ -39,46 +59,69 @@ impl Future for ProcessTask {
     }
 }
 
-pub struct CommandSpawner<'tasks, 'requests> {
-    process_tasks: &'tasks mut Vec<ProcessTask>,
-    requests: &'requests mut Vec<PlatformRequest>,
-}
-impl<'tasks, 'requests> CommandSpawner<'tasks, 'requests> {
-    pub async fn spawn(&mut self, command: Command) -> Result<String, ()> {
-        let mut index = self.process_tasks.len();
-        for (i, task) in self.process_tasks.iter_mut().enumerate() {
-            if matches!(
-                task.status,
-                ProcessTaskStatus::Ok | ProcessTaskStatus::Err
-            ) {
-                task.status = ProcessTaskStatus::Pending;
-                task.buf.clear();
+#[derive(Default)]
+struct ProcessTaskCollection(Vec<&'static RefCell<ProcessTask>>);
+impl ProcessTaskCollection {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 
+    pub fn add_new(&mut self) -> ProcessTag {
+        let mut index = self.0.len();
+        for (i, task) in self.0.iter_mut().enumerate() {
+            let task = match task.try_borrow_mut() {
+                Ok(task) => task,
+                Err(_) => continue,
+            };
+
+            if let (ProcessTaskStatus::Ok | ProcessTaskStatus::Err) =
+                task.status
+            {
+                task.dispose();
                 index = i;
                 break;
             }
         }
 
-        if index == self.process_tasks.len() {
-            self.process_tasks.push(ProcessTask {
-                handle: None,
-                buf: Vec::new(),
-                status: ProcessTaskStatus::Pending,
-            });
+        if index == self.0.len() {
+            let task = RefCell::new(ProcessTask::new());
+            let task = Box::leak(Box::new(task));
+            self.0.push(task);
         }
 
-        self.requests.push(PlatformRequest::SpawnProcess {
-            tag: ProcessTag(index as _),
+        ProcessTag(index as _)
+    }
+
+    pub fn get(&self, tag: ProcessTag) -> &RefCell<ProcessTask> {
+        self.0[tag.0 as usize]
+    }
+}
+
+pub struct ProcessTaskSpawner<'a> {
+    process_tasks: &'a mut ProcessTaskCollection,
+    platform_requests: &'a mut Vec<PlatformRequest>,
+}
+impl<'a> ProcessTaskSpawner<'a> {
+    pub fn spawn(
+        &mut self,
+        command: Command,
+        buf_len: usize,
+    ) -> impl Future<Output = Result<String, ()>> {
+        let tag = self.process_tasks.add_new();
+        self.platform_requests.push(PlatformRequest::SpawnProcess {
+            tag,
             command,
-            buf_len: 1024,
+            buf_len,
         });
-        Ok(String::new())
+
+        self.process_tasks.get(tag).borrow_mut()
     }
 }
 
 pub struct Application {
     stdout: io::StdoutLock<'static>,
-    process_tasks: Vec<ProcessTask>,
+    process_tasks: ProcessTaskCollection,
+    platform_requests: Vec<PlatformRequest>,
 }
 impl Application {
     pub fn new() -> Self {
@@ -94,15 +137,12 @@ impl Application {
 
         Self {
             stdout,
-            process_tasks: Vec::new(),
+            process_tasks: ProcessTaskCollection::default(),
+            platform_requests: Vec::new(),
         }
     }
 
-    pub fn update(
-        &mut self,
-        events: &[PlatformEvent],
-        requests: &mut Vec<PlatformRequest>,
-    ) -> bool {
+    pub fn update(&mut self, events: &[PlatformEvent]) -> bool {
         for event in events {
             match event {
                 PlatformEvent::Key(Key::Esc) => return false,
@@ -113,11 +153,11 @@ impl Application {
                     command.stdout(Stdio::piped());
                     command.stderr(Stdio::null());
 
-                    let mut spawner = CommandSpawner {
+                    let mut spawner = ProcessTaskSpawner {
                         process_tasks: &mut self.process_tasks,
-                        requests,
+                        platform_requests: &mut self.platform_requests,
                     };
-                    let fut = spawner.spawn(command);
+                    let task = spawner.spawn(command, 1024);
                     /*
                     self.my_future = Some(Box::pin(async {
                         match fut.await {
@@ -128,14 +168,17 @@ impl Application {
                     */
                 }
                 PlatformEvent::ProcessSpawned { tag, handle } => {
-                    self.process_tasks[tag.0 as usize].handle = Some(*handle);
+                    self.process_tasks.get(*tag).borrow_mut().handle =
+                        Some(*handle);
                 }
-                PlatformEvent::ProcessOutput { tag, buf } => self.process_tasks
-                    [tag.0 as usize]
+                PlatformEvent::ProcessOutput { tag, buf } => self
+                    .process_tasks
+                    .get(*tag)
+                    .borrow_mut()
                     .buf
                     .extend_from_slice(&buf),
                 PlatformEvent::ProcessExit { tag } => {
-                    let process = &mut self.process_tasks[tag.0 as usize];
+                    let process = self.process_tasks.get(*tag).borrow_mut();
                     // TODO: what here?
                 }
                 _ => {
@@ -145,6 +188,12 @@ impl Application {
         }
 
         true
+    }
+
+    pub fn drain_platform_requests<'a>(
+        &'a mut self,
+    ) -> impl 'a + Iterator<Item = PlatformRequest> {
+        self.platform_requests.drain(..)
     }
 }
 impl Drop for Application {
