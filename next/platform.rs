@@ -23,9 +23,7 @@ pub enum Key {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum ProcessTag {
-    None, // TODO: something
-}
+pub struct ProcessTag(pub u32);
 
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessHandle(pub u32);

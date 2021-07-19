@@ -67,7 +67,7 @@ use winapi::{
 };
 
 use crate::{
-    application::{AnyError, Application},
+    application::Application,
     platform::{
         Key, PlatformEvent, PlatformRequest, ProcessHandle, ProcessTag,
     },
