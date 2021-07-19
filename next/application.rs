@@ -1,6 +1,11 @@
 use std::{env, fs, io, panic, path::Path};
 
-use crate::{ui, platform::{Key, PlatformRequest, ProcessHandle, ProcessTag, PlatformEvent}};
+use crate::{
+    platform::{
+        Key, PlatformEvent, PlatformRequest, ProcessHandle, ProcessTag,
+    },
+    ui,
+};
 
 pub struct AnyError;
 impl<T> From<T> for AnyError
@@ -19,7 +24,7 @@ impl Application {
     pub fn new() -> Self {
         let stdout = Box::new(io::stdout());
         let stdout = Box::leak(stdout);
-        let stdout = stdout.lock();
+        let mut stdout = stdout.lock();
 
         use io::Write;
         let _ = stdout.write_all(ui::ENTER_ALTERNATE_BUFFER_CODE);
@@ -27,12 +32,14 @@ impl Application {
         let _ = stdout.write_all(ui::MODE_256_COLORS_CODE);
         stdout.flush().unwrap();
 
-        Self {
-            stdout,
-        }
+        Self { stdout }
     }
 
-    pub fn update(&mut self, events: &[PlatformEvent]) -> bool {
+    pub fn update(
+        &mut self,
+        events: &[PlatformEvent],
+        requests: &mut Vec<PlatformRequest>,
+    ) -> bool {
         true
     }
 }
