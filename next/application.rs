@@ -9,6 +9,9 @@ use crate::{
         Key, PlatformEvent, PlatformRequest, ProcessHandle, ProcessTag,
     },
     ui,
+    version_control::{
+        version_control_from_current_repository, VersionControl,
+    },
 };
 
 struct ProcessTask {
@@ -42,6 +45,7 @@ pub struct Application {
     stdout: io::StdoutLock<'static>,
     process_tasks: HashMap<ProcessTag, ProcessTask>,
     platform_requests: Vec<PlatformRequest>,
+    version_control: Box<dyn VersionControl>,
 }
 impl Application {
     pub fn new() -> Self {
@@ -59,6 +63,7 @@ impl Application {
             stdout,
             process_tasks: HashMap::new(),
             platform_requests: Vec::new(),
+            version_control: version_control_from_current_repository(),
         }
     }
 

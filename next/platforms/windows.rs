@@ -1,20 +1,10 @@
-use std::{
-    env, io,
-    os::windows::{ffi::OsStrExt, io::IntoRawHandle},
-    process::Child,
-    ptr::NonNull,
-    sync::atomic::{AtomicPtr, Ordering},
-    time::Duration,
-};
+use std::{io, os::windows::io::IntoRawHandle, process::Child, time::Duration};
 
 use winapi::{
     shared::{
         minwindef::{BOOL, DWORD, FALSE, TRUE},
         ntdef::NULL,
-        winerror::{
-            ERROR_IO_PENDING, ERROR_MORE_DATA, ERROR_PIPE_CONNECTED,
-            WAIT_TIMEOUT,
-        },
+        winerror::{ERROR_IO_PENDING, ERROR_MORE_DATA, WAIT_TIMEOUT},
     },
     um::{
         consoleapi::{
@@ -22,29 +12,14 @@ use winapi::{
             SetConsoleMode,
         },
         errhandlingapi::GetLastError,
-        fileapi::{
-            CreateFileW, FindClose, FindFirstFileW, GetFileType, ReadFile,
-            WriteFile, OPEN_EXISTING,
-        },
+        fileapi::{GetFileType, ReadFile},
         handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
         ioapiset::GetOverlappedResult,
         minwinbase::OVERLAPPED,
-        namedpipeapi::{
-            ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe,
-            SetNamedPipeHandleState,
-        },
-        processenv::{GetCommandLineW, GetStdHandle},
-        processthreadsapi::{
-            CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW,
-        },
-        stringapiset::{MultiByteToWideChar, WideCharToMultiByte},
+        processenv::GetStdHandle,
         synchapi::{CreateEventW, SetEvent, WaitForMultipleObjects},
         winbase::{
-            GlobalAlloc, GlobalFree, GlobalLock, GlobalUnlock,
-            FILE_FLAG_OVERLAPPED, FILE_TYPE_CHAR, GMEM_MOVEABLE, INFINITE,
-            NORMAL_PRIORITY_CLASS, PIPE_ACCESS_DUPLEX, PIPE_READMODE_BYTE,
-            PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, STARTF_USESTDHANDLES,
-            STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+            FILE_TYPE_CHAR, INFINITE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
             WAIT_OBJECT_0,
         },
         wincon::{
@@ -55,13 +30,11 @@ use winapi::{
             INPUT_RECORD, KEY_EVENT, LEFT_ALT_PRESSED, LEFT_CTRL_PRESSED,
             RIGHT_ALT_PRESSED, RIGHT_CTRL_PRESSED, WINDOW_BUFFER_SIZE_EVENT,
         },
-        winnls::CP_UTF8,
-        winnt::{GENERIC_READ, GENERIC_WRITE, HANDLE, MAXIMUM_WAIT_OBJECTS},
+        winnt::{HANDLE, MAXIMUM_WAIT_OBJECTS},
         winuser::{
-            CloseClipboard, EmptyClipboard, GetClipboardData, OpenClipboard,
-            SetClipboardData, CF_UNICODETEXT, VK_BACK, VK_DELETE, VK_DOWN,
-            VK_END, VK_ESCAPE, VK_F1, VK_F24, VK_HOME, VK_LEFT, VK_NEXT,
-            VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SPACE, VK_TAB, VK_UP,
+            VK_BACK, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_F1, VK_F24,
+            VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SPACE,
+            VK_TAB, VK_UP,
         },
     },
 };
@@ -303,16 +276,8 @@ impl AsyncReader {
         }
     }
 
-    pub fn handle(&self) -> &Handle {
-        &self.handle
-    }
-
     pub fn event(&self) -> &Event {
         &self.event
-    }
-
-    pub fn overlapped(&mut self) -> &mut Overlapped {
-        &mut self.overlapped
     }
 
     pub fn read_async(&mut self, buf: &mut [u8]) -> ReadResult {
@@ -372,36 +337,6 @@ fn is_pipped(handle: &Handle) -> bool {
     unsafe { GetFileType(handle.0) != FILE_TYPE_CHAR }
 }
 
-fn write_all_bytes(handle: &Handle, mut buf: &[u8]) -> bool {
-    while !buf.is_empty() {
-        let mut write_len = 0;
-        let result = unsafe {
-            WriteFile(
-                handle.0,
-                buf.as_ptr() as _,
-                buf.len() as _,
-                &mut write_len,
-                std::ptr::null_mut(),
-            )
-        };
-        if result == FALSE {
-            return false;
-        }
-
-        buf = &buf[(write_len as usize)..];
-    }
-
-    true
-}
-
-fn global_lock<T>(handle: HANDLE) -> Option<NonNull<T>> {
-    NonNull::new(unsafe { GlobalLock(handle) as _ })
-}
-
-fn global_unlock(handle: HANDLE) {
-    unsafe { GlobalUnlock(handle) };
-}
-
 fn wait_for_multiple_objects(
     handles: &[HANDLE],
     timeout: Option<Duration>,
@@ -455,10 +390,6 @@ fn set_event(handle: HANDLE) {
 
 struct Event(HANDLE);
 impl Event {
-    pub fn automatic() -> Self {
-        Self(create_event(false, false))
-    }
-
     pub fn manual() -> Self {
         Self(create_event(true, false))
     }
@@ -474,25 +405,6 @@ impl Event {
 impl Drop for Event {
     fn drop(&mut self) {
         unsafe { CloseHandle(self.0) };
-    }
-}
-
-struct Clipboard;
-impl Clipboard {
-    pub fn open() -> Self {
-        let result = unsafe { OpenClipboard(std::ptr::null_mut()) };
-        if result == FALSE {
-            panic!("could not open clipboard");
-        }
-        Self
-    }
-}
-impl Drop for Clipboard {
-    fn drop(&mut self) {
-        let result = unsafe { CloseClipboard() };
-        if result == FALSE {
-            panic!("could not close clipboard");
-        }
     }
 }
 
