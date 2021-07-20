@@ -76,7 +76,10 @@ pub fn main() {
     let mut wait_handles = [std::ptr::null_mut(); MAXIMUM_WAIT_OBJECTS as _];
     wait_handles[0] = input_handle.0;
 
-    let mut application = Application::new();
+    let mut application = match Application::new() {
+        Some(application) => application,
+        None => return,
+    };
 
     let mut events = Vec::new();
     let size = get_console_size(&output_handle);

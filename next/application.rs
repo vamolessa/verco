@@ -1,17 +1,16 @@
 use std::{
     collections::HashMap,
     io,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
 use crate::{
+    backend::{backend_from_current_repository, Backend},
     platform::{
         Key, PlatformEvent, PlatformRequest, ProcessHandle, ProcessTag,
     },
     ui,
-    version_control::{
-        version_control_from_current_repository, VersionControl,
-    },
 };
 
 struct ProcessTask {
@@ -33,11 +32,21 @@ impl ProcessTask {
 }
 
 pub struct Context<'a> {
+    root: &'a Path,
     platform_requests: &'a mut Vec<PlatformRequest>,
 }
 impl<'a> Context<'a> {
-    pub fn request(&mut self, request: PlatformRequest) {
-        self.platform_requests.push(request);
+    pub fn spawn(&mut self, tag: ProcessTag, mut command: Command) {
+        command.current_dir(self.root);
+        command.stdin(Stdio::piped());
+        command.stdout(Stdio::piped());
+        command.stderr(Stdio::null());
+
+        self.platform_requests.push(PlatformRequest::SpawnProcess {
+            tag,
+            command,
+            buf_len: 4 * 1024,
+        });
     }
 }
 
@@ -45,13 +54,16 @@ pub struct Application {
     stdout: io::StdoutLock<'static>,
     process_tasks: HashMap<ProcessTag, ProcessTask>,
     platform_requests: Vec<PlatformRequest>,
-    version_control: Box<dyn VersionControl>,
+    root: PathBuf,
+    backend: Box<dyn Backend>,
 }
 impl Application {
-    pub fn new() -> Self {
+    pub fn new() -> Option<Self> {
         let stdout = Box::new(io::stdout());
         let stdout = Box::leak(stdout);
         let mut stdout = stdout.lock();
+
+        let (root, backend) = backend_from_current_repository()?;
 
         use io::Write;
         let _ = stdout.write_all(ui::ENTER_ALTERNATE_BUFFER_CODE);
@@ -59,12 +71,13 @@ impl Application {
         let _ = stdout.write_all(ui::MODE_256_COLORS_CODE);
         stdout.flush().unwrap();
 
-        Self {
+        Some(Self {
             stdout,
             process_tasks: HashMap::new(),
             platform_requests: Vec::new(),
-            version_control: version_control_from_current_repository(),
-        }
+            root,
+            backend,
+        })
     }
 
     pub fn update(&mut self, events: &[PlatformEvent]) -> bool {
