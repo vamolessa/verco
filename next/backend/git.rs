@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::backend::{get_command_output, Backend};
+use crate::backend::{get_command_output, Backend, Context};
 
 pub struct Git {
     //
@@ -17,6 +17,8 @@ impl Git {
 }
 
 impl Backend for Git {
-    //
+    fn status(&mut self, ctx: &mut Context) {
+        //
+    }
 }
 

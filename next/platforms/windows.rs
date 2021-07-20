@@ -40,10 +40,8 @@ use winapi::{
 };
 
 use crate::{
-    application::Application,
-    platform::{
-        Key, PlatformEvent, PlatformRequest, ProcessHandle, ProcessTag,
-    },
+    application::{Application, ProcessTag},
+    platform::{Key, PlatformEvent, PlatformRequest, ProcessHandle},
 };
 
 const CONSOLE_EVENT_BUFFER_LEN: usize = 32;

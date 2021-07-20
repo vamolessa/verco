@@ -1,5 +1,7 @@
 use std::process::Command;
 
+use crate::application::ProcessTag;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     None,
@@ -20,11 +22,6 @@ pub enum Key {
     Ctrl(char),
     Alt(char),
     Esc,
-}
-
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum ProcessTag {
-    A
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -1,17 +1,20 @@
 use std::{
     collections::HashMap,
     io,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
 use crate::{
-    backend::{backend_from_current_repository, Backend},
-    platform::{
-        Key, PlatformEvent, PlatformRequest, ProcessHandle, ProcessTag,
-    },
+    backend::{backend_from_current_repository, Backend, Context},
+    platform::{Key, PlatformEvent, PlatformRequest, ProcessHandle},
     ui,
 };
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum ProcessTag {
+    A,
+}
 
 struct ProcessTask {
     pub handle: Option<ProcessHandle>,
@@ -28,25 +31,6 @@ impl ProcessTask {
     pub fn dispose(&mut self) {
         self.handle = None;
         self.buf.clear();
-    }
-}
-
-pub struct Context<'a> {
-    root: &'a Path,
-    platform_requests: &'a mut Vec<PlatformRequest>,
-}
-impl<'a> Context<'a> {
-    pub fn spawn(&mut self, tag: ProcessTag, mut command: Command) {
-        command.current_dir(self.root);
-        command.stdin(Stdio::piped());
-        command.stdout(Stdio::piped());
-        command.stderr(Stdio::null());
-
-        self.platform_requests.push(PlatformRequest::SpawnProcess {
-            tag,
-            command,
-            buf_len: 4 * 1024,
-        });
     }
 }
 
