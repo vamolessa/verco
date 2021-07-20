@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum ProcessTag {
-    A,
+    Status,
 }
 
 struct ProcessTask {
@@ -77,7 +77,7 @@ impl Application {
 
                     self.platform_requests.push(
                         PlatformRequest::SpawnProcess {
-                            tag: ProcessTag::A,
+                            tag: ProcessTag::Status,
                             command,
                             buf_len: 1024,
                         },

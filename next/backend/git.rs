@@ -17,8 +17,12 @@ impl Git {
 }
 
 impl Backend for Git {
-    fn status(&mut self, ctx: &mut Context) {
-        //
+    fn name(&self) -> &str {
+        "git"
     }
+    
+    //fn status(&mut self, ctx: &mut Context) {
+    //    //
+    //}
 }
 
