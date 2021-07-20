@@ -162,6 +162,7 @@ pub fn main() {
                 if !application.update(&events) {
                     break;
                 }
+                events.clear();
 
                 for request in application.drain_platform_requests() {
                     match request {
@@ -214,7 +215,6 @@ pub fn main() {
                     }
                 }
 
-                events.clear();
                 timeout = None;
             }
         }
