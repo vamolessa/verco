@@ -1,4 +1,4 @@
-use std::{io, os::windows::io::IntoRawHandle, process::Child, time::Duration};
+use std::{os::windows::io::IntoRawHandle, process::Child, time::Duration};
 
 use winapi::{
     shared::{
@@ -39,9 +39,8 @@ use winapi::{
     },
 };
 
-use crate::{
-    application::{Application, ProcessTag},
-    platform::{Key, PlatformEvent, PlatformRequest, ProcessHandle},
+use crate::application::{
+    Application, Key, PlatformEvent, ProcessHandle, SpawnProcessRequest,
 };
 
 const CONSOLE_EVENT_BUFFER_LEN: usize = 32;
@@ -74,6 +73,15 @@ pub fn main() {
     let mut wait_handles = [std::ptr::null_mut(); MAXIMUM_WAIT_OBJECTS as _];
     wait_handles[0] = input_handle.0;
 
+    #[derive(Clone, Copy)]
+    enum HandleSource {
+        Console,
+        Stdout(u8),
+        Stderr(u8),
+    }
+
+    let mut handle_sources = [HandleSource::Console; MAXIMUM_WAIT_OBJECTS as _];
+
     let mut application = match Application::new() {
         Some(application) => application,
         None => return,
@@ -88,13 +96,26 @@ pub fn main() {
     let mut timeout = Some(Duration::ZERO);
     loop {
         let mut wait_handles_len = 1;
-        for process in &processes {
+        for (i, process) in processes.iter().enumerate() {
             if wait_handles_len == MAXIMUM_WAIT_OBJECTS as _ {
                 break;
             }
 
-            wait_handles[wait_handles_len] = process.stdout.event().handle();
-            wait_handles_len += 1;
+            if let Some(stdout) = &process.stdout {
+                wait_handles[wait_handles_len] = stdout.event().handle();
+                handle_sources[wait_handles_len] = HandleSource::Stdout(i as _);
+                wait_handles_len += 1;
+            }
+
+            if wait_handles_len == MAXIMUM_WAIT_OBJECTS as _ {
+                break;
+            }
+
+            if let Some(stderr) = &process.stderr {
+                wait_handles[wait_handles_len] = stderr.event().handle();
+                handle_sources[wait_handles_len] = HandleSource::Stderr(i as _);
+                wait_handles_len += 1;
+            }
         }
 
         match wait_for_multiple_objects(
@@ -102,30 +123,61 @@ pub fn main() {
             timeout,
         ) {
             Some(i) => {
-                match i {
-                    0 => {
+                match handle_sources[i] {
+                    HandleSource::Console => {
                         let console_events = read_console_input(
                             &input_handle,
                             &mut console_event_buf,
                         );
                         parse_console_events(console_events, &mut events);
                     }
-                    i => {
-                        let index = i - 1;
-                        let process = &mut processes[index];
-                        let tag = process.tag;
-                        match process.stdout.read_async() {
+                    HandleSource::Stdout(i) => {
+                        let process = &mut processes[i as usize];
+                        let handle = process.handle;
+
+                        match process.stdout.as_mut().unwrap().read_async() {
                             Ok(None) => (),
                             Ok(Some(buf)) if !buf.is_empty() => {
-                                events.push(PlatformEvent::ProcessOutput {
-                                    tag,
+                                events.push(PlatformEvent::ProcessStdout {
+                                    handle,
                                     buf,
                                 })
                             }
                             _ => {
-                                process.kill();
-                                processes.remove(index);
-                                events.push(PlatformEvent::ProcessExit { tag });
+                                process.stdout = None;
+                                if process.stderr.is_none() {
+                                    let success = process.kill();
+                                    processes.remove(i as _);
+                                    events.push(PlatformEvent::ProcessExit {
+                                        handle,
+                                        success,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    HandleSource::Stderr(i) => {
+                        let process = &mut processes[i as usize];
+                        let handle = process.handle;
+
+                        match process.stderr.as_mut().unwrap().read_async() {
+                            Ok(None) => (),
+                            Ok(Some(buf)) if !buf.is_empty() => {
+                                events.push(PlatformEvent::ProcessStderr {
+                                    handle,
+                                    buf,
+                                })
+                            }
+                            _ => {
+                                process.stderr = None;
+                                if process.stdout.is_none() {
+                                    let success = process.kill();
+                                    processes.remove(i as _);
+                                    events.push(PlatformEvent::ProcessExit {
+                                        handle,
+                                        success,
+                                    });
+                                }
                             }
                         }
                     }
@@ -138,54 +190,22 @@ pub fn main() {
                 }
                 events.clear();
 
-                for request in application.drain_platform_requests() {
-                    match request {
-                        PlatformRequest::SpawnProcess {
-                            tag,
-                            mut command,
-                            buf_len,
-                        } => match command.spawn() {
-                            Ok(child) => {
-                                let handle =
-                                    ProcessHandle(processes.len() as _);
-                                match AsyncProcess::new(child, tag, buf_len) {
-                                    Some(process) => {
-                                        events.push(
-                                            PlatformEvent::ProcessSpawned {
-                                                tag,
-                                                handle,
-                                            },
-                                        );
-                                        processes.push(process);
-                                    }
-                                    None => events.push(
-                                        PlatformEvent::ProcessExit { tag },
-                                    ),
-                                };
-                            }
-                            Err(_) => {
-                                events.push(PlatformEvent::ProcessExit { tag });
-                            }
-                        },
-                        PlatformRequest::WriteToProcess { handle, buf } => {
-                            let process = &mut processes[handle.0 as usize];
-                            if !process.write(&buf) {
-                                let tag = process.tag;
-                                process.kill();
-                                processes.remove(handle.0 as _);
-                                events.push(PlatformEvent::ProcessExit { tag });
-                            }
-                        }
-                        PlatformRequest::CloseProcessInput { handle } => {
-                            processes[handle.0 as usize].close_input();
-                        }
-                        PlatformRequest::KillProcess { handle } => {
-                            let process = &mut processes[handle.0 as usize];
-                            let tag = process.tag;
-                            process.kill();
-                            processes.remove(handle.0 as _);
-                            events.push(PlatformEvent::ProcessExit { tag });
-                        }
+                for request in application.drain_requests() {
+                    let SpawnProcessRequest {
+                        handle,
+                        mut command,
+                        buf_len,
+                    } = request;
+                    match command.spawn() {
+                        Ok(child) => processes.push(AsyncProcess::new(
+                            child,
+                            handle,
+                            buf_len as _,
+                        )),
+                        Err(_) => events.push(PlatformEvent::ProcessExit {
+                            handle,
+                            success: false,
+                        }),
                     }
                 }
 
@@ -498,15 +518,16 @@ impl ProcessPipe {
 struct AsyncProcess {
     alive: bool,
     child: Child,
-    tag: ProcessTag,
-    pub stdout: ProcessPipe,
+    handle: ProcessHandle,
+    pub stdout: Option<ProcessPipe>,
+    pub stderr: Option<ProcessPipe>,
 }
 impl AsyncProcess {
     pub fn new(
         mut child: Child,
-        tag: ProcessTag,
+        handle: ProcessHandle,
         buf_len: usize,
-    ) -> Option<Self> {
+    ) -> Self {
         let stdout = child
             .stdout
             .take()
@@ -514,36 +535,40 @@ impl AsyncProcess {
             .map(|h| {
                 let reader = AsyncReader::new(Handle(h as _));
                 ProcessPipe::new(reader, buf_len)
-            })?;
+            });
 
-        Some(Self {
+        let stderr = child
+            .stderr
+            .take()
+            .map(IntoRawHandle::into_raw_handle)
+            .map(|h| {
+                let reader = AsyncReader::new(Handle(h as _));
+                ProcessPipe::new(reader, buf_len)
+            });
+
+        Self {
             alive: true,
             child,
-            tag,
+            handle,
             stdout,
-        })
-    }
-
-    pub fn write(&mut self, buf: &[u8]) -> bool {
-        use io::Write;
-        match self.child.stdin {
-            Some(ref mut stdin) => stdin.write_all(buf).is_ok(),
-            None => true,
+            stderr,
         }
     }
 
-    pub fn close_input(&mut self) {
-        self.child.stdin = None;
-    }
-
-    pub fn kill(&mut self) {
+    pub fn kill(&mut self) -> bool {
         if !self.alive {
-            return;
+            return false;
         }
 
         self.alive = false;
+        self.stdout = None;
+        self.stderr = None;
+
         let _ = self.child.kill();
-        let _ = self.child.wait();
+        match self.child.wait() {
+            Ok(status) => status.success(),
+            Err(_) => false,
+        }
     }
 }
 impl Drop for AsyncProcess {

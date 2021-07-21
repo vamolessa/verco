@@ -1,44 +1,156 @@
 use std::{
-    collections::HashMap,
     io,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
 use crate::{
-    backend::{backend_from_current_repository, Backend, Context},
-    platform::{Key, PlatformEvent, PlatformRequest, ProcessHandle},
+    backend::{backend_from_current_repository, Backend},
+    promise::{Poll, Promise},
     ui,
 };
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum ProcessTag {
-    Status,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Key {
+    None,
+    Backspace,
+    Enter,
+    Left,
+    Right,
+    Up,
+    Down,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Tab,
+    Delete,
+    F(u8),
+    Char(char),
+    Ctrl(char),
+    Alt(char),
+    Esc,
+}
+
+#[derive(Debug)]
+pub enum PlatformEvent {
+    Resize(u16, u16),
+    Key(Key),
+    ProcessStdout {
+        handle: ProcessHandle,
+        buf: Vec<u8>,
+    },
+    ProcessStderr {
+        handle: ProcessHandle,
+        buf: Vec<u8>,
+    },
+    ProcessExit {
+        handle: ProcessHandle,
+        success: bool,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ProcessHandle(pub u32);
+
+pub struct SpawnProcessRequest {
+    pub handle: ProcessHandle,
+    pub command: Command,
+    pub buf_len: u32,
+}
+
+enum ProcessStatus {
+    Running,
+    Finished(bool),
 }
 
 struct ProcessTask {
-    pub handle: Option<ProcessHandle>,
-    pub buf: Vec<u8>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    status: ProcessStatus,
 }
 impl ProcessTask {
     pub fn new() -> Self {
         Self {
-            handle: None,
-            buf: Vec::new(),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            status: ProcessStatus::Running,
         }
     }
 
-    pub fn dispose(&mut self) {
-        self.handle = None;
-        self.buf.clear();
+    pub fn reset(&mut self) {
+        self.stdout.clear();
+        self.stderr.clear();
+        self.status = ProcessStatus::Running;
+    }
+}
+
+struct ProcessOutputPromise {
+    handle: ProcessHandle,
+}
+impl Promise for ProcessOutputPromise {
+    type Output = String;
+    fn poll(&mut self, ctx: &mut Context) -> Poll<Self::Output> {
+        let process = &ctx.process_tasks[self.handle.0 as usize];
+        match process.status {
+            ProcessStatus::Running => Poll::Pending,
+            ProcessStatus::Finished(true) => {
+                let output = String::from_utf8_lossy(&process.stdout);
+                Poll::Ok(output.into())
+            }
+            ProcessStatus::Finished(false) => {
+                let mut output = String::new();
+                output.push_str(&String::from_utf8_lossy(&process.stdout));
+                output.push('\n');
+                output.push_str(&String::from_utf8_lossy(&process.stderr));
+
+                Poll::Err(output.into())
+            }
+        }
+    }
+}
+
+pub struct Context {
+    root: PathBuf,
+    process_tasks: Vec<ProcessTask>,
+    requests: Vec<SpawnProcessRequest>,
+}
+impl Context {
+    pub fn spawn(
+        &mut self,
+        mut command: Command,
+    ) -> impl Promise<Output = String> {
+        command.current_dir(&self.root);
+        command.stdin(Stdio::piped());
+        command.stdout(Stdio::piped());
+        command.stderr(Stdio::null());
+
+        let mut handle = ProcessHandle(self.process_tasks.len() as _);
+        for (i, task) in self.process_tasks.iter_mut().enumerate() {
+            if let ProcessStatus::Finished(_) = task.status {
+                handle = ProcessHandle(i as _);
+                task.reset();
+                break;
+            }
+        }
+        if handle.0 == self.process_tasks.len() as _ {
+            self.process_tasks.push(ProcessTask::new());
+        }
+
+        self.requests.push(SpawnProcessRequest {
+            handle,
+            command,
+            buf_len: 4 * 1024,
+        });
+
+        ProcessOutputPromise { handle }
     }
 }
 
 pub struct Application {
     stdout: io::StdoutLock<'static>,
-    process_tasks: HashMap<ProcessTag, ProcessTask>,
-    platform_requests: Vec<PlatformRequest>,
-    root: PathBuf,
+    context: Context,
+    //promises: Vec<Box<dyn Promise>>,
     backend: Box<dyn Backend>,
 }
 impl Application {
@@ -57,9 +169,12 @@ impl Application {
 
         Some(Self {
             stdout,
-            process_tasks: HashMap::new(),
-            platform_requests: Vec::new(),
-            root,
+            context: Context {
+                root,
+                process_tasks: Vec::new(),
+                requests: Vec::new(),
+            },
+            //promises: Vec::new(),
             backend,
         })
     }
@@ -75,32 +190,27 @@ impl Application {
                     command.stdout(Stdio::piped());
                     command.stderr(Stdio::null());
 
-                    self.platform_requests.push(
-                        PlatformRequest::SpawnProcess {
-                            tag: ProcessTag::Status,
-                            command,
-                            buf_len: 1024,
-                        },
-                    );
+                    self.context.requests.push(SpawnProcessRequest {
+                        handle: ProcessHandle(0),
+                        command,
+                        buf_len: 1024,
+                    });
                 }
-                PlatformEvent::ProcessSpawned { tag, handle } => {
-                    self.process_tasks
-                        .entry(*tag)
-                        .or_insert_with(ProcessTask::new)
-                        .handle = Some(*handle);
+                PlatformEvent::ProcessStdout { handle, buf } => {
+                    self.context.process_tasks[handle.0 as usize]
+                        .stdout
+                        .extend_from_slice(buf);
                 }
-                PlatformEvent::ProcessOutput { tag, buf } => {
-                    if let Some(process) = self.process_tasks.get_mut(tag) {
-                        process.buf.extend_from_slice(buf);
-                    }
+                PlatformEvent::ProcessStderr { handle, buf } => {
+                    self.context.process_tasks[handle.0 as usize]
+                        .stderr
+                        .extend_from_slice(buf);
                 }
-                PlatformEvent::ProcessExit { tag } => {
-                    if let Some(process) = self.process_tasks.get_mut(tag) {
-                        let output = String::from_utf8_lossy(&process.buf);
-                        eprintln!("finished:\n{}", output);
-                        // TODO
-                        process.dispose();
-                    }
+                PlatformEvent::ProcessExit { handle, success } => {
+                    let process =
+                        &mut self.context.process_tasks[handle.0 as usize];
+                    process.status = ProcessStatus::Finished(*success);
+                    todo!();
                 }
                 _ => {
                     dbg!(event);
@@ -111,10 +221,10 @@ impl Application {
         true
     }
 
-    pub fn drain_platform_requests(
+    pub fn drain_requests(
         &mut self,
-    ) -> impl '_ + Iterator<Item = PlatformRequest> {
-        self.platform_requests.drain(..)
+    ) -> impl '_ + Iterator<Item = SpawnProcessRequest> {
+        self.context.requests.drain(..)
     }
 }
 impl Drop for Application {

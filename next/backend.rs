@@ -1,43 +1,16 @@
 use std::{
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
-use crate::{application::ProcessTag, platform::PlatformRequest};
-
-pub struct Context<'a> {
-    root: &'a Path,
-    platform_requests: &'a mut Vec<PlatformRequest>,
-}
-impl<'a> Context<'a> {
-    pub fn new(
-        root: &'a Path,
-        platform_requests: &'a mut Vec<PlatformRequest>,
-    ) -> Self {
-        Self {
-            root,
-            platform_requests,
-        }
-    }
-
-    pub fn spawn(&mut self, tag: ProcessTag, mut command: Command) {
-        command.current_dir(self.root);
-        command.stdin(Stdio::piped());
-        command.stdout(Stdio::piped());
-        command.stderr(Stdio::null());
-
-        self.platform_requests.push(PlatformRequest::SpawnProcess {
-            tag,
-            command,
-            buf_len: 4 * 1024,
-        });
-    }
-}
+use crate::application::Context;
 
 pub mod git;
 
 pub trait Backend {
     fn name(&self) -> &str;
+
+    //fn status(&self,
 
     //fn get_changed_files_workspace(&mut self, ctx: &mut Context);
     //fn get_changed_files_revision(&mut self, ctx: &mut Context, revision: &str);
