@@ -1,6 +1,9 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::Command};
 
-use crate::backend::{get_command_output, Backend, Context};
+use crate::{
+    backend::{get_command_output, Backend, Context},
+    promise::Task,
+};
 
 pub struct Git {
     //
@@ -20,9 +23,11 @@ impl Backend for Git {
     fn name(&self) -> &str {
         "git"
     }
-    
-    //fn status(&mut self, ctx: &mut Context) {
-    //    //
-    //}
+
+    fn status(&self, ctx: &mut Context) -> Task<String> {
+        let mut command = Command::new("git");
+        command.arg("status");
+        ctx.spawn(command).into()
+    }
 }
 

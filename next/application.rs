@@ -1,12 +1,12 @@
 use std::{
     io,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
 use crate::{
     backend::{backend_from_current_repository, Backend},
-    promise::{Poll, Promise},
+    promise::{Poll, Promise, Task},
     ui,
 };
 
@@ -150,7 +150,7 @@ impl Context {
 pub struct Application {
     stdout: io::StdoutLock<'static>,
     context: Context,
-    promises: Vec<Box<dyn Promise<Output = ()>>>,
+    tasks: Vec<Task<()>>,
     backend: Box<dyn Backend>,
 }
 impl Application {
@@ -174,7 +174,7 @@ impl Application {
                 process_tasks: Vec::new(),
                 requests: Vec::new(),
             },
-            promises: Vec::new(),
+            tasks: Vec::new(),
             backend,
         })
     }

@@ -3,14 +3,14 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::application::Context;
+use crate::{application::Context, promise::Task};
 
 pub mod git;
 
 pub trait Backend {
     fn name(&self) -> &str;
 
-    //fn status(&self,
+    fn status(&self, ctx: &mut Context) -> Task<String>;
 
     //fn get_changed_files_workspace(&mut self, ctx: &mut Context);
     //fn get_changed_files_revision(&mut self, ctx: &mut Context, revision: &str);

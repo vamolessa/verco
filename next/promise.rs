@@ -97,3 +97,17 @@ where
     }
 }
 
+pub struct Task<T> {
+    promise: Box<dyn Promise<Output = T>>,
+}
+impl<T, P> From<P> for Task<T>
+where
+    P: 'static + Promise<Output = T>,
+{
+    fn from(other: P) -> Self {
+        Self {
+            promise: Box::new(other),
+        }
+    }
+}
+
