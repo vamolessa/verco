@@ -150,7 +150,7 @@ impl Context {
 pub struct Application {
     stdout: io::StdoutLock<'static>,
     context: Context,
-    //promises: Vec<Box<dyn Promise>>,
+    promises: Vec<Box<dyn Promise<Output = ()>>>,
     backend: Box<dyn Backend>,
 }
 impl Application {
@@ -174,7 +174,7 @@ impl Application {
                 process_tasks: Vec::new(),
                 requests: Vec::new(),
             },
-            //promises: Vec::new(),
+            promises: Vec::new(),
             backend,
         })
     }
