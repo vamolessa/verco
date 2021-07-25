@@ -1,5 +1,6 @@
 use std::fmt;
 
+/*
 pub static ENTER_ALTERNATE_BUFFER_CODE: &str = "\x1b[?1049h";
 pub static EXIT_ALTERNATE_BUFFER_CODE: &str = "\x1b[?1049l";
 pub static HIDE_CURSOR_CODE: &str = "\x1b[?25l";
@@ -50,4 +51,5 @@ pub fn set_underlined(buf: &mut String) {
 pub fn set_not_underlined(buf: &mut String) {
     buf.push_str("\x1b[24m");
 }
+*/
 

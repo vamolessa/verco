@@ -3,14 +3,10 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{platform::Context, promise::Task};
-
 pub mod git;
 
 pub trait Backend {
     fn name(&self) -> &str;
-
-    fn status(&self, ctx: &mut Context) -> Task<String>;
 
     //fn get_changed_files_workspace(&mut self, ctx: &mut Context);
     //fn get_changed_files_revision(&mut self, ctx: &mut Context, revision: &str);
@@ -100,8 +96,8 @@ pub fn get_command_output(command_name: &str, args: &[&str]) -> Option<String> {
     Some(output.into())
 }
 
-pub fn backend_from_current_repository() -> Option<(PathBuf, Box<dyn Backend>)>
-{
+pub fn backend_from_current_repository(
+) -> Option<(PathBuf, Box<dyn 'static + Send + Backend>)> {
     if let Some((root, git)) = git::Git::try_new() {
         Some((root, Box::new(git)))
     } else {

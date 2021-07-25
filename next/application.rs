@@ -1,35 +1,61 @@
-use crate::{
-    backend::Backend,
-    platform::{Context, Key, Keys, PlatformOperation},
+use std::{
+    path::PathBuf,
+    sync::atomic::{AtomicU16, Ordering},
 };
 
-pub enum Action {
-    Status,
+use crossterm::{event, terminal};
+
+use crate::backend::Backend;
+
+static VIEWPORT_WIDTH: AtomicU16 = AtomicU16::new(0);
+static VIEWPORT_HEIGHT: AtomicU16 = AtomicU16::new(0);
+
+fn resize(width: u16, height: u16) {
+    VIEWPORT_WIDTH.store(width, Ordering::Relaxed);
+    VIEWPORT_HEIGHT.store(height, Ordering::Relaxed);
 }
 
-pub struct Application {
-    backend: Box<dyn Backend>,
-}
-impl Application {
-    pub fn new(backend: Box<dyn Backend>) -> Self {
-        Self { backend }
-    }
-
-    pub fn update(
-        &mut self,
-        ctx: &mut Context,
-        keys: &mut Keys,
-    ) -> Option<PlatformOperation> {
-        match keys.next()? {
-            Key::Esc => Some(PlatformOperation::Quit),
-            Key::Char('s') => self
-                .backend
-                .status(ctx)
-                .map(|_ctx, o| format!("status output:\n{}", o))
-                .into_op(Action::Status),
-            _ => Some(PlatformOperation::Continue),
+pub fn next_key() -> event::KeyEvent {
+    loop {
+        match event::read().unwrap() {
+            event::Event::Key(key) => return key,
+            event::Event::Mouse(_) => (),
+            event::Event::Resize(width, height) => resize(width, height),
         }
     }
 }
 
+pub struct Application {
+    root: PathBuf,
+    backend: Box<dyn 'static + Send + Backend>,
+}
+impl Application {
+    pub fn new(
+        root: PathBuf,
+        backend: Box<dyn 'static + Send + Backend>,
+    ) -> Self {
+        Self { root, backend }
+    }
+
+    pub fn run(&mut self) {
+        match terminal::size() {
+            Ok((width, height)) => resize(width, height),
+            Err(_) => return,
+        };
+
+        loop {
+            match next_key() {
+                event::KeyEvent {
+                    code: event::KeyCode::Esc,
+                    ..
+                } => break,
+                event::KeyEvent {
+                    code: event::KeyCode::Char(c),
+                    ..
+                } => println!("char: {}", c),
+                _ => (),
+            }
+        }
+    }
+}
 

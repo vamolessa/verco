@@ -1,14 +1,8 @@
 use std::{path::PathBuf, process::Command};
 
-use crate::{
-    backend::{get_command_output, Backend},
-    platform::Context,
-    promise::Task,
-};
+use crate::backend::{get_command_output, Backend};
 
-pub struct Git {
-    //
-}
+pub struct Git;
 
 impl Git {
     pub fn try_new() -> Option<(PathBuf, Self)> {
@@ -25,10 +19,12 @@ impl Backend for Git {
         "git"
     }
 
+    /*
     fn status(&self, ctx: &mut Context) -> Task<String> {
         let mut command = Command::new("git");
         command.arg("status");
         ctx.spawn(command).into()
     }
+    */
 }
 
