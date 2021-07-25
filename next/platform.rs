@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    application::Application,
+    application::{Action, Application},
     backend::{backend_from_current_repository, Backend},
     promise::{Poll, Promise, Task},
     ui,
@@ -139,8 +139,6 @@ pub struct Context {
     root: PathBuf,
     process_tasks: Vec<ProcessTask>,
     requests: Vec<SpawnProcessRequest>,
-    stdout: io::StdoutLock<'static>,
-    viewport_size: (u16, u16),
 }
 impl Context {
     pub fn spawn(
@@ -194,19 +192,16 @@ impl<'a> Iterator for Keys<'a> {
 pub enum PlatformOperation {
     Continue,
     Quit,
-    Spawn(Task<()>),
-}
-impl From<Task<()>> for Option<PlatformOperation> {
-    fn from(other: Task<()>) -> Self {
-        Some(PlatformOperation::Spawn(other))
-    }
+    Spawn(Action, Task<String>),
 }
 
 pub struct Platform {
     application: Application,
     context: Context,
-    tasks: Vec<Task<()>>,
+    tasks: Vec<(Action, Task<String>)>,
     keys: Vec<Key>,
+    stdout: io::StdoutLock<'static>,
+    viewport_size: (u16, u16),
 }
 impl Platform {
     pub fn new() -> Option<Self> {
@@ -217,9 +212,9 @@ impl Platform {
         let (root, backend) = backend_from_current_repository()?;
 
         use io::Write;
-        let _ = stdout.write_all(ui::ENTER_ALTERNATE_BUFFER_CODE);
-        let _ = stdout.write_all(ui::HIDE_CURSOR_CODE);
-        let _ = stdout.write_all(ui::MODE_256_COLORS_CODE);
+        let _ = stdout.write_all(ui::ENTER_ALTERNATE_BUFFER_CODE.as_bytes());
+        let _ = stdout.write_all(ui::HIDE_CURSOR_CODE.as_bytes());
+        let _ = stdout.write_all(ui::MODE_256_COLORS_CODE.as_bytes());
         stdout.flush().unwrap();
 
         Some(Self {
@@ -228,11 +223,11 @@ impl Platform {
                 root,
                 process_tasks: Vec::new(),
                 requests: Vec::new(),
-                stdout,
-                viewport_size: (0, 0),
             },
             tasks: Vec::new(),
             keys: Vec::new(),
+            stdout,
+            viewport_size: (0, 0),
         })
     }
 
@@ -240,7 +235,7 @@ impl Platform {
         for event in events {
             match event {
                 PlatformEvent::Resize(width, height) => {
-                    self.context.viewport_size = (*width, *height);
+                    self.viewport_size = (*width, *height);
                 }
                 PlatformEvent::Key(key) => self.keys.push(*key),
                 PlatformEvent::ProcessStdout { handle, buf } => {
@@ -258,9 +253,10 @@ impl Platform {
                         &mut self.context.process_tasks[handle.0 as usize];
                     process.status = ProcessStatus::Finished(*success);
                     for i in (0..self.tasks.len()).rev() {
-                        match self.tasks[i].poll(&mut self.context) {
+                        match self.tasks[i].1.poll(&mut self.context) {
                             Poll::Pending => (),
-                            Poll::Ok(()) => {
+                            Poll::Ok(output) => {
+                                println!("deu ruim aqui: '{}'", output);
                                 self.tasks.remove(i);
                             }
                             Poll::Err(error) => {
@@ -281,7 +277,9 @@ impl Platform {
             match self.application.update(&mut self.context, &mut keys) {
                 Some(PlatformOperation::Continue) => (),
                 Some(PlatformOperation::Quit) => return false,
-                Some(PlatformOperation::Spawn(task)) => self.tasks.push(task),
+                Some(PlatformOperation::Spawn(action, task)) => {
+                    self.tasks.push((action, task))
+                }
                 None => break,
             }
         }
@@ -301,12 +299,11 @@ impl Drop for Platform {
     fn drop(&mut self) {
         use io::Write;
         let _ = self
-            .context
             .stdout
-            .write_all(ui::EXIT_ALTERNATE_BUFFER_CODE);
-        let _ = self.context.stdout.write_all(ui::SHOW_CURSOR_CODE);
-        let _ = self.context.stdout.write_all(ui::RESET_STYLE_CODE);
-        let _ = self.context.stdout.flush();
+            .write_all(ui::EXIT_ALTERNATE_BUFFER_CODE.as_bytes());
+        let _ = self.stdout.write_all(ui::SHOW_CURSOR_CODE.as_bytes());
+        let _ = self.stdout.write_all(ui::RESET_STYLE_CODE.as_bytes());
+        let _ = self.stdout.flush();
     }
 }
 

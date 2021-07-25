@@ -3,6 +3,10 @@ use crate::{
     platform::{Context, Key, Keys, PlatformOperation},
 };
 
+pub enum Action {
+    Status,
+}
+
 pub struct Application {
     backend: Box<dyn Backend>,
 }
@@ -21,12 +25,11 @@ impl Application {
             Key::Char('s') => self
                 .backend
                 .status(ctx)
-                .map(|_ctx, o| {
-                    println!("status output:\n{}", o);
-                })
-                .into(),
+                .map(|_ctx, o| format!("status output:\n{}", o))
+                .into_op(Action::Status),
             _ => Some(PlatformOperation::Continue),
         }
     }
 }
+
 

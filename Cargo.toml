@@ -22,9 +22,8 @@ name = "verco"
 path = "next/main.rs"
 
 [dependencies]
-crossterm = "0.17.5"
-ctrlc = "3.1.4"
-rustyline = "6.1.1"
+crossterm = "0.20"
+ctrlc = "3.1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winbase", "winerror", "winuser", "errhandlingapi", "stringapiset", "winnls", "consoleapi", "processenv", "handleapi", "synchapi", "ioapiset", "namedpipeapi"] }

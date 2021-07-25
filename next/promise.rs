@@ -1,4 +1,7 @@
-use crate::platform::Context;
+use crate::{
+    application::Action,
+    platform::{Context, PlatformOperation},
+};
 
 pub enum Poll<T> {
     Pending,
@@ -123,6 +126,11 @@ where
         O: 'static,
     {
         self.promise.map(f).into()
+    }
+}
+impl Task<String> {
+    pub fn into_op(self, action: Action) -> Option<PlatformOperation> {
+        Some(PlatformOperation::Spawn(action, self))
     }
 }
 impl<T, P> From<P> for Task<T>
