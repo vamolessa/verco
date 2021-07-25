@@ -1,8 +1,8 @@
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU16, Ordering},
-        mpsc, Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
     },
 };
 
@@ -10,22 +10,14 @@ use crossterm::{event, terminal};
 
 use crate::backend::Backend;
 
-static VIEWPORT_WIDTH: AtomicU16 = AtomicU16::new(0);
-static VIEWPORT_HEIGHT: AtomicU16 = AtomicU16::new(0);
+static VIEWPORT_WIDTH: AtomicUsize = AtomicUsize::new(0);
+static VIEWPORT_HEIGHT: AtomicUsize = AtomicUsize::new(0);
+static CURRENT_ACTION_KIND: AtomicUsize =
+    AtomicUsize::new(ActionKind::default() as _);
 
 fn resize(width: u16, height: u16) {
-    VIEWPORT_WIDTH.store(width, Ordering::Relaxed);
-    VIEWPORT_HEIGHT.store(height, Ordering::Relaxed);
-}
-
-pub fn next_key() -> event::KeyEvent {
-    loop {
-        match event::read().unwrap() {
-            event::Event::Key(key) => return key,
-            event::Event::Mouse(_) => (),
-            event::Event::Resize(width, height) => resize(width, height),
-        }
-    }
+    VIEWPORT_WIDTH.store(width as _, Ordering::Relaxed);
+    VIEWPORT_HEIGHT.store(height as _, Ordering::Relaxed);
 }
 
 pub fn run(root: PathBuf, backend: Arc<dyn Backend>) {
@@ -38,19 +30,15 @@ pub fn run(root: PathBuf, backend: Arc<dyn Backend>) {
         root,
         backend,
         outputs: Default::default(),
-        current_action: ActionKind::Help,
+        current_action: ActionKind::default(),
     };
 
     loop {
-        match next_key() {
+        match app.next_key() {
             event::KeyEvent {
                 code: event::KeyCode::Esc,
                 ..
             } => break,
-            event::KeyEvent {
-                code: event::KeyCode::Char(c),
-                ..
-            } => println!("char: {}", c),
             _ => (),
         }
     }
@@ -60,6 +48,11 @@ enum ActionKind {
     Help,
     Status,
     LEN,
+}
+impl ActionKind {
+    pub const fn default() -> Self {
+        ActionKind::Help
+    }
 }
 
 enum ApplicationEvent {
@@ -72,5 +65,19 @@ pub struct Application {
     backend: Arc<dyn Backend>,
     outputs: Arc<[Mutex<String>; ActionKind::LEN as _]>,
     current_action: ActionKind,
+}
+impl Application {
+    pub fn next_key(&self) -> event::KeyEvent {
+        loop {
+            match event::read().unwrap() {
+                event::Event::Key(key) => return key,
+                event::Event::Mouse(_) => (),
+                event::Event::Resize(width, height) => {
+                    resize(width, height);
+                    println!("redraw resized");
+                }
+            }
+        }
+    }
 }
 
