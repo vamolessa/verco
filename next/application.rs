@@ -1,11 +1,10 @@
 use crate::{
     backend::Backend,
-    platform::{Context, Key, Keys},
+    platform::{Context, Key, Keys, PlatformOperation},
 };
 
 pub struct Application {
     backend: Box<dyn Backend>,
-    //
 }
 impl Application {
     pub fn new(backend: Box<dyn Backend>) -> Self {
@@ -16,11 +15,17 @@ impl Application {
         &mut self,
         ctx: &mut Context,
         keys: &mut Keys,
-    ) -> Option<bool> {
+    ) -> Option<PlatformOperation> {
         match keys.next()? {
-            Key::Esc => Some(false),
-            //Key::Char('s') => self.backend.status(),
-            _ => Some(true),
+            Key::Esc => Some(PlatformOperation::Quit),
+            Key::Char('s') => self
+                .backend
+                .status(ctx)
+                .map(|_ctx, o| {
+                    println!("status output:\n{}", o);
+                })
+                .into(),
+            _ => Some(PlatformOperation::Continue),
         }
     }
 }

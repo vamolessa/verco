@@ -140,6 +140,7 @@ pub struct Context {
     process_tasks: Vec<ProcessTask>,
     requests: Vec<SpawnProcessRequest>,
     stdout: io::StdoutLock<'static>,
+    viewport_size: (u16, u16),
 }
 impl Context {
     pub fn spawn(
@@ -190,6 +191,17 @@ impl<'a> Iterator for Keys<'a> {
     }
 }
 
+pub enum PlatformOperation {
+    Continue,
+    Quit,
+    Spawn(Task<()>),
+}
+impl From<Task<()>> for Option<PlatformOperation> {
+    fn from(other: Task<()>) -> Self {
+        Some(PlatformOperation::Spawn(other))
+    }
+}
+
 pub struct Platform {
     application: Application,
     context: Context,
@@ -217,6 +229,7 @@ impl Platform {
                 process_tasks: Vec::new(),
                 requests: Vec::new(),
                 stdout,
+                viewport_size: (0, 0),
             },
             tasks: Vec::new(),
             keys: Vec::new(),
@@ -226,6 +239,9 @@ impl Platform {
     pub fn update(&mut self, events: &[PlatformEvent]) -> bool {
         for event in events {
             match event {
+                PlatformEvent::Resize(width, height) => {
+                    self.context.viewport_size = (*width, *height);
+                }
                 PlatformEvent::Key(key) => self.keys.push(*key),
                 PlatformEvent::ProcessStdout { handle, buf } => {
                     self.context.process_tasks[handle.0 as usize]
@@ -241,10 +257,18 @@ impl Platform {
                     let process =
                         &mut self.context.process_tasks[handle.0 as usize];
                     process.status = ProcessStatus::Finished(*success);
-                    todo!();
-                }
-                _ => {
-                    dbg!(event);
+                    for i in (0..self.tasks.len()).rev() {
+                        match self.tasks[i].poll(&mut self.context) {
+                            Poll::Pending => (),
+                            Poll::Ok(()) => {
+                                self.tasks.remove(i);
+                            }
+                            Poll::Err(error) => {
+                                println!("deu ruim aqui: '{}'", error);
+                                self.tasks.remove(i);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -255,12 +279,14 @@ impl Platform {
         };
         loop {
             match self.application.update(&mut self.context, &mut keys) {
-                Some(true) => (),
-                Some(false) => return false,
+                Some(PlatformOperation::Continue) => (),
+                Some(PlatformOperation::Quit) => return false,
+                Some(PlatformOperation::Spawn(task)) => self.tasks.push(task),
                 None => break,
             }
         }
-        self.keys.drain(..keys.index);
+        let drain_len = keys.index;
+        self.keys.drain(..drain_len);
 
         true
     }
