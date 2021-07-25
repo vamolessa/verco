@@ -1,6 +1,9 @@
 use std::{
     path::PathBuf,
-    sync::atomic::{AtomicU16, Ordering},
+    sync::{
+        atomic::{AtomicU16, Ordering},
+        mpsc, Arc, Mutex,
+    },
 };
 
 use crossterm::{event, terminal};
@@ -25,37 +28,49 @@ pub fn next_key() -> event::KeyEvent {
     }
 }
 
-pub struct Application {
-    root: PathBuf,
-    backend: Box<dyn 'static + Send + Backend>,
-}
-impl Application {
-    pub fn new(
-        root: PathBuf,
-        backend: Box<dyn 'static + Send + Backend>,
-    ) -> Self {
-        Self { root, backend }
-    }
+pub fn run(root: PathBuf, backend: Arc<dyn Backend>) {
+    match terminal::size() {
+        Ok((width, height)) => resize(width, height),
+        Err(_) => return,
+    };
 
-    pub fn run(&mut self) {
-        match terminal::size() {
-            Ok((width, height)) => resize(width, height),
-            Err(_) => return,
-        };
+    let mut app = Application {
+        root,
+        backend,
+        outputs: Default::default(),
+        current_action: ActionKind::Help,
+    };
 
-        loop {
-            match next_key() {
-                event::KeyEvent {
-                    code: event::KeyCode::Esc,
-                    ..
-                } => break,
-                event::KeyEvent {
-                    code: event::KeyCode::Char(c),
-                    ..
-                } => println!("char: {}", c),
-                _ => (),
-            }
+    loop {
+        match next_key() {
+            event::KeyEvent {
+                code: event::KeyCode::Esc,
+                ..
+            } => break,
+            event::KeyEvent {
+                code: event::KeyCode::Char(c),
+                ..
+            } => println!("char: {}", c),
+            _ => (),
         }
     }
+}
+
+enum ActionKind {
+    Help,
+    Status,
+    LEN,
+}
+
+enum ApplicationEvent {
+    Key(event::KeyEvent),
+    Output(ActionKind),
+}
+
+pub struct Application {
+    root: PathBuf,
+    backend: Arc<dyn Backend>,
+    outputs: Arc<[Mutex<String>; ActionKind::LEN as _]>,
+    current_action: ActionKind,
 }
 

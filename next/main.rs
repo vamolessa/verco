@@ -1,5 +1,6 @@
 mod application;
 mod backend;
+mod controller;
 mod ui;
 
 fn main() {
@@ -18,7 +19,6 @@ fn main() {
 
     ctrlc::set_handler(|| {}).unwrap();
 
-    let mut app = application::Application::new(root, backend);
-    app.run();
+    application::run(root, backend);
 }
 

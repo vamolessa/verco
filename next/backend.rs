@@ -1,6 +1,7 @@
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
+    sync::Arc,
 };
 
 pub mod git;
@@ -97,9 +98,9 @@ pub fn get_command_output(command_name: &str, args: &[&str]) -> Option<String> {
 }
 
 pub fn backend_from_current_repository(
-) -> Option<(PathBuf, Box<dyn 'static + Send + Backend>)> {
+) -> Option<(PathBuf, Arc<dyn 'static + Send + Backend>)> {
     if let Some((root, git)) = git::Git::try_new() {
-        Some((root, Box::new(git)))
+        Some((root, Arc::new(git)))
     } else {
         None
     }
