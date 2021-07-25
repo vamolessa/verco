@@ -1,4 +1,4 @@
-use crate::application::Context;
+use crate::platform::Context;
 
 pub enum Poll<T> {
     Pending,
@@ -8,6 +8,7 @@ pub enum Poll<T> {
 
 pub trait Promise {
     type Output;
+
     fn poll(&mut self, ctx: &mut Context) -> Poll<Self::Output>;
 
     fn map<O>(
@@ -31,6 +32,14 @@ pub trait Promise {
             first_output: None,
             second_output: None,
         }
+    }
+}
+
+impl<O> Promise for Box<dyn Promise<Output = O>> {
+    type Output = O;
+    fn poll(&mut self, ctx: &mut Context) -> Poll<Self::Output> {
+        use std::ops::DerefMut;
+        self.deref_mut().poll(ctx)
     }
 }
 
@@ -99,6 +108,22 @@ where
 
 pub struct Task<T> {
     promise: Box<dyn Promise<Output = T>>,
+}
+impl<T> Task<T> {
+    pub fn poll(&mut self, ctx: &mut Context) -> Poll<T> {
+        self.promise.poll(ctx)
+    }
+}
+impl<T> Task<T>
+where
+    T: 'static,
+{
+    pub fn map<O>(self, f: fn(ctx: &mut Context, T) -> O) -> Task<O>
+    where
+        O: 'static,
+    {
+        self.promise.map(f).into()
+    }
 }
 impl<T, P> From<P> for Task<T>
 where

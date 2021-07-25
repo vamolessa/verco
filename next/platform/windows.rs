@@ -39,8 +39,8 @@ use winapi::{
     },
 };
 
-use crate::application::{
-    Application, Key, PlatformEvent, ProcessHandle, SpawnProcessRequest,
+use crate::platform::{
+    Platform, Key, PlatformEvent, ProcessHandle, SpawnProcessRequest,
 };
 
 const CONSOLE_EVENT_BUFFER_LEN: usize = 32;
@@ -82,7 +82,7 @@ pub fn main() {
 
     let mut handle_sources = [HandleSource::Console; MAXIMUM_WAIT_OBJECTS as _];
 
-    let mut application = match Application::new() {
+    let mut application = match Platform::new() {
         Some(application) => application,
         None => return,
     };
