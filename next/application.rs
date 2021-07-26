@@ -123,6 +123,10 @@ impl ActionKind {
     pub fn current() -> usize {
         CURRENT_ACTION_KIND.load(Ordering::Relaxed)
     }
+
+    pub fn set_as_current(self) {
+        CURRENT_ACTION_KIND.store(self as _, Ordering::Relaxed)
+    }
 }
 
 enum ActionState {
@@ -156,10 +160,12 @@ impl Application {
 
     pub fn schedule(
         &self,
-        kind: ActionKind,
+        action: ActionKind,
         f: fn(&dyn Backend) -> Result<String, String>,
     ) {
-        let mut output = self.outputs[kind as usize].lock().unwrap();
+        action.set_as_current();
+
+        let mut output = self.outputs[action as usize].lock().unwrap();
         if let ActionState::Waiting = output.state {
             return;
         }
@@ -172,7 +178,7 @@ impl Application {
             use std::ops::Deref;
             let result = f(backend.deref());
 
-            let mut output = outputs[kind as usize].lock().unwrap();
+            let mut output = outputs[action as usize].lock().unwrap();
             match result {
                 Ok(text) => {
                     output.state = ActionState::Ok;
@@ -184,7 +190,7 @@ impl Application {
                 }
             }
 
-            if ActionKind::current() == kind as _ {
+            if ActionKind::current() == action as _ {
                 println!("output:\n{}", &output.text);
             }
         });
@@ -192,7 +198,7 @@ impl Application {
 
     pub fn redraw(&self) {
         let output = self.outputs[ActionKind::current()].lock().unwrap();
-        println!("output:\n{}", &output.text);
+        println!("redraw:\n{}", &output.text);
     }
 }
 
