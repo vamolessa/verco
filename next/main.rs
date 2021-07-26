@@ -1,3 +1,5 @@
+use std::io::Write;
+
 mod application;
 mod backend;
 mod controller;
@@ -22,8 +24,38 @@ fn main() {
         return;
     }
 
-    ctrlc::set_handler(|| {}).unwrap();
+    {
+        let stdout = std::io::stdout();
+        let mut stdout = stdout.lock();
+        crossterm::execute!(
+            &mut stdout,
+            crossterm::terminal::SetTitle(format!(
+                "{} @ {}",
+                env!("CARGO_PKG_NAME"),
+                root.as_os_str().to_string_lossy(),
+            )),
+            crossterm::terminal::EnterAlternateScreen,
+            crossterm::cursor::Hide,
+        )
+        .unwrap();
+        crossterm::terminal::enable_raw_mode().unwrap();
+        stdout.flush().unwrap();
+    }
 
+    ctrlc::set_handler(|| {}).unwrap();
     application::run(backend);
+
+    {
+        let stdout = std::io::stdout();
+        let mut stdout = stdout.lock();
+        crossterm::execute!(
+            &mut stdout,
+            crossterm::style::ResetColor,
+            crossterm::cursor::Show,
+            crossterm::terminal::LeaveAlternateScreen,
+        )
+        .unwrap();
+        crossterm::terminal::disable_raw_mode().unwrap();
+    }
 }
 
