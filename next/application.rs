@@ -8,7 +8,7 @@ use std::{
 
 use crossterm::{event, terminal};
 
-use crate::{backend::Backend, controller};
+use crate::{backend::Backend, controller, ui};
 
 static VIEWPORT_WIDTH: AtomicUsize = AtomicUsize::new(0);
 static VIEWPORT_HEIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -127,6 +127,12 @@ impl ActionKind {
     pub fn set_as_current(self) {
         CURRENT_ACTION_KIND.store(self as _, Ordering::Relaxed)
     }
+
+    pub fn name_from_index(index: usize) -> &'static str {
+        static ACTION_NAMES: &[&str] = &["help", "status"];
+
+        ACTION_NAMES[index]
+    }
 }
 
 enum ActionState {
@@ -191,14 +197,17 @@ impl Application {
             }
 
             if ActionKind::current() == action as _ {
-                println!("output:\n{}", &output.text);
+                let action = ActionKind::name_from_index(action as usize);
+                ui::draw_output(action, &output.text);
             }
         });
     }
 
     pub fn redraw(&self) {
-        let output = self.outputs[ActionKind::current()].lock().unwrap();
-        println!("redraw:\n{}", &output.text);
+        let action = ActionKind::current();
+        let output = self.outputs[action].lock().unwrap();
+        let action = ActionKind::name_from_index(action);
+        ui::draw_output(action, &output.text);
     }
 }
 

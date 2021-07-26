@@ -1,0 +1,30 @@
+"MODES":
+
+- anywhere
+    - `f` => fetch
+    - `p` => pull
+    - `P` => push
+
+    - `s` => status
+    - `l` => log
+    - `b` => branches
+
+- status (changed files, new files, etc) selectable!!
+    - `c` => commit selected if there are selected files, else commit all
+    - `R` => revert selected if there are selected files, else revert all
+    - `d` => diff selected if there are selected files, else diff all
+- log
+    - `u` => checkout selected commit
+    - `R` => revert to selected commit (??)
+    - `c` => show commit changes
+    - `d` => diff commit
+
+- commit changes
+    - `d` => 
+
+- branches
+    - `u` => checkout selected branch
+    - `n` => new branch
+    - `d` => delete branch
+
+- conflicts

@@ -29,11 +29,7 @@ fn main() {
         let mut stdout = stdout.lock();
         crossterm::execute!(
             &mut stdout,
-            crossterm::terminal::SetTitle(format!(
-                "{} @ {}",
-                env!("CARGO_PKG_NAME"),
-                root.as_os_str().to_string_lossy(),
-            )),
+            crossterm::terminal::SetTitle(root.as_os_str().to_string_lossy()),
             crossterm::terminal::EnterAlternateScreen,
             crossterm::cursor::Hide,
         )
