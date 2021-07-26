@@ -1,8 +1,8 @@
 use std::io::Write;
 
 mod application;
+mod mode;
 mod backend;
-mod controller;
 mod ui;
 
 fn main() {

@@ -8,13 +8,14 @@ use std::{
 
 use crossterm::{event, terminal};
 
-use crate::{backend::Backend, controller, ui};
+use crate::{
+    backend::Backend,
+    mode::{ModeKind, Modes},
+    ui,
+};
 
 static VIEWPORT_WIDTH: AtomicUsize = AtomicUsize::new(0);
 static VIEWPORT_HEIGHT: AtomicUsize = AtomicUsize::new(0);
-
-static CURRENT_ACTION_KIND: AtomicUsize =
-    AtomicUsize::new(ActionKind::Help as _);
 
 fn resize(width: u16, height: u16) {
     VIEWPORT_WIDTH.store(width as _, Ordering::Relaxed);
@@ -107,63 +108,12 @@ impl ApplicationEvent {
     }
 }
 
-pub enum ApplicationFlow {
-    Continue,
-    Pending,
-    Quit,
-}
-
-#[derive(Clone, Copy)]
-pub enum ActionKind {
-    Help,
-    Status,
-    LEN,
-}
-impl ActionKind {
-    pub fn current() -> usize {
-        CURRENT_ACTION_KIND.load(Ordering::Relaxed)
-    }
-
-    pub fn set_as_current(self) {
-        CURRENT_ACTION_KIND.store(self as _, Ordering::Relaxed)
-    }
-
-    pub fn name_from_index(index: usize) -> &'static str {
-        static ACTION_NAMES: &[&str] = &["help", "status"];
-
-        ACTION_NAMES[index]
-    }
-}
-
-enum ActionState {
-    Waiting,
-    Ok,
-    Err,
-}
-
-struct ActionOutput {
-    text: String,
-    state: ActionState,
-}
-impl Default for ActionOutput {
-    fn default() -> Self {
-        Self {
-            text: String::new(),
-            state: ActionState::Ok,
-        }
-    }
-}
-
 pub struct Application {
     backend: Arc<dyn Backend>,
-    outputs: Arc<[Mutex<ActionOutput>; ActionKind::LEN as _]>,
-    previous_key: Key,
+    modes: Arc<Modes>,
 }
 impl Application {
-    pub fn previous_key(&self) -> Key {
-        self.previous_key
-    }
-
+    /*
     pub fn schedule(
         &self,
         action: ActionKind,
@@ -202,12 +152,15 @@ impl Application {
             }
         });
     }
+    */
 
     pub fn redraw(&self) {
+        /*
         let action = ActionKind::current();
         let output = self.outputs[action].lock().unwrap();
         let action = ActionKind::name_from_index(action);
         ui::draw_output(action, &output.text);
+        */
     }
 }
 
@@ -219,17 +172,14 @@ pub fn run(backend: Arc<dyn Backend>) {
 
     let mut app = Application {
         backend,
-        outputs: Default::default(),
-        previous_key: Key::None,
+        modes: Arc::new(Modes::default()),
     };
 
     loop {
         match ApplicationEvent::next() {
             ApplicationEvent::Key(key) => {
-                match controller::handle_key(&app, key) {
-                    ApplicationFlow::Continue => app.previous_key = Key::None,
-                    ApplicationFlow::Pending => app.previous_key = key,
-                    ApplicationFlow::Quit => break,
+                if !app.modes.handle_key(key) {
+                    break;
                 }
             }
             ApplicationEvent::Redraw => (),

@@ -8,21 +8,20 @@
     - `t` => tags
 
 - status (changed files, new files, etc) selectable!!
-    - `i` => commit selected if there are selected files, else commit all
+    - `c` => commit selected if there are selected files, else commit all
     - `U` => revert selected if there are selected files, else revert all
     - `d` => diff selected if there are selected files, else diff all
 
 - log
-    - `c` => checkout selected commit
-    - `U` => revert to selected commit (??)
-    - `c` => show commit changes
-    - `d` => diff commit
+    - `u` => checkout selected revision
+    - `U` => revert to selected revision (??)
+    - `d` => show revision details
 
     - `f` => fetch
     - `p` => pull
     - `P` => push
 
-- commit changes
+- revision details
     - `d` => diff selected files if there are selected files, else diff all
 
 - branches
