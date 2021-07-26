@@ -1,16 +1,15 @@
 use std::{
     path::PathBuf,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     sync::Arc,
 };
 
 pub mod git;
 
-pub trait Backend {
+pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 
-    //fn get_changed_files_workspace(&mut self, ctx: &mut Context);
-    //fn get_changed_files_revision(&mut self, ctx: &mut Context, revision: &str);
+    fn status(&self) -> Result<String, String>;
 }
 
 /*
@@ -85,20 +84,48 @@ pub trait VersionControlActions: Send {
 }
 */
 
-pub fn get_command_output(command_name: &str, args: &[&str]) -> Option<String> {
-    let mut command = Command::new(command_name);
-    command.args(args);
-    command.stdin(Stdio::null());
-    command.stdout(Stdio::piped());
-    command.stderr(Stdio::null());
-    let child = command.spawn().ok()?;
-    let output = child.wait_with_output().ok()?;
-    let output = String::from_utf8_lossy(&output.stdout);
-    Some(output.into())
+pub struct Process(Child);
+impl Process {
+    pub fn spawn(command_name: &str, args: &[&str]) -> Result<Self, String> {
+        let mut command = Command::new(command_name);
+        command.args(args);
+        command.stdin(Stdio::null());
+        command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
+
+        match command.spawn() {
+            Ok(child) => Ok(Self(child)),
+            Err(error) => Err(format!(
+                "could not spawn process '{}': {}",
+                command_name, error
+            )),
+        }
+    }
+
+    pub fn wait(self) -> Result<String, String> {
+        let output = match self.0.wait_with_output() {
+            Ok(output) => output,
+            Err(error) => {
+                return Err(format!("could not wait for process: {}", error))
+            }
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if output.status.success() {
+            Ok(stdout.into())
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let mut error = String::new();
+            error.push_str(&stdout);
+            error.push('\n');
+            error.push_str(&stderr);
+            Err(error)
+        }
+    }
 }
 
 pub fn backend_from_current_repository(
-) -> Option<(PathBuf, Arc<dyn 'static + Send + Backend>)> {
+) -> Option<(PathBuf, Arc<dyn Backend>)> {
     if let Some((root, git)) = git::Git::try_new() {
         Some((root, Arc::new(git)))
     } else {

@@ -17,8 +17,13 @@ fn main() {
         }
     };
 
+    if std::env::set_current_dir(&root).is_err() {
+        eprintln!("could not set current dir to {:?}", root);
+        return;
+    }
+
     ctrlc::set_handler(|| {}).unwrap();
 
-    application::run(root, backend);
+    application::run(backend);
 }
 
