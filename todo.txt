@@ -1,30 +1,40 @@
 "MODES":
 
 - anywhere
+    - `s` => status
+    - `l` => log
+    - `r` => conflicts
+    - `b` => branches
+    - `t` => tags
+
+- status (changed files, new files, etc) selectable!!
+    - `i` => commit selected if there are selected files, else commit all
+    - `U` => revert selected if there are selected files, else revert all
+    - `d` => diff selected if there are selected files, else diff all
+
+- log
+    - `c` => checkout selected commit
+    - `U` => revert to selected commit (??)
+    - `c` => show commit changes
+    - `d` => diff commit
+
     - `f` => fetch
     - `p` => pull
     - `P` => push
 
-    - `s` => status
-    - `l` => log
-    - `b` => branches
-
-- status (changed files, new files, etc) selectable!!
-    - `c` => commit selected if there are selected files, else commit all
-    - `R` => revert selected if there are selected files, else revert all
-    - `d` => diff selected if there are selected files, else diff all
-- log
-    - `u` => checkout selected commit
-    - `R` => revert to selected commit (??)
-    - `c` => show commit changes
-    - `d` => diff commit
-
 - commit changes
-    - `d` => 
+    - `d` => diff selected files if there are selected files, else diff all
 
 - branches
     - `u` => checkout selected branch
     - `n` => new branch
     - `d` => delete branch
 
+- tags
+    - `u` => checkout selected tag
+    - `n` => new tag
+    - `d` => delete tag
+
 - conflicts
+    - `o` => resolve taking other
+    - `l` => resolve taking local
