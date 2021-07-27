@@ -1,28 +1,27 @@
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
-    thread,
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 use crossterm::{event, terminal};
 
-use crate::{
-    backend::Backend,
-    mode::{ModeKind, Modes},
-    ui,
-};
+use crate::{backend::Backend, mode::ModeManager, ui};
 
 static VIEWPORT_WIDTH: AtomicUsize = AtomicUsize::new(0);
 static VIEWPORT_HEIGHT: AtomicUsize = AtomicUsize::new(0);
 
-fn resize(width: u16, height: u16) {
+fn viewport_size() -> (u16, u16) {
+    let width = VIEWPORT_WIDTH.load(Ordering::Relaxed);
+    let height = VIEWPORT_HEIGHT.load(Ordering::Relaxed);
+    (width as _, height as _)
+}
+
+fn resize_viewport(width: u16, height: u16) {
     VIEWPORT_WIDTH.store(width as _, Ordering::Relaxed);
     VIEWPORT_HEIGHT.store(height as _, Ordering::Relaxed);
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     None,
     Backspace,
@@ -100,7 +99,7 @@ impl ApplicationEvent {
                 }
                 event::Event::Mouse(_) => (),
                 event::Event::Resize(width, height) => {
-                    resize(width, height);
+                    resize_viewport(width, height);
                     return Self::Redraw;
                 }
             }
@@ -110,82 +109,31 @@ impl ApplicationEvent {
 
 pub struct Application {
     backend: Arc<dyn Backend>,
-    modes: Arc<Modes>,
-}
-impl Application {
-    /*
-    pub fn schedule(
-        &self,
-        action: ActionKind,
-        f: fn(&dyn Backend) -> Result<String, String>,
-    ) {
-        action.set_as_current();
-
-        let mut output = self.outputs[action as usize].lock().unwrap();
-        if let ActionState::Waiting = output.state {
-            return;
-        }
-        output.state = ActionState::Waiting;
-
-        let backend = self.backend.clone();
-        let outputs = self.outputs.clone();
-
-        thread::spawn(move || {
-            use std::ops::Deref;
-            let result = f(backend.deref());
-
-            let mut output = outputs[action as usize].lock().unwrap();
-            match result {
-                Ok(text) => {
-                    output.state = ActionState::Ok;
-                    output.text = text;
-                }
-                Err(text) => {
-                    output.state = ActionState::Err;
-                    output.text = text;
-                }
-            }
-
-            if ActionKind::current() == action as _ {
-                let action = ActionKind::name_from_index(action as usize);
-                ui::draw_output(action, &output.text);
-            }
-        });
-    }
-    */
-
-    pub fn redraw(&self) {
-        /*
-        let action = ActionKind::current();
-        let output = self.outputs[action].lock().unwrap();
-        let action = ActionKind::name_from_index(action);
-        ui::draw_output(action, &output.text);
-        */
-    }
+    modes: Arc<ModeManager>,
 }
 
 pub fn run(backend: Arc<dyn Backend>) {
     match terminal::size() {
-        Ok((width, height)) => resize(width, height),
+        Ok((width, height)) => resize_viewport(width, height),
         Err(_) => return,
     };
 
-    let mut app = Application {
+    let app = Application {
         backend,
-        modes: Arc::new(Modes::default()),
+        modes: Arc::new(ModeManager::new()),
     };
 
     loop {
         match ApplicationEvent::next() {
             ApplicationEvent::Key(key) => {
-                if !app.modes.handle_key(key) {
+                if !app.modes.on_key(app.backend.clone(), key) {
                     break;
                 }
             }
             ApplicationEvent::Redraw => (),
         }
 
-        app.redraw()
+        app.modes.draw(viewport_size());
     }
 }
 

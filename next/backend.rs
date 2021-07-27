@@ -124,8 +124,8 @@ impl Process {
     }
 }
 
-pub fn backend_from_current_repository(
-) -> Option<(PathBuf, Arc<dyn Backend>)> {
+pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)>
+{
     if let Some((root, git)) = git::Git::try_new() {
         Some((root, Arc::new(git)))
     } else {
