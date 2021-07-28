@@ -10,6 +10,7 @@ pub struct Entry {
 pub struct Mode {
     state: mode::ModeState,
     entries: Mutex<Vec<Entry>>,
+    cursor_menu: mode::CursorMenu,
 }
 impl mode::Mode for Mode {
     fn name(&self) -> &'static str {
@@ -25,14 +26,22 @@ impl mode::Mode for Mode {
     }
 
     fn enter(self: Arc<Self>, backend: Arc<dyn Backend>) {
-        //
+        let this = self.clone();
+        mode::request(self, move || {
+            let result = backend.status();
+            this.entries.lock().unwrap().clear();
+        });
     }
 
-    fn on_key(self: Arc<Self>, backend: Arc<dyn Backend>, key: Key) -> bool {
-        true
+    fn on_key(self: Arc<Self>, backend: Arc<dyn Backend>, key: Key) {
+        let entries = self.entries.lock().unwrap();
+        self.cursor_menu.on_key(entries.len(), key);
+        match key {
+            _ => (),
+        }
     }
 
-    fn draw(&self, viewport_size: (u16, u16)) {
+    fn draw(&self) {
         //
     }
 }

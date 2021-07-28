@@ -10,7 +10,7 @@ use crate::{backend::Backend, mode::ModeManager, ui};
 static VIEWPORT_WIDTH: AtomicUsize = AtomicUsize::new(0);
 static VIEWPORT_HEIGHT: AtomicUsize = AtomicUsize::new(0);
 
-fn viewport_size() -> (u16, u16) {
+pub fn viewport_size() -> (u16, u16) {
     let width = VIEWPORT_WIDTH.load(Ordering::Relaxed);
     let height = VIEWPORT_HEIGHT.load(Ordering::Relaxed);
     (width as _, height as _)
@@ -125,15 +125,14 @@ pub fn run(backend: Arc<dyn Backend>) {
 
     loop {
         match ApplicationEvent::next() {
-            ApplicationEvent::Key(key) => {
-                if !app.modes.on_key(app.backend.clone(), key) {
-                    break;
-                }
-            }
+            ApplicationEvent::Key(
+                Key::Esc | Key::Ctrl('c') | Key::Char('q'),
+            ) => break,
+            ApplicationEvent::Key(key) => app.modes.on_key(app.backend.clone(), key),
             ApplicationEvent::Redraw => (),
         }
 
-        app.modes.draw(viewport_size());
+        app.modes.draw();
     }
 }
 
