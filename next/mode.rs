@@ -17,11 +17,6 @@ mod status;
 pub struct ModeState {
     waiting: AtomicBool,
 }
-impl ModeState {
-    pub fn is_waiting(&self) -> bool {
-        self.waiting.load(Ordering::Acquire)
-    }
-}
 
 pub trait Mode: 'static + Send + Sync {
     fn name(&self) -> &'static str;
@@ -99,12 +94,18 @@ impl ModeManager {
     }
 }
 
+pub enum SelectMenuAction {
+    None,
+    Toggle(usize),
+    ToggleAll,
+}
+
 #[derive(Default)]
-pub struct CursorMenu {
+pub struct SelectMenu {
     cursor: AtomicUsize,
     scroll: AtomicUsize,
 }
-impl CursorMenu {
+impl SelectMenu {
     pub fn cursor(&self) -> usize {
         self.cursor.load(Ordering::Acquire)
     }
@@ -113,7 +114,7 @@ impl CursorMenu {
         self.scroll.load(Ordering::Acquire)
     }
 
-    pub fn on_key(&self, entries_len: usize, key: Key) {
+    pub fn on_key(&self, entries_len: usize, key: Key) -> SelectMenuAction {
         let last_index = entries_len.saturating_sub(1);
 
         let cursor = self.cursor();
@@ -145,15 +146,12 @@ impl CursorMenu {
 
         self.cursor.store(cursor, Ordering::Release);
         self.scroll.store(scroll, Ordering::Release);
+
+        match key {
+            Key::Char(' ') => SelectMenuAction::Toggle(cursor),
+            Key::Ctrl('a') => SelectMenuAction::ToggleAll,
+            _ => SelectMenuAction::None,
+        }
     }
 }
 
-pub trait Select {
-    //
-}
-
-#[derive(Default)]
-pub struct SelectMenu {
-    cursor: AtomicUsize,
-    scroll: AtomicUsize,
-}
