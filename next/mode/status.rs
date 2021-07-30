@@ -58,7 +58,7 @@ impl mode::Mode for Mode {
         */
     }
 
-    fn on_response(&mut self, response: &mode::ModeResponse) {
+    fn on_response(&mut self, result: &mode::ModeResponse) {
         //
     }
 

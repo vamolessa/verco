@@ -9,7 +9,6 @@ pub mod status;
 
 pub enum ModeResponse {
     Status,
-    Error,
 }
 
 pub enum ModeKind {

@@ -8,7 +8,6 @@ use crossterm::{event, terminal};
 use crate::{
     backend::Backend,
     mode::{self, Mode, ModeContext, ModeKind, ModeResponse},
-    ui,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -79,12 +78,12 @@ impl Key {
 enum Event {
     Key(Key),
     Resize(u16, u16),
-    Response(Result<ModeResponse, String>),
+    Response(ModeResponse),
 }
 
 pub struct ModeResponseSender(mpsc::SyncSender<Event>);
 impl ModeResponseSender {
-    pub fn send(&self, result: Result<ModeResponse, String>) {
+    pub fn send(&self, result: ModeResponse) {
         let _ = self.0.send(Event::Response(result));
     }
 }
@@ -126,7 +125,7 @@ pub fn run(backend: Arc<dyn Backend>) {
         response_sender: ModeResponseSender(event_sender.clone()),
         viewport_size,
     };
-    let mut last_error = String::new();
+
     let mut current_mode = ModeKind::Status;
     let mut status_mode = mode::status::Mode::default();
 
@@ -151,23 +150,13 @@ pub fn run(backend: Arc<dyn Backend>) {
             Event::Resize(width, height) => {
                 mode_ctx.viewport_size = (width, height);
             }
-            Event::Response(result) => {
-                last_error.clear();
-                match result {
-                    Ok(response) => {
-                        status_mode.on_response(&response);
-                    }
-                    Err(error) => last_error.push_str(&error),
-                }
+            Event::Response(response) => {
+                status_mode.on_response(&response);
             }
         }
 
-        if !last_error.is_empty() {
-            // TODO: draw error
-        } else {
-            match current_mode {
-                ModeKind::Status => status_mode.draw(mode_ctx.viewport_size),
-            }
+        match current_mode {
+            ModeKind::Status => status_mode.draw(mode_ctx.viewport_size),
         }
     }
 }
