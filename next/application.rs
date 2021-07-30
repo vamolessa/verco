@@ -1,8 +1,5 @@
 use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        mpsc, Arc,
-    },
+    sync::{mpsc, Arc},
     thread,
 };
 
@@ -10,23 +7,9 @@ use crossterm::{event, terminal};
 
 use crate::{
     backend::Backend,
-    mode::{ModeManager, ModeResponse},
+    mode::{self, Mode, ModeContext, ModeKind, ModeResponse},
     ui,
 };
-
-static VIEWPORT_WIDTH: AtomicUsize = AtomicUsize::new(0);
-static VIEWPORT_HEIGHT: AtomicUsize = AtomicUsize::new(0);
-
-pub fn viewport_size() -> (u16, u16) {
-    let width = VIEWPORT_WIDTH.load(Ordering::Relaxed);
-    let height = VIEWPORT_HEIGHT.load(Ordering::Relaxed);
-    (width as _, height as _)
-}
-
-fn resize_viewport(width: u16, height: u16) {
-    VIEWPORT_WIDTH.store(width as _, Ordering::Relaxed);
-    VIEWPORT_HEIGHT.store(height as _, Ordering::Relaxed);
-}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -93,68 +76,99 @@ impl Key {
     }
 }
 
-pub enum InputEvent {
+enum Event {
     Key(Key),
-    Redraw,
+    Resize(u16, u16),
+    Response(Result<ModeResponse, String>),
 }
-impl InputEvent {
-    pub fn next() -> Self {
-        loop {
-            match event::read().unwrap() {
-                event::Event::Key(key) => {
-                    return Self::Key(Key::from_key_event(key));
+
+pub struct ModeResponseSender(mpsc::SyncSender<Event>);
+impl ModeResponseSender {
+    pub fn send(&self, result: Result<ModeResponse, String>) {
+        let _ = self.0.send(Event::Response(result));
+    }
+}
+
+fn console_events_loop(sender: mpsc::SyncSender<Event>) {
+    loop {
+        let event = match event::read() {
+            Ok(event) => event,
+            Err(_) => break,
+        };
+        match event {
+            event::Event::Key(key) => {
+                let event = Event::Key(Key::from_key_event(key));
+                if sender.send(event).is_err() {
+                    break;
                 }
-                event::Event::Mouse(_) => (),
-                event::Event::Resize(width, height) => {
-                    resize_viewport(width, height);
-                    return Self::Redraw;
+            }
+            event::Event::Mouse(_) => (),
+            event::Event::Resize(width, height) => {
+                let event = Event::Resize(width, height);
+                if sender.send(event).is_err() {
+                    break;
                 }
             }
         }
     }
 }
 
-pub enum ApplicationEvent {
-    Input(InputEvent),
-    Response(Result<ModeResponse, String>),
-}
-
-#[derive(Clone)]
-pub struct ModeResponseSender(mpsc::SyncSender<ApplicationEvent>);
-impl ModeResponseSender {
-    pub fn send(&self, result: Result<ModeResponse, String>) {
-        let _ = self.0.send(ApplicationEvent::Response(result));
-    }
-}
-
-pub struct Application {
-    backend: Arc<dyn Backend>,
-    modes: ModeManager,
-}
-
 pub fn run(backend: Arc<dyn Backend>) {
-    match terminal::size() {
-        Ok((width, height)) => resize_viewport(width, height),
+    let viewport_size = match terminal::size() {
+        Ok((width, height)) => (width, height),
         Err(_) => return,
     };
 
     let (event_sender, event_receiver) = mpsc::sync_channel(0);
 
-    let mut app = Application {
+    let mut mode_ctx = ModeContext {
         backend,
-        modes: ModeManager::new(ModeResponseSender(event_sender.clone())),
+        response_sender: ModeResponseSender(event_sender.clone()),
+        viewport_size,
     };
+    let mut last_error = String::new();
+    let mut current_mode = ModeKind::Status;
+    let mut status_mode = mode::status::Mode::default();
+
+    status_mode.on_enter(&mode_ctx);
+
+    thread::spawn(|| console_events_loop(event_sender));
 
     loop {
-        match InputEvent::next() {
-            InputEvent::Key(Key::Esc | Key::Ctrl('c') | Key::Char('q')) => {
-                break
+        let event = match event_receiver.recv() {
+            Ok(event) => event,
+            Err(_) => break,
+        };
+        match event {
+            Event::Key(Key::Esc | Key::Ctrl('c') | Key::Char('q')) => break,
+            Event::Key(Key::Char('s')) => {
+                current_mode = ModeKind::Status;
+                status_mode.on_enter(&mode_ctx);
             }
-            InputEvent::Key(key) => app.modes.on_key(app.backend.clone(), key),
-            InputEvent::Redraw => (),
+            Event::Key(key) => match current_mode {
+                ModeKind::Status => status_mode.on_key(&mode_ctx, key),
+            },
+            Event::Resize(width, height) => {
+                mode_ctx.viewport_size = (width, height);
+            }
+            Event::Response(result) => {
+                last_error.clear();
+                match result {
+                    Ok(response) => {
+                        status_mode.on_response(&response);
+                    }
+                    Err(error) => last_error.push_str(&error),
+                }
+            }
         }
 
-        app.modes.draw();
+        if !last_error.is_empty() {
+            // TODO: draw error
+        } else {
+            match current_mode {
+                ModeKind::Status => status_mode.draw(mode_ctx.viewport_size),
+            }
+        }
     }
 }
 

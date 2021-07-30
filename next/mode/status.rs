@@ -22,11 +22,7 @@ impl mode::Mode for Mode {
         &mut self.state
     }
 
-    fn on_enter(
-        &mut self,
-        backend: Arc<dyn Backend>,
-        response_sender: ModeResponseSender,
-    ) {
+    fn on_enter(&mut self, ctx: &mode::ModeContext) {
         /*
         let this = self.clone();
         mode::request(self, move || {
@@ -43,12 +39,7 @@ impl mode::Mode for Mode {
         */
     }
 
-    fn on_key(
-        &mut self,
-        backend: Arc<dyn Backend>,
-        response_sender: ModeResponseSender,
-        key: Key,
-    ) {
+    fn on_key(&mut self, ctx: &mode::ModeContext, key: Key) {
         /*
         let entries = self.entries.lock().unwrap();
         self.select.on_key(entries.len(), key);
@@ -71,7 +62,7 @@ impl mode::Mode for Mode {
         //
     }
 
-    fn draw(&self) {
+    fn draw(&self, viewport_size: (u16, u16)) {
         //ui::draw_output(self.name(), &self.output.lock().unwrap());
     }
 }

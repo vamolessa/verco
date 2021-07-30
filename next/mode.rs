@@ -1,15 +1,19 @@
 use std::{sync::Arc, thread};
 
 use crate::{
-    application::{viewport_size, ApplicationEvent, Key, ModeResponseSender},
+    application::{Key, ModeResponseSender},
     backend::Backend,
 };
 
-mod status;
+pub mod status;
 
 pub enum ModeResponse {
     Status,
     Error,
+}
+
+pub enum ModeKind {
+    Status,
 }
 
 #[derive(Default)]
@@ -19,19 +23,16 @@ pub struct ModeState {
 
 pub trait Mode {
     fn state(&mut self) -> &mut ModeState;
-    fn on_enter(
-        &mut self,
-        backend: Arc<dyn Backend>,
-        response_sender: ModeResponseSender,
-    );
-    fn on_key(
-        &mut self,
-        backend: Arc<dyn Backend>,
-        response_sender: ModeResponseSender,
-        key: Key,
-    );
+    fn on_enter(&mut self, ctx: &ModeContext);
+    fn on_key(&mut self, ctx: &ModeContext, key: Key);
     fn on_response(&mut self, response: &ModeResponse);
-    fn draw(&self);
+    fn draw(&self, viewport_size: (u16, u16));
+}
+
+pub struct ModeContext {
+    pub backend: Arc<dyn Backend>,
+    pub response_sender: ModeResponseSender,
+    pub viewport_size: (u16, u16),
 }
 
 /*
@@ -69,64 +70,6 @@ pub fn request<T>(
 }
 */
 
-enum ModeKind {
-    Status,
-}
-
-pub struct ModeManager {
-    response_sender: ModeResponseSender,
-    current: ModeKind,
-    status: status::Mode,
-    last_error: String,
-}
-impl ModeManager {
-    pub fn new(sender: ModeResponseSender) -> Self {
-        Self {
-            response_sender: sender,
-            current: ModeKind::Status,
-            status: status::Mode::default(),
-            last_error: String::new(),
-        }
-    }
-
-    pub fn on_key(&mut self, backend: Arc<dyn Backend>, key: Key) {
-        match key {
-            Key::Char('s') => {
-                self.current = ModeKind::Status;
-                self.status.on_enter(backend, self.response_sender.clone());
-            }
-            _ => match self.current {
-                ModeKind::Status => self.status.on_key(
-                    backend,
-                    self.response_sender.clone(),
-                    key,
-                ),
-            },
-        }
-    }
-
-    pub fn on_response(&mut self, result: Result<ModeResponse, String>) {
-        self.last_error.clear();
-        match result {
-            Ok(response) => {
-                self.status.on_response(&response);
-            }
-            Err(error) => self.last_error.push_str(&error),
-        }
-    }
-
-    pub fn draw(&self) {
-        if !self.last_error.is_empty() {
-            todo!();
-            return;
-        }
-
-        match self.current {
-            ModeKind::Status => self.status.draw(),
-        }
-    }
-}
-
 pub enum SelectMenuAction {
     None,
     Toggle(usize),
@@ -147,10 +90,15 @@ impl SelectMenu {
         self.scroll
     }
 
-    pub fn on_key(&mut self, entries_len: usize, key: Key) -> SelectMenuAction {
+    pub fn on_key(
+        &mut self,
+        ctx: &ModeContext,
+        entries_len: usize,
+        key: Key,
+    ) -> SelectMenuAction {
         let last_index = entries_len.saturating_sub(1);
 
-        let available_height = viewport_size().1.saturating_sub(1) as usize;
+        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
         let half_height = available_height / 2;
 
         self.cursor = match key {
