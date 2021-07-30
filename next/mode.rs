@@ -1,32 +1,40 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-    },
-    thread,
-};
+use std::{sync::Arc, thread};
 
 use crate::{
-    application::{viewport_size, Key},
+    application::{viewport_size, ApplicationEvent, Key, ModeResponseSender},
     backend::Backend,
 };
 
 mod status;
 
-#[derive(Default)]
-pub struct ModeState {
-    waiting: AtomicBool,
+pub enum ModeResponse {
+    Status,
+    Error,
 }
 
-pub trait Mode: 'static + Send + Sync {
-    fn name(&self) -> &'static str;
-    fn activation_key(&self) -> Key;
-    fn state(&self) -> &ModeState;
-    fn enter(self: Arc<Self>, backend: Arc<dyn Backend>);
-    fn on_key(self: Arc<Self>, backend: Arc<dyn Backend>, key: Key);
+#[derive(Default)]
+pub struct ModeState {
+    waiting: bool,
+}
+
+pub trait Mode {
+    fn state(&mut self) -> &mut ModeState;
+    fn on_enter(
+        &mut self,
+        backend: Arc<dyn Backend>,
+        response_sender: ModeResponseSender,
+    );
+    fn on_key(
+        &mut self,
+        backend: Arc<dyn Backend>,
+        response_sender: ModeResponseSender,
+        key: Key,
+    );
+    fn on_response(&mut self, response: &ModeResponse);
     fn draw(&self);
 }
 
+/*
 pub fn request<F>(mode: Arc<dyn Mode>, f: F)
 where
     F: 'static + FnOnce() + Send + Sync,
@@ -40,6 +48,7 @@ where
         mode.draw();
     });
 }
+*/
 
 /*
 pub fn request<T>(
@@ -60,37 +69,61 @@ pub fn request<T>(
 }
 */
 
-static CURRENT_MODE_INDEX: AtomicUsize = AtomicUsize::new(0);
+enum ModeKind {
+    Status,
+}
 
 pub struct ModeManager {
-    modes: [Arc<dyn Mode>; 1],
+    response_sender: ModeResponseSender,
+    current: ModeKind,
+    status: status::Mode,
+    last_error: String,
 }
 impl ModeManager {
-    pub fn new() -> Self {
+    pub fn new(sender: ModeResponseSender) -> Self {
         Self {
-            modes: [
-                Arc::new(status::Mode::default()),
-                //
-            ],
+            response_sender: sender,
+            current: ModeKind::Status,
+            status: status::Mode::default(),
+            last_error: String::new(),
         }
     }
 
-    pub fn on_key(&self, backend: Arc<dyn Backend>, key: Key) {
-        for (i, mode) in self.modes.iter().enumerate() {
-            if key == mode.activation_key() {
-                CURRENT_MODE_INDEX.store(i, Ordering::Relaxed);
-                mode.clone().enter(backend);
-                return;
+    pub fn on_key(&mut self, backend: Arc<dyn Backend>, key: Key) {
+        match key {
+            Key::Char('s') => {
+                self.current = ModeKind::Status;
+                self.status.on_enter(backend, self.response_sender.clone());
             }
+            _ => match self.current {
+                ModeKind::Status => self.status.on_key(
+                    backend,
+                    self.response_sender.clone(),
+                    key,
+                ),
+            },
         }
+    }
 
-        let current_index = CURRENT_MODE_INDEX.load(Ordering::Relaxed);
-        self.modes[current_index].clone().on_key(backend, key);
+    pub fn on_response(&mut self, result: Result<ModeResponse, String>) {
+        self.last_error.clear();
+        match result {
+            Ok(response) => {
+                self.status.on_response(&response);
+            }
+            Err(error) => self.last_error.push_str(&error),
+        }
     }
 
     pub fn draw(&self) {
-        let current_index = CURRENT_MODE_INDEX.load(Ordering::Relaxed);
-        self.modes[current_index].clone().draw();
+        if !self.last_error.is_empty() {
+            todo!();
+            return;
+        }
+
+        match self.current {
+            ModeKind::Status => self.status.draw(),
+        }
     }
 }
 
@@ -102,53 +135,50 @@ pub enum SelectMenuAction {
 
 #[derive(Default)]
 pub struct SelectMenu {
-    cursor: AtomicUsize,
-    scroll: AtomicUsize,
+    cursor: usize,
+    scroll: usize,
 }
 impl SelectMenu {
     pub fn cursor(&self) -> usize {
-        self.cursor.load(Ordering::Acquire)
+        self.cursor
     }
 
     pub fn scroll(&self) -> usize {
-        self.scroll.load(Ordering::Acquire)
+        self.scroll
     }
 
-    pub fn on_key(&self, entries_len: usize, key: Key) -> SelectMenuAction {
+    pub fn on_key(&mut self, entries_len: usize, key: Key) -> SelectMenuAction {
         let last_index = entries_len.saturating_sub(1);
 
-        let cursor = self.cursor();
         let available_height = viewport_size().1.saturating_sub(1) as usize;
         let half_height = available_height / 2;
 
-        let cursor = match key {
+        self.cursor = match key {
             Key::Down | Key::Ctrl('n') | Key::Char('j') => {
-                last_index.min(cursor + 1)
+                last_index.min(self.cursor + 1)
             }
             Key::Up | Key::Ctrl('p') | Key::Char('k') => {
-                cursor.saturating_sub(1)
+                self.cursor.saturating_sub(1)
             }
             Key::Ctrl('h') | Key::Home => 0,
             Key::Ctrl('e') | Key::End => last_index,
             Key::Ctrl('d') | Key::PageDown => {
-                last_index.min(cursor + half_height)
+                last_index.min(self.cursor + half_height)
             }
-            Key::Ctrl('u') | Key::PageUp => cursor.saturating_sub(half_height),
-            _ => cursor,
+            Key::Ctrl('u') | Key::PageUp => {
+                self.cursor.saturating_sub(half_height)
+            }
+            _ => self.cursor,
         };
 
-        let mut scroll = self.scroll();
-        if cursor < scroll {
-            scroll = cursor;
-        } else if cursor >= scroll + available_height {
-            scroll = cursor + 1 - available_height;
+        if self.cursor < self.scroll {
+            self.scroll = self.cursor;
+        } else if self.cursor >= self.scroll + available_height {
+            self.scroll = self.cursor + 1 - available_height;
         }
 
-        self.cursor.store(cursor, Ordering::Release);
-        self.scroll.store(scroll, Ordering::Release);
-
         match key {
-            Key::Char(' ') => SelectMenuAction::Toggle(cursor),
+            Key::Char(' ') => SelectMenuAction::Toggle(self.cursor),
             Key::Ctrl('a') => SelectMenuAction::ToggleAll,
             _ => SelectMenuAction::None,
         }

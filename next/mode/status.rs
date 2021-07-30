@@ -1,6 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use crate::{application::Key, backend::Backend, mode, ui};
+use crate::{
+    application::{Key, ModeResponseSender},
+    backend::Backend,
+    mode, ui,
+};
 
 pub struct Entry {
     //
@@ -9,24 +13,21 @@ pub struct Entry {
 #[derive(Default)]
 pub struct Mode {
     state: mode::ModeState,
-    entries: Mutex<Vec<Entry>>,
-    output: Mutex<String>, // TODO: remove
+    entries: Vec<Entry>,
+    output: String, // TODO: remove
     select: mode::SelectMenu,
 }
 impl mode::Mode for Mode {
-    fn name(&self) -> &'static str {
-        "status"
+    fn state(&mut self) -> &mut mode::ModeState {
+        &mut self.state
     }
 
-    fn activation_key(&self) -> Key {
-        Key::Char('s')
-    }
-
-    fn state(&self) -> &mode::ModeState {
-        &self.state
-    }
-
-    fn enter(self: Arc<Self>, backend: Arc<dyn Backend>) {
+    fn on_enter(
+        &mut self,
+        backend: Arc<dyn Backend>,
+        response_sender: ModeResponseSender,
+    ) {
+        /*
         let this = self.clone();
         mode::request(self, move || {
             let output = match backend.status() {
@@ -39,9 +40,16 @@ impl mode::Mode for Mode {
             this.entries.lock().unwrap().clear();
             *this.output.lock().unwrap() = output;
         });
+        */
     }
 
-    fn on_key(self: Arc<Self>, backend: Arc<dyn Backend>, key: Key) {
+    fn on_key(
+        &mut self,
+        backend: Arc<dyn Backend>,
+        response_sender: ModeResponseSender,
+        key: Key,
+    ) {
+        /*
         let entries = self.entries.lock().unwrap();
         self.select.on_key(entries.len(), key);
         match key {
@@ -56,10 +64,15 @@ impl mode::Mode for Mode {
             }
             _ => (),
         }
+        */
+    }
+
+    fn on_response(&mut self, response: &mode::ModeResponse) {
+        //
     }
 
     fn draw(&self) {
-        ui::draw_output(self.name(), &self.output.lock().unwrap());
+        //ui::draw_output(self.name(), &self.output.lock().unwrap());
     }
 }
 

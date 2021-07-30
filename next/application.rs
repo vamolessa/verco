@@ -1,11 +1,18 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc, Arc,
+    },
+    thread,
 };
 
 use crossterm::{event, terminal};
 
-use crate::{backend::Backend, mode::ModeManager, ui};
+use crate::{
+    backend::Backend,
+    mode::{ModeManager, ModeResponse},
+    ui,
+};
 
 static VIEWPORT_WIDTH: AtomicUsize = AtomicUsize::new(0);
 static VIEWPORT_HEIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -86,11 +93,11 @@ impl Key {
     }
 }
 
-pub enum ApplicationEvent {
+pub enum InputEvent {
     Key(Key),
     Redraw,
 }
-impl ApplicationEvent {
+impl InputEvent {
     pub fn next() -> Self {
         loop {
             match event::read().unwrap() {
@@ -107,9 +114,22 @@ impl ApplicationEvent {
     }
 }
 
+pub enum ApplicationEvent {
+    Input(InputEvent),
+    Response(Result<ModeResponse, String>),
+}
+
+#[derive(Clone)]
+pub struct ModeResponseSender(mpsc::SyncSender<ApplicationEvent>);
+impl ModeResponseSender {
+    pub fn send(&self, result: Result<ModeResponse, String>) {
+        let _ = self.0.send(ApplicationEvent::Response(result));
+    }
+}
+
 pub struct Application {
     backend: Arc<dyn Backend>,
-    modes: Arc<ModeManager>,
+    modes: ModeManager,
 }
 
 pub fn run(backend: Arc<dyn Backend>) {
@@ -118,18 +138,20 @@ pub fn run(backend: Arc<dyn Backend>) {
         Err(_) => return,
     };
 
-    let app = Application {
+    let (event_sender, event_receiver) = mpsc::sync_channel(0);
+
+    let mut app = Application {
         backend,
-        modes: Arc::new(ModeManager::new()),
+        modes: ModeManager::new(ModeResponseSender(event_sender.clone())),
     };
 
     loop {
-        match ApplicationEvent::next() {
-            ApplicationEvent::Key(
-                Key::Esc | Key::Ctrl('c') | Key::Char('q'),
-            ) => break,
-            ApplicationEvent::Key(key) => app.modes.on_key(app.backend.clone(), key),
-            ApplicationEvent::Redraw => (),
+        match InputEvent::next() {
+            InputEvent::Key(Key::Esc | Key::Ctrl('c') | Key::Char('q')) => {
+                break
+            }
+            InputEvent::Key(key) => app.modes.on_key(app.backend.clone(), key),
+            InputEvent::Redraw => (),
         }
 
         app.modes.draw();
