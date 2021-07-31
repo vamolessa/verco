@@ -73,6 +73,14 @@ impl Key {
             event::KeyCode::Esc => Self::Esc,
         }
     }
+
+    pub fn is_submit(&self) -> bool {
+        matches!(self, Self::Enter | Self::Char('\n') | Self::Ctrl('m'))
+    }
+
+    pub fn is_cancel(&self) -> bool {
+        matches!(self, Self::Esc | Self::Ctrl('c'))
+    }
 }
 
 enum Event {
@@ -140,12 +148,16 @@ pub fn run(backend: Arc<dyn Backend>) {
             Err(_) => break,
         };
         match event {
-            Event::Key(Key::Esc | Key::Ctrl('c') | Key::Char('q')) => break,
             Event::Key(key) => {
                 let input_blocked = match current_mode {
                     ModeKind::Status => status_mode.on_key(&mode_ctx, key),
                 };
+
                 if !input_blocked {
+                    if key.is_cancel() {
+                        break;
+                    }
+
                     match key {
                         Key::Char('s') => {
                             current_mode = ModeKind::Status;

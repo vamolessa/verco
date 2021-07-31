@@ -22,12 +22,6 @@ pub struct ModeContext {
     pub viewport_size: (u16, u16),
 }
 
-pub enum ReadLineAction {
-    None,
-    Submit,
-    Cancel,
-}
-
 #[derive(Default)]
 pub struct ReadLine {
     input: String,
@@ -41,12 +35,8 @@ impl ReadLine {
         &self.input
     }
 
-    pub fn on_key(&mut self, key: Key) -> ReadLineAction {
+    pub fn on_key(&mut self, key: Key) {
         match key {
-            Key::Esc | Key::Ctrl('c') => return ReadLineAction::Cancel,
-            Key::Enter | Key::Char('\n') | Key::Ctrl('m') => {
-                return ReadLineAction::Submit;
-            }
             Key::Home | Key::Ctrl('u') => self.input.clear(),
             Key::Ctrl('w') => {
                 fn is_word(c: char) -> bool {
@@ -89,8 +79,6 @@ impl ReadLine {
             Key::Char(c) => self.input.push(c),
             _ => (),
         }
-
-        ReadLineAction::None
     }
 }
 

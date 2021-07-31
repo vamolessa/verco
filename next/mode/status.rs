@@ -3,10 +3,7 @@ use std::thread;
 use crate::{
     application::Key,
     backend::BackendResult,
-    mode::{
-        ModeContext, ModeResponse, ReadLine, ReadLineAction, SelectMenu,
-        SelectMenuAction,
-    },
+    mode::{ModeContext, ModeResponse, ReadLine, SelectMenu, SelectMenuAction},
     ui,
 };
 
@@ -17,6 +14,9 @@ struct FileEntry {
 
 pub enum Response {
     Entries(BackendResult<Vec<FileEntry>>),
+    Commit(String),
+    Revert(String),
+    Diff(String),
 }
 
 enum State {
@@ -48,11 +48,14 @@ impl Mode {
         }
         self.state = State::WaitingForEntries;
 
+        self.readline.clear();
+        self.message.clear();
+
         let ctx = ctx.clone();
         thread::spawn(move || {
             let response = match ctx.backend.status() {
-                BackendResult::Ok(_) => BackendResult::Ok(Vec::new()),
-                BackendResult::Err(error) => BackendResult::Err(error),
+                Ok(_) => Ok(Vec::new()),
+                Err(error) => Err(error),
             };
             let response = Response::Entries(response);
             ctx.response_sender.send(ModeResponse::Status(response));
@@ -85,25 +88,35 @@ impl Mode {
                 match key {
                     Key::Char('c') => {
                         self.state = State::CommitMessageInput;
-                        // TODO: goto commit
+                        self.readline.clear();
                     }
                     Key::Char('U') => {
+                        self.state = State::ViewRevertResult;
                         // TODO: goto revert
                     }
                     Key::Char('d') => {
+                        self.state = State::ViewDiff;
                         // TODO: goto diff
                     }
                     _ => (),
                 }
             }
             State::CommitMessageInput => {
-                match self.readline.on_key(key) {
-                    ReadLineAction::None => (),
-                    ReadLineAction::Submit => {
-                        self.state = State::ViewCommitResult;
-                        // TODO: send request
-                    }
-                    ReadLineAction::Cancel => self.on_enter(ctx),
+                self.readline.on_key(key);
+                if key.is_submit() {
+                    self.state = State::ViewCommitResult;
+
+                    // TODO: send request
+                    let ctx = ctx.clone();
+                    thread::spawn(move || {
+                        // TODO: change to commit selected
+                        let message = match ctx.backend.status() {
+                            Ok(message) => message,
+                            Err(error) => error,
+                        };
+                    });
+                } else if key.is_cancel() {
+                    self.on_enter(ctx);
                 }
             }
             _ => {
@@ -126,6 +139,15 @@ impl Mode {
                     Ok(entries) => self.entries = entries.clone(),
                     Err(error) => self.message.push_str(&error),
                 }
+            }
+            Response::Commit(message) => {
+                //
+            }
+            Response::Revert(message) => {
+                //
+            }
+            Response::Diff(message) => {
+                //
             }
         }
     }
