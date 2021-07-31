@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread};
+use std::sync::Arc;
 
 use crate::{
     application::{Key, ModeResponseSender},
@@ -8,66 +8,91 @@ use crate::{
 pub mod status;
 
 pub enum ModeResponse {
-    Status,
+    Status(status::Response),
 }
 
 pub enum ModeKind {
     Status,
 }
 
-#[derive(Default)]
-pub struct ModeState {
-    waiting: bool,
-}
-
-pub trait Mode {
-    fn state(&mut self) -> &mut ModeState;
-    fn on_enter(&mut self, ctx: &ModeContext);
-    fn on_key(&mut self, ctx: &ModeContext, key: Key);
-    fn on_response(&mut self, response: &ModeResponse);
-    fn draw(&self, viewport_size: (u16, u16));
-}
-
+#[derive(Clone)]
 pub struct ModeContext {
     pub backend: Arc<dyn Backend>,
     pub response_sender: ModeResponseSender,
     pub viewport_size: (u16, u16),
 }
 
-/*
-pub fn request<F>(mode: Arc<dyn Mode>, f: F)
-where
-    F: 'static + FnOnce() + Send + Sync,
-{
-    if mode.state().waiting.load(Ordering::Acquire) {
-        return;
-    }
-    mode.state().waiting.store(true, Ordering::Release);
-    thread::spawn(move || {
-        f();
-        mode.draw();
-    });
+pub enum ReadLineAction {
+    None,
+    Submit,
+    Cancel,
 }
-*/
 
-/*
-pub fn request<T>(
-    mode: Arc<dyn Mode>,
-    requester: fn(&dyn Backend) -> Result<T, String>,
-) where
-    T: 'static,
-{
-    if mode.state().waiting.load(Ordering::Acquire) {
-        return;
-    }
-    mode.state().waiting.store(true, Ordering::Release);
-
-    thread::spawn(move || {
-        use std::ops::Deref;
-        let result = requester(backend.deref());
-    });
+#[derive(Default)]
+pub struct ReadLine {
+    input: String,
 }
-*/
+impl ReadLine {
+    pub fn clear(&mut self) {
+        self.input.clear();
+    }
+
+    pub fn input(&self) -> &str {
+        &self.input
+    }
+
+    pub fn on_key(&mut self, key: Key) -> ReadLineAction {
+        match key {
+            Key::Esc | Key::Ctrl('c') => return ReadLineAction::Cancel,
+            Key::Enter | Key::Char('\n') | Key::Ctrl('m') => {
+                return ReadLineAction::Submit;
+            }
+            Key::Home | Key::Ctrl('u') => self.input.clear(),
+            Key::Ctrl('w') => {
+                fn is_word(c: char) -> bool {
+                    c.is_alphanumeric() || c == '_'
+                }
+
+                fn rfind_boundary(
+                    mut chars: std::str::Chars,
+                    f: fn(&char) -> bool,
+                ) -> usize {
+                    match chars.rfind(f) {
+                        Some(c) => chars.as_str().len() + c.len_utf8(),
+                        None => 0,
+                    }
+                }
+
+                let mut chars = self.input.chars();
+                if let Some(c) = chars.next_back() {
+                    let len = if is_word(c) {
+                        rfind_boundary(chars, |&c| !is_word(c))
+                    } else if c.is_ascii_whitespace() {
+                        rfind_boundary(chars, |&c| {
+                            is_word(c) || !c.is_ascii_whitespace()
+                        })
+                    } else {
+                        rfind_boundary(chars, |&c| {
+                            is_word(c) || c.is_ascii_whitespace()
+                        })
+                    };
+                    self.input.truncate(len);
+                }
+            }
+            Key::Backspace | Key::Ctrl('h') => {
+                if let Some((last_char_index, _)) =
+                    self.input.char_indices().next_back()
+                {
+                    self.input.truncate(last_char_index);
+                }
+            }
+            Key::Char(c) => self.input.push(c),
+            _ => (),
+        }
+
+        ReadLineAction::None
+    }
+}
 
 pub enum SelectMenuAction {
     None,
@@ -91,32 +116,29 @@ impl SelectMenu {
 
     pub fn on_key(
         &mut self,
-        ctx: &ModeContext,
         entries_len: usize,
+        available_height: usize,
         key: Key,
     ) -> SelectMenuAction {
         let last_index = entries_len.saturating_sub(1);
 
-        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
         let half_height = available_height / 2;
 
         self.cursor = match key {
-            Key::Down | Key::Ctrl('n') | Key::Char('j') => {
-                last_index.min(self.cursor + 1)
-            }
+            Key::Down | Key::Ctrl('n') | Key::Char('j') => self.cursor + 1,
             Key::Up | Key::Ctrl('p') | Key::Char('k') => {
                 self.cursor.saturating_sub(1)
             }
             Key::Ctrl('h') | Key::Home => 0,
             Key::Ctrl('e') | Key::End => last_index,
-            Key::Ctrl('d') | Key::PageDown => {
-                last_index.min(self.cursor + half_height)
-            }
+            Key::Ctrl('d') | Key::PageDown => self.cursor + half_height,
             Key::Ctrl('u') | Key::PageUp => {
                 self.cursor.saturating_sub(half_height)
             }
             _ => self.cursor,
         };
+
+        self.cursor = self.cursor.min(last_index);
 
         if self.cursor < self.scroll {
             self.scroll = self.cursor;
@@ -125,7 +147,9 @@ impl SelectMenu {
         }
 
         match key {
-            Key::Char(' ') => SelectMenuAction::Toggle(self.cursor),
+            Key::Char(' ') if self.cursor < entries_len => {
+                SelectMenuAction::Toggle(self.cursor)
+            }
             Key::Ctrl('a') => SelectMenuAction::ToggleAll,
             _ => SelectMenuAction::None,
         }

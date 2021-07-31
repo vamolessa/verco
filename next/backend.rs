@@ -6,10 +6,12 @@ use std::{
 
 pub mod git;
 
+pub type BackendResult<T> = std::result::Result<T, String>;
+
 pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 
-    fn status(&self) -> Result<String, String>;
+    fn status(&self) -> BackendResult<String>;
 }
 
 /*
@@ -86,7 +88,7 @@ pub trait VersionControlActions: Send {
 
 pub struct Process(Child);
 impl Process {
-    pub fn spawn(command_name: &str, args: &[&str]) -> Result<Self, String> {
+    pub fn spawn(command_name: &str, args: &[&str]) -> BackendResult<Self> {
         let mut command = Command::new(command_name);
         command.args(args);
         command.stdin(Stdio::null());
@@ -102,11 +104,14 @@ impl Process {
         }
     }
 
-    pub fn wait(self) -> Result<String, String> {
+    pub fn wait(self) -> BackendResult<String> {
         let output = match self.0.wait_with_output() {
             Ok(output) => output,
             Err(error) => {
-                return Err(format!("could not wait for process: {}", error))
+                return Err(format!(
+                    "could not wait for process: {}",
+                    error
+                ))
             }
         };
 

@@ -7,7 +7,7 @@ use crossterm::{event, terminal};
 
 use crate::{
     backend::Backend,
-    mode::{self, Mode, ModeContext, ModeKind, ModeResponse},
+    mode::{self, ModeContext, ModeKind, ModeResponse},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -81,6 +81,7 @@ enum Event {
     Response(ModeResponse),
 }
 
+#[derive(Clone)]
 pub struct ModeResponseSender(mpsc::SyncSender<Event>);
 impl ModeResponseSender {
     pub fn send(&self, result: ModeResponse) {
@@ -140,18 +141,25 @@ pub fn run(backend: Arc<dyn Backend>) {
         };
         match event {
             Event::Key(Key::Esc | Key::Ctrl('c') | Key::Char('q')) => break,
-            Event::Key(Key::Char('s')) => {
-                current_mode = ModeKind::Status;
-                status_mode.on_enter(&mode_ctx);
+            Event::Key(key) => {
+                let input_blocked = match current_mode {
+                    ModeKind::Status => status_mode.on_key(&mode_ctx, key),
+                };
+                if !input_blocked {
+                    match key {
+                        Key::Char('s') => {
+                            current_mode = ModeKind::Status;
+                            status_mode.on_enter(&mode_ctx);
+                        }
+                        _ => (),
+                    }
+                }
             }
-            Event::Key(key) => match current_mode {
-                ModeKind::Status => status_mode.on_key(&mode_ctx, key),
-            },
             Event::Resize(width, height) => {
                 mode_ctx.viewport_size = (width, height);
             }
-            Event::Response(response) => {
-                status_mode.on_response(&response);
+            Event::Response(ModeResponse::Status(response)) => {
+                status_mode.on_response(response);
             }
         }
 

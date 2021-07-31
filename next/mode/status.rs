@@ -1,69 +1,148 @@
-use std::sync::Arc;
+use std::thread;
 
 use crate::{
-    application::{Key, ModeResponseSender},
-    backend::Backend,
-    mode, ui,
+    application::Key,
+    backend::BackendResult,
+    mode::{
+        ModeContext, ModeResponse, ReadLine, ReadLineAction, SelectMenu,
+        SelectMenuAction,
+    },
+    ui,
 };
 
-pub struct Entry {
-    //
+#[derive(Clone)]
+struct FileEntry {
+    pub selected: bool,
+}
+
+pub enum Response {
+    Entries(BackendResult<Vec<FileEntry>>),
+}
+
+enum State {
+    Idle,
+    WaitingForEntries,
+    CommitMessageInput,
+    ViewCommitResult,
+    ViewRevertResult,
+    ViewDiff,
+}
+impl Default for State {
+    fn default() -> Self {
+        Self::Idle
+    }
 }
 
 #[derive(Default)]
 pub struct Mode {
-    state: mode::ModeState,
-    entries: Vec<Entry>,
-    output: String, // TODO: remove
-    select: mode::SelectMenu,
+    state: State,
+    entries: Vec<FileEntry>,
+    message: String,
+    select: SelectMenu,
+    readline: ReadLine,
 }
-impl mode::Mode for Mode {
-    fn state(&mut self) -> &mut mode::ModeState {
-        &mut self.state
-    }
-
-    fn on_enter(&mut self, ctx: &mode::ModeContext) {
-        /*
-        let this = self.clone();
-        mode::request(self, move || {
-            let output = match backend.status() {
-                Ok(output) => output,
-                Err(error) => {
-                    ui::draw_output(this.name(), &error);
-                    return;
-                }
-            };
-            this.entries.lock().unwrap().clear();
-            *this.output.lock().unwrap() = output;
-        });
-        */
-    }
-
-    fn on_key(&mut self, ctx: &mode::ModeContext, key: Key) {
-        /*
-        let entries = self.entries.lock().unwrap();
-        self.select.on_key(entries.len(), key);
-        match key {
-            Key::Char('c') => {
-                // commit
-            }
-            Key::Char('U') => {
-                // revert
-            }
-            Key::Char('d') => {
-                // diff
-            }
-            _ => (),
+impl Mode {
+    pub fn on_enter(&mut self, ctx: &ModeContext) {
+        if let State::WaitingForEntries = self.state {
+            return;
         }
-        */
+        self.state = State::WaitingForEntries;
+
+        let ctx = ctx.clone();
+        thread::spawn(move || {
+            let response = match ctx.backend.status() {
+                BackendResult::Ok(_) => BackendResult::Ok(Vec::new()),
+                BackendResult::Err(error) => BackendResult::Err(error),
+            };
+            let response = Response::Entries(response);
+            ctx.response_sender.send(ModeResponse::Status(response));
+        });
     }
 
-    fn on_response(&mut self, result: &mode::ModeResponse) {
-        //
+    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> bool {
+        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+
+        match self.state {
+            State::Idle | State::WaitingForEntries => {
+                match self.select.on_key(
+                    self.entries.len(),
+                    available_height,
+                    key,
+                ) {
+                    SelectMenuAction::None => (),
+                    SelectMenuAction::Toggle(i) => {
+                        self.entries[i].selected = !self.entries[i].selected
+                    }
+                    SelectMenuAction::ToggleAll => {
+                        let all_selected =
+                            self.entries.iter().all(|e| e.selected);
+                        for entry in &mut self.entries {
+                            entry.selected = !all_selected;
+                        }
+                    }
+                }
+
+                match key {
+                    Key::Char('c') => {
+                        self.state = State::CommitMessageInput;
+                        // TODO: goto commit
+                    }
+                    Key::Char('U') => {
+                        // TODO: goto revert
+                    }
+                    Key::Char('d') => {
+                        // TODO: goto diff
+                    }
+                    _ => (),
+                }
+            }
+            State::CommitMessageInput => {
+                match self.readline.on_key(key) {
+                    ReadLineAction::None => (),
+                    ReadLineAction::Submit => {
+                        self.state = State::ViewCommitResult;
+                        // TODO: send request
+                    }
+                    ReadLineAction::Cancel => self.on_enter(ctx),
+                }
+            }
+            _ => {
+                //
+            }
+        }
+
+        matches!(self.state, State::CommitMessageInput)
     }
 
-    fn draw(&self, viewport_size: (u16, u16)) {
-        //ui::draw_output(self.name(), &self.output.lock().unwrap());
+    pub fn on_response(&mut self, response: Response) {
+        self.message.clear();
+
+        match response {
+            Response::Entries(entries) => {
+                if let State::WaitingForEntries = self.state {
+                    self.state = State::Idle;
+                }
+                match entries {
+                    Ok(entries) => self.entries = entries.clone(),
+                    Err(error) => self.message.push_str(&error),
+                }
+            }
+        }
+    }
+
+    pub fn draw(&self, viewport_size: (u16, u16)) {
+        match self.state {
+            State::Idle => {
+                //ui::draw_output(self.name(), &self.output.lock().unwrap());
+            }
+            State::WaitingForEntries => {
+                //
+            }
+            State::CommitMessageInput => (),
+            State::ViewCommitResult => (),
+            State::ViewRevertResult => (),
+            State::ViewDiff => (),
+        }
     }
 }
 
