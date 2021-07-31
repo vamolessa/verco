@@ -141,13 +141,13 @@ impl Mode {
                 }
             }
             Response::Commit(message) => {
-                //
+                // TODO
             }
             Response::Revert(message) => {
-                //
+                // TODO
             }
             Response::Diff(message) => {
-                //
+                // TODO
             }
         }
     }
