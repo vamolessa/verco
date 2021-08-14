@@ -63,10 +63,9 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> bool {
-        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
-
         match self.state {
             State::Idle | State::WaitingForEntries => {
+                let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
                 match self.select.on_key(
                     self.entries.len(),
                     available_height,
