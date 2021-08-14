@@ -18,19 +18,21 @@ impl<'a> Drawer<'a> {
     }
 
     pub fn header(&mut self, mode_name: &str) {
-        let dark_background_color = style::Color::DarkGreen;
-        let light_background_color = style::Color::Green;
-        let foreground_color = style::Color::White;
+        let background_color = style::Color::DarkGreen;
+        let foreground_color = style::Color::Black;
 
         crossterm::queue!(
             &mut self.stdout,
             cursor::MoveTo(0, 0),
-            style::SetBackgroundColor(light_background_color),
+            style::SetBackgroundColor(background_color),
             style::SetForegroundColor(foreground_color),
             style::Print(' '),
-            style::SetBackgroundColor(dark_background_color),
+            style::SetBackgroundColor(foreground_color),
+            style::SetForegroundColor(background_color),
+            style::Print(' '),
             style::Print(mode_name),
-            style::SetBackgroundColor(light_background_color),
+            style::Print(' '),
+            style::SetBackgroundColor(background_color),
             terminal::Clear(terminal::ClearType::UntilNewLine),
             cursor::MoveToNextLine(1),
             style::ResetColor,
@@ -48,6 +50,7 @@ impl<'a> Drawer<'a> {
     }
 
     pub fn output(&mut self, output: &Output) {
+        
         //write!(&mut self.stdout, "output:\n{}\n----\n", output).unwrap();
     }
 
