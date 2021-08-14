@@ -22,7 +22,7 @@ impl<'a> Drawer<'a> {
     }
 
     pub fn header(&mut self, mode_name: &str) {
-        let background_color = style::Color::DarkGreen;
+        let background_color = style::Color::DarkYellow;
         let foreground_color = style::Color::Black;
 
         crossterm::queue!(
@@ -70,7 +70,7 @@ impl<'a> Drawer<'a> {
             style::SetBackgroundColor(style::Color::Black),
             style::SetForegroundColor(style::Color::White),
             style::Print(readline.input()),
-            style::SetBackgroundColor(style::Color::Red),
+            style::SetBackgroundColor(style::Color::DarkRed),
             style::Print(' '),
             style::SetBackgroundColor(style::Color::Black),
         )
