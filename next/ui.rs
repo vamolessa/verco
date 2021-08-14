@@ -2,20 +2,7 @@ use std::io::{StdoutLock, Write};
 
 use crossterm::{self, cursor, style, terminal};
 
-use crate::mode::SelectMenu;
-
-pub enum TextKind {
-    Normal,
-    Label,
-}
-impl TextKind {
-    pub fn to_color(self) -> style::Color {
-        match self {
-            Self::Normal => style::Color::White,
-            Self::Label => style::Color::DarkYellow,
-        }
-    }
-}
+use crate::mode::{SelectMenu, ReadLine, Output};
 
 pub trait Draw {
     fn draw(&self, drawer: &mut Drawer);
@@ -51,13 +38,8 @@ impl<'a> Drawer<'a> {
         .unwrap();
     }
 
-    pub fn text(&mut self, text: &str, kind: TextKind) {
-        crossterm::queue!(
-            &mut self.stdout,
-            style::SetForegroundColor(kind.to_color()),
-            style::Print(text)
-        )
-        .unwrap();
+    pub fn text(&mut self, text: &str) {
+        crossterm::queue!(&mut self.stdout, style::Print(text)).unwrap();
     }
 
     pub fn toggle(&mut self, on: bool) {
@@ -65,17 +47,21 @@ impl<'a> Drawer<'a> {
         self.stdout.write_all(state_text.as_bytes()).unwrap();
     }
 
-    pub fn next_line(&mut self) {
-        crossterm::queue!(
-            &mut self.stdout,
-            terminal::Clear(terminal::ClearType::UntilNewLine),
-            cursor::MoveToNextLine(1)
-        )
-        .unwrap();
+    pub fn output(&mut self, output: &Output) {
+        //write!(&mut self.stdout, "output:\n{}\n----\n", output).unwrap();
     }
 
-    pub fn output(&mut self, output: &str) {
-        write!(&mut self.stdout, "output:\n{}\n----\n", output).unwrap();
+    pub fn readline(&mut self, readline: &ReadLine) {
+        crossterm::queue!(
+            &mut self.stdout,
+            style::SetBackgroundColor(style::Color::Black),
+            style::SetForegroundColor(style::Color::White),
+            style::Print(readline.input()),
+            style::SetBackgroundColor(style::Color::Red),
+            style::Print(' '),
+            style::SetBackgroundColor(style::Color::Black),
+        )
+        .unwrap();
     }
 
     pub fn select_menu<'entries, I, E>(

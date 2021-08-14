@@ -3,8 +3,11 @@ use std::{io, thread};
 use crate::{
     application::Key,
     backend::BackendResult,
-    mode::{ModeContext, ModeResponse, ReadLine, SelectMenu, SelectMenuAction},
-    ui::{Draw, Drawer, TextKind},
+    mode::{
+        ModeContext, ModeResponse, Output, ReadLine, SelectMenu,
+        SelectMenuAction,
+    },
+    ui::{Draw, Drawer},
 };
 
 #[derive(Clone)]
@@ -15,7 +18,7 @@ struct FileEntry {
 impl Draw for FileEntry {
     fn draw(&self, drawer: &mut Drawer) {
         drawer.toggle(self.selected);
-        drawer.text(&self.name, TextKind::Normal);
+        drawer.text(&self.name);
     }
 }
 
@@ -44,7 +47,7 @@ impl Default for State {
 pub struct Mode {
     state: State,
     entries: Vec<FileEntry>,
-    message: String,
+    output: Output,
     select: SelectMenu,
     readline: ReadLine,
 }
@@ -56,7 +59,7 @@ impl Mode {
         self.state = State::WaitingForEntries;
 
         self.readline.clear();
-        self.message.clear();
+        self.output.set(String::new());
 
         let ctx = ctx.clone();
         thread::spawn(move || {
@@ -70,10 +73,11 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> bool {
+        let input_locked = matches!(self.state, State::CommitMessageInput);
+        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+
         match self.state {
             State::Idle | State::WaitingForEntries => {
-                let available_height =
-                    ctx.viewport_size.1.saturating_sub(1) as usize;
                 match self.select.on_key(
                     self.entries.len(),
                     available_height,
@@ -99,11 +103,11 @@ impl Mode {
                     }
                     Key::Char('U') => {
                         self.state = State::ViewRevertResult;
-                        // TODO: goto revert
+                        self.output.set(String::new());
                     }
                     Key::Char('d') => {
                         self.state = State::ViewDiff;
-                        // TODO: goto diff
+                        self.output.set(String::new());
                     }
                     _ => (),
                 }
@@ -126,17 +130,13 @@ impl Mode {
                     self.on_enter(ctx);
                 }
             }
-            _ => {
-                //
-            }
+            _ => self.output.on_key(available_height, key),
         }
 
-        matches!(self.state, State::CommitMessageInput)
+        input_locked
     }
 
     pub fn on_response(&mut self, response: Response) {
-        self.message.clear();
-
         match response {
             Response::Entries(entries) => {
                 if let State::WaitingForEntries = self.state {
@@ -144,17 +144,20 @@ impl Mode {
                 }
                 match entries {
                     Ok(entries) => self.entries = entries,
-                    Err(error) => self.message.push_str(&error),
+                    Err(error) => self.output.set(error),
                 }
             }
-            Response::Commit(message) => {
-                // TODO
+            Response::Commit(output) => {
+                self.state = State::ViewCommitResult;
+                self.output.set(output);
             }
-            Response::Revert(message) => {
-                // TODO
+            Response::Revert(output) => {
+                self.state = State::ViewRevertResult;
+                self.output.set(output);
             }
-            Response::Diff(message) => {
-                // TODO
+            Response::Diff(output) => {
+                self.state = State::ViewDiff;
+                self.output.set(output);
             }
         }
     }
@@ -182,17 +185,19 @@ impl Mode {
             }
             State::CommitMessageInput => {
                 drawer.header("commit message");
-                drawer.text(self.readline.input(), TextKind::Normal);
+                drawer.readline(&self.readline);
             }
             State::ViewCommitResult => {
                 drawer.header("commit");
-                // TODO
+                drawer.output(&self.output);
             }
             State::ViewRevertResult => {
                 drawer.header("revert");
+                drawer.output(&self.output);
             }
             State::ViewDiff => {
                 drawer.header("diff");
+                drawer.output(&self.output);
             }
         }
     }

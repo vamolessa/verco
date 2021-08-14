@@ -23,6 +23,43 @@ pub struct ModeContext {
 }
 
 #[derive(Default)]
+pub struct Output {
+    text: String,
+    line_count: usize,
+    scroll: usize,
+}
+impl Output {
+    pub fn set(&mut self, output: String) {
+        self.text = output;
+        self.line_count = self.text.lines().count();
+        self.scroll = 0;
+    }
+
+    pub fn on_key(&mut self, available_height: usize, key: Key) {
+        let half_height = available_height / 2;
+
+        self.scroll = match key {
+            Key::Down | Key::Ctrl('n') | Key::Char('j') => self.scroll + 1,
+            Key::Up | Key::Ctrl('p') | Key::Char('k') => {
+                self.scroll.saturating_sub(1)
+            }
+            Key::Ctrl('h') | Key::Home => 0,
+            Key::Ctrl('e') | Key::End => usize::MAX,
+            Key::Ctrl('d') | Key::PageDown => self.scroll + half_height,
+            Key::Ctrl('u') | Key::PageUp => {
+                self.scroll.saturating_sub(half_height)
+            }
+            _ => self.scroll,
+        };
+
+        self.scroll = self
+            .line_count
+            .saturating_sub(available_height)
+            .min(self.scroll);
+    }
+}
+
+#[derive(Default)]
 pub struct ReadLine {
     input: String,
 }
@@ -109,7 +146,6 @@ impl SelectMenu {
         key: Key,
     ) -> SelectMenuAction {
         let last_index = entries_len.saturating_sub(1);
-
         let half_height = available_height / 2;
 
         self.cursor = match key {
@@ -118,7 +154,7 @@ impl SelectMenu {
                 self.cursor.saturating_sub(1)
             }
             Key::Ctrl('h') | Key::Home => 0,
-            Key::Ctrl('e') | Key::End => last_index,
+            Key::Ctrl('e') | Key::End => usize::MAX,
             Key::Ctrl('d') | Key::PageDown => self.cursor + half_height,
             Key::Ctrl('u') | Key::PageUp => {
                 self.cursor.saturating_sub(half_height)
@@ -143,3 +179,4 @@ impl SelectMenu {
         }
     }
 }
+
