@@ -1,8 +1,8 @@
 use std::io::Write;
 
 mod application;
-mod mode;
 mod backend;
+mod mode;
 mod ui;
 
 fn main() {
@@ -54,4 +54,3 @@ fn main() {
         crossterm::terminal::disable_raw_mode().unwrap();
     }
 }
-

@@ -1,15 +1,22 @@
-use std::thread;
+use std::{io, thread};
 
 use crate::{
     application::Key,
     backend::BackendResult,
     mode::{ModeContext, ModeResponse, ReadLine, SelectMenu, SelectMenuAction},
-    ui,
+    ui::{Draw, Drawer, TextKind},
 };
 
 #[derive(Clone)]
 struct FileEntry {
     pub selected: bool,
+    pub name: String,
+}
+impl Draw for FileEntry {
+    fn draw(&self, drawer: &mut Drawer) {
+        drawer.toggle(self.selected);
+        drawer.text(&self.name, TextKind::Normal);
+    }
 }
 
 pub enum Response {
@@ -65,7 +72,8 @@ impl Mode {
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> bool {
         match self.state {
             State::Idle | State::WaitingForEntries => {
-                let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+                let available_height =
+                    ctx.viewport_size.1.saturating_sub(1) as usize;
                 match self.select.on_key(
                     self.entries.len(),
                     available_height,
@@ -135,7 +143,7 @@ impl Mode {
                     self.state = State::Idle;
                 }
                 match entries {
-                    Ok(entries) => self.entries = entries.clone(),
+                    Ok(entries) => self.entries = entries,
                     Err(error) => self.message.push_str(&error),
                 }
             }
@@ -152,17 +160,40 @@ impl Mode {
     }
 
     pub fn draw(&self, viewport_size: (u16, u16)) {
+        let stdout = io::stdout();
+        let mut drawer = Drawer::new(stdout.lock());
+
         match self.state {
             State::Idle => {
-                //ui::draw_output(self.name(), &self.output.lock().unwrap());
+                drawer.header("status");
+                drawer.select_menu(
+                    &self.select,
+                    self.entries.iter(),
+                    viewport_size,
+                );
             }
             State::WaitingForEntries => {
-                //
+                drawer.header("status...");
+                drawer.select_menu(
+                    &self.select,
+                    self.entries.iter(),
+                    viewport_size,
+                );
             }
-            State::CommitMessageInput => (),
-            State::ViewCommitResult => (),
-            State::ViewRevertResult => (),
-            State::ViewDiff => (),
+            State::CommitMessageInput => {
+                drawer.header("commit message");
+                drawer.text(self.readline.input(), TextKind::Normal);
+            }
+            State::ViewCommitResult => {
+                drawer.header("commit");
+                // TODO
+            }
+            State::ViewRevertResult => {
+                drawer.header("revert");
+            }
+            State::ViewDiff => {
+                drawer.header("diff");
+            }
         }
     }
 }

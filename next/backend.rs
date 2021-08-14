@@ -108,10 +108,7 @@ impl Process {
         let output = match self.0.wait_with_output() {
             Ok(output) => output,
             Err(error) => {
-                return Err(format!(
-                    "could not wait for process: {}",
-                    error
-                ))
+                return Err(format!("could not wait for process: {}", error))
             }
         };
 
@@ -137,4 +134,3 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)>
         None
     }
 }
-

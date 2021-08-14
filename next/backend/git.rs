@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::backend::{Backend, Process, BackendResult};
+use crate::backend::{Backend, BackendResult, Process};
 
 pub struct Git;
 
@@ -27,4 +27,3 @@ impl Backend for Git {
         Process::spawn("git", &["status"])?.wait()
     }
 }
-
