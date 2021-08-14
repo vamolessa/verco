@@ -2,7 +2,7 @@ use std::io::{StdoutLock, Write};
 
 use crossterm::{self, cursor, style, terminal};
 
-use crate::mode::{SelectMenu, ReadLine, Output};
+use crate::mode::{Output, ReadLine, SelectMenu};
 
 pub trait Draw {
     fn draw(&self, drawer: &mut Drawer);
@@ -10,11 +10,15 @@ pub trait Draw {
 
 pub struct Drawer<'a> {
     stdout: StdoutLock<'a>,
+    viewport_size: (u16, u16),
 }
 
 impl<'a> Drawer<'a> {
-    pub fn new(stdout: StdoutLock<'a>) -> Self {
-        Self { stdout }
+    pub fn new(stdout: StdoutLock<'a>, viewport_size: (u16, u16)) -> Self {
+        Self {
+            stdout,
+            viewport_size,
+        }
     }
 
     pub fn header(&mut self, mode_name: &str) {
@@ -41,7 +45,7 @@ impl<'a> Drawer<'a> {
     }
 
     pub fn text(&mut self, text: &str) {
-        crossterm::queue!(&mut self.stdout, style::Print(text)).unwrap();
+        self.stdout.write_all(text.as_bytes()).unwrap();
     }
 
     pub fn toggle(&mut self, on: bool) {
@@ -50,8 +54,14 @@ impl<'a> Drawer<'a> {
     }
 
     pub fn output(&mut self, output: &Output) {
-        
-        //write!(&mut self.stdout, "output:\n{}\n----\n", output).unwrap();
+        for line in output.lines_from_scroll() {
+            crossterm::queue!(
+                &mut self.stdout,
+                style::Print(line),
+                terminal::Clear(terminal::ClearType::UntilNewLine)
+            )
+            .unwrap();
+        }
     }
 
     pub fn readline(&mut self, readline: &ReadLine) {
@@ -71,7 +81,6 @@ impl<'a> Drawer<'a> {
         &mut self,
         select: &SelectMenu,
         entries: I,
-        viewport_size: (u16, u16),
     ) where
         I: 'entries + Iterator<Item = &'entries E>,
         E: 'entries + Draw,
@@ -88,17 +97,24 @@ impl<'a> Drawer<'a> {
         for (i, entry) in entries
             .enumerate()
             .skip(select.scroll())
-            .take(viewport_size.1 as _)
+            .take(self.viewport_size.1 as _)
         {
             if i == cursor_index {
                 crossterm::queue!(
                     &mut self.stdout,
-                    style::SetBackgroundColor(style::Color::Grey),
+                    style::SetBackgroundColor(style::Color::DarkGrey),
                 )
                 .unwrap();
             }
 
             entry.draw(self);
+
+            crossterm::queue!(
+                &mut self.stdout,
+                terminal::Clear(terminal::ClearType::UntilNewLine),
+                cursor::MoveToNextLine(1),
+            )
+            .unwrap();
 
             if i == cursor_index {
                 crossterm::queue!(
@@ -107,12 +123,6 @@ impl<'a> Drawer<'a> {
                 )
                 .unwrap();
             }
-
-            crossterm::queue!(
-                &mut self.stdout,
-                terminal::Clear(terminal::ClearType::UntilNewLine),
-            )
-            .unwrap();
         }
     }
 }

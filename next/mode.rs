@@ -35,6 +35,10 @@ impl Output {
         self.scroll = 0;
     }
 
+    pub fn lines_from_scroll<'a>(&'a self) -> impl 'a + Iterator<Item = &'a str> {
+        self.text.lines().skip(self.scroll)
+    }
+
     pub fn on_key(&mut self, available_height: usize, key: Key) {
         let half_height = available_height / 2;
 

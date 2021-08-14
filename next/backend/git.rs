@@ -24,6 +24,7 @@ impl Backend for Git {
     }
 
     fn status(&self) -> BackendResult<String> {
+        // TODO: parse files
         Process::spawn("git", &["status"])?.wait()
     }
 }

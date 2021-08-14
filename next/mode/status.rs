@@ -64,7 +64,23 @@ impl Mode {
         let ctx = ctx.clone();
         thread::spawn(move || {
             let response = match ctx.backend.status() {
-                Ok(_) => Ok(Vec::new()),
+                Ok(_) => {
+                    // TODO: use the entries returned from backend
+                    let mut entries = Vec::new();
+                    entries.push(FileEntry {
+                        selected: false,
+                        name: "matheus".into(),
+                    });
+                    entries.push(FileEntry {
+                        selected: false,
+                        name: "nuria".into(),
+                    });
+                    entries.push(FileEntry {
+                        selected: false,
+                        name: "pepper".into(),
+                    });
+                    Ok(entries)
+                }
                 Err(error) => Err(error),
             };
             let response = Response::Entries(response);
@@ -164,24 +180,16 @@ impl Mode {
 
     pub fn draw(&self, viewport_size: (u16, u16)) {
         let stdout = io::stdout();
-        let mut drawer = Drawer::new(stdout.lock());
+        let mut drawer = Drawer::new(stdout.lock(), viewport_size);
 
         match self.state {
             State::Idle => {
                 drawer.header("status");
-                drawer.select_menu(
-                    &self.select,
-                    self.entries.iter(),
-                    viewport_size,
-                );
+                drawer.select_menu(&self.select, self.entries.iter());
             }
             State::WaitingForEntries => {
                 drawer.header("status...");
-                drawer.select_menu(
-                    &self.select,
-                    self.entries.iter(),
-                    viewport_size,
-                );
+                drawer.select_menu(&self.select, self.entries.iter());
             }
             State::CommitMessageInput => {
                 drawer.header("commit message");
