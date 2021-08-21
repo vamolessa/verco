@@ -2,7 +2,7 @@ use std::{io, thread};
 
 use crate::{
     application::Key,
-    backend::{BackendResult, FileStatus},
+    backend::FileStatus,
     mode::{
         ModeContext, ModeResponse, Output, ReadLine, SelectMenu,
         SelectMenuAction,
@@ -27,10 +27,8 @@ impl Draw for FileEntry {
 }
 
 pub enum Response {
-    Entries(BackendResult<Vec<FileEntry>>),
-    Commit(String),
-    Revert(String),
-    Diff(String),
+    Output(String),
+    Entries(Vec<FileEntry>),
 }
 
 enum State {
@@ -67,17 +65,27 @@ impl Mode {
 
         let ctx = ctx.clone();
         thread::spawn(move || {
-            let entries = ctx.backend.status().map(|mut r| {
-                r.drain(..)
-                    .map(|e| FileEntry {
-                        selected: false,
-                        name: e.name,
-                        status: e.status,
-                    })
-                    .collect()
-            });
-            let response = Response::Entries(entries);
-            ctx.response_sender.send(ModeResponse::Status(response));
+            let (output, entries) = match ctx.backend.status() {
+                Ok(mut info) => {
+                    let output = info.header;
+                    let entries = info
+                        .entries
+                        .drain(..)
+                        .map(|e| FileEntry {
+                            selected: false,
+                            name: e.name,
+                            status: e.status,
+                        })
+                        .collect();
+                    (output, entries)
+                }
+                Err(error) => (error, Vec::new()),
+            };
+
+            ctx.response_sender
+                .send(ModeResponse::Status(Response::Output(output)));
+            ctx.response_sender
+                .send(ModeResponse::Status(Response::Entries(entries)));
         });
     }
 
@@ -116,6 +124,21 @@ impl Mode {
                         if !self.entries.is_empty() {
                             self.state = State::ViewRevertResult;
                             self.output.set(String::new());
+
+                            thread::spawn(move || {
+                                /*
+                                let message = match ctx
+                                    .backend
+                                    .commit(&message, &files)
+                                {
+                                    Ok(message) => message,
+                                    Err(error) => error,
+                                };
+                                let response = Response::Commit(message);
+                                ctx.response_sender
+                                    .send(ModeResponse::Status(response));
+                                */
+                            });
                         }
                     }
                     Key::Char('d') => {
@@ -147,7 +170,7 @@ impl Mode {
                             Ok(message) => message,
                             Err(error) => error,
                         };
-                        let response = Response::Commit(message);
+                        let response = Response::Output(message);
                         ctx.response_sender
                             .send(ModeResponse::Status(response));
                     });
@@ -163,26 +186,14 @@ impl Mode {
 
     pub fn on_response(&mut self, response: Response) {
         match response {
+            Response::Output(output) => {
+                self.output.set(output);
+            }
             Response::Entries(entries) => {
                 if let State::WaitingForEntries = self.state {
                     self.state = State::Idle;
                 }
-                match entries {
-                    Ok(entries) => self.entries = entries,
-                    Err(error) => self.output.set(error),
-                }
-            }
-            Response::Commit(output) => {
-                self.state = State::ViewCommitResult;
-                self.output.set(output);
-            }
-            Response::Revert(output) => {
-                self.state = State::ViewRevertResult;
-                self.output.set(output);
-            }
-            Response::Diff(output) => {
-                self.state = State::ViewDiff;
-                self.output.set(output);
+                self.entries = entries;
             }
         }
     }
@@ -190,6 +201,8 @@ impl Mode {
     pub fn draw(&self, viewport_size: (u16, u16)) {
         let stdout = io::stdout();
         let mut drawer = Drawer::new(stdout.lock(), viewport_size);
+
+        let any_selected = self.entries.iter().any(|e| e.selected);
 
         match self.state {
             State::Idle => {
@@ -201,19 +214,43 @@ impl Mode {
                 drawer.select_menu(&self.select, self.entries.iter());
             }
             State::CommitMessageInput => {
-                drawer.header("commit message");
+                let header = if any_selected {
+                    "commit selected message"
+                } else {
+                    "commit all message"
+                };
+
+                drawer.header(header);
                 drawer.readline(&self.readline);
             }
             State::ViewCommitResult => {
-                drawer.header("commit");
+                let header = if any_selected {
+                    "commit selected"
+                } else {
+                    "commit all"
+                };
+
+                drawer.header(header);
                 drawer.output(&self.output);
             }
             State::ViewRevertResult => {
-                drawer.header("revert");
+                let header = if any_selected {
+                    "revert selected"
+                } else {
+                    "revert all"
+                };
+
+                drawer.header(header);
                 drawer.output(&self.output);
             }
             State::ViewDiff => {
-                drawer.header("diff");
+                let header = if any_selected {
+                    "diff selected"
+                } else {
+                    "diff all"
+                };
+
+                drawer.header(header);
                 drawer.output(&self.output);
             }
         }
