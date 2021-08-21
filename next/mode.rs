@@ -6,13 +6,16 @@ use crate::{
 };
 
 pub mod status;
+pub mod log;
 
 pub enum ModeResponse {
     Status(status::Response),
+    Log(log::Response),
 }
 
 pub enum ModeKind {
     Status,
+    Log,
 }
 
 #[derive(Clone)]

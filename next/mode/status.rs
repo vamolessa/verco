@@ -11,12 +11,12 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct FileEntry {
+pub struct Entry {
     pub selected: bool,
     pub name: String,
     pub status: FileStatus,
 }
-impl Draw for FileEntry {
+impl Draw for Entry {
     fn draw(&self, drawer: &mut Drawer) {
         let selected_text = if self.selected { '+' } else { ' ' };
         drawer.write(&format_args!(
@@ -29,7 +29,7 @@ impl Draw for FileEntry {
 pub enum Response {
     Refresh {
         header: String,
-        entries: Vec<FileEntry>,
+        entries: Vec<Entry>,
     },
     Commit(String),
     Discard(String),
@@ -53,13 +53,13 @@ impl Default for State {
 #[derive(Default)]
 pub struct Mode {
     state: State,
-    entries: Vec<FileEntry>,
+    entries: Vec<Entry>,
     output: Output,
     select: SelectMenu,
     readline: ReadLine,
 }
 impl Mode {
-    pub fn get_selected_entries(&self) -> Vec<StatusEntry> {
+    fn get_selected_entries(&self) -> Vec<StatusEntry> {
         let entries: Vec<_> = self
             .entries
             .iter()
@@ -72,7 +72,7 @@ impl Mode {
         entries
     }
 
-    pub fn remove_selected_entries(&mut self) {
+    fn remove_selected_entries(&mut self) {
         self.entries.retain(|e| !e.selected);
     }
 
@@ -93,7 +93,7 @@ impl Mode {
                     let entries = info
                         .entries
                         .drain(..)
-                        .map(|e| FileEntry {
+                        .map(|e| Entry {
                             selected: false,
                             name: e.name,
                             status: e.status,

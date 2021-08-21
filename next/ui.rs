@@ -28,7 +28,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
     }
 
     pub fn clear_to_bottom(&mut self) {
-        crossterm::execute!(
+        crossterm::queue!(
             self.stdout,
             style::SetBackgroundColor(style::Color::Black),
             terminal::Clear(terminal::ClearType::FromCursorDown),

@@ -52,6 +52,10 @@ pub struct StatusEntry {
     pub status: FileStatus,
 }
 
+pub struct LogEntry {
+    //
+}
+
 pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 

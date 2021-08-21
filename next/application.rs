@@ -139,7 +139,9 @@ pub fn run(backend: Arc<dyn Backend>) {
     };
 
     let mut current_mode = ModeKind::Status;
+
     let mut status_mode = mode::status::Mode::default();
+    let mut log_mode = mode::log::Mode::default();
 
     status_mode.on_enter(&mode_ctx);
 
@@ -157,6 +159,7 @@ pub fn run(backend: Arc<dyn Backend>) {
             Ok(Event::Key(key)) => {
                 let input_status = match current_mode {
                     ModeKind::Status => status_mode.on_key(&mode_ctx, key),
+                    ModeKind::Log => log_mode.on_key(&mode_ctx, key),
                 };
 
                 if !input_status.pending {
@@ -179,6 +182,9 @@ pub fn run(backend: Arc<dyn Backend>) {
             Ok(Event::Response(ModeResponse::Status(response))) => {
                 status_mode.on_response(response);
             }
+            Ok(Event::Response(ModeResponse::Log(response))) => {
+                log_mode.on_response(response);
+            }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 spinner_state = spinner_state.wrapping_add(1);
                 draw_body = false;
@@ -188,20 +194,22 @@ pub fn run(backend: Arc<dyn Backend>) {
 
         let mut drawer = Drawer::new(&mut stdout, viewport_size);
 
-        let mut header_info = match current_mode {
+        let header_info = match current_mode {
             ModeKind::Status => status_mode.header(),
+            ModeKind::Log => log_mode.header(),
         };
         drawer.header(header_info, spinner_state);
 
         if draw_body {
             match current_mode {
                 ModeKind::Status => status_mode.draw(&mut drawer),
+                ModeKind::Log => log_mode.draw(&mut drawer),
             }
             drawer.clear_to_bottom();
-        } else {
-            use io::Write;
-            stdout.flush().unwrap();
         }
+
+        use io::Write;
+        stdout.flush().unwrap();
     }
 }
 
