@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     path::PathBuf,
     process::{Child, Command, Stdio},
     sync::Arc,
@@ -8,10 +9,49 @@ pub mod git;
 
 pub type BackendResult<T> = std::result::Result<T, String>;
 
+#[derive(Clone, Copy)]
+pub enum FileStatus {
+    Unmodified,
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Untracked,
+    Copied,
+    Unmerged,
+    Missing,
+    Ignored,
+    Clean,
+}
+impl fmt::Display for FileStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Unmodified => f.write_str("unmodified"),
+            Self::Modified => f.write_str("modified"),
+            Self::Added => f.write_str("added"),
+            Self::Deleted => f.write_str("deleted"),
+            Self::Renamed => f.write_str("renamed"),
+            Self::Untracked => f.write_str("untracked"),
+            Self::Copied => f.write_str("copied"),
+            Self::Unmerged => f.write_str("unmerged"),
+            Self::Missing => f.write_str("missing"),
+            Self::Ignored => f.write_str("ignored"),
+            Self::Clean => f.write_str("clean"),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct StatusEntry {
+    pub name: String,
+    pub status: FileStatus,
+}
+
 pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 
-    fn status(&self) -> BackendResult<String>;
+    fn status(&self) -> BackendResult<Vec<StatusEntry>>;
+    fn commit(&self, message: &str, files: &[String]) -> BackendResult<String>;
 }
 
 /*
@@ -134,3 +174,4 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)>
         None
     }
 }
+

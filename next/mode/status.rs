@@ -2,7 +2,7 @@ use std::{io, thread};
 
 use crate::{
     application::Key,
-    backend::BackendResult,
+    backend::{BackendResult, FileStatus},
     mode::{
         ModeContext, ModeResponse, Output, ReadLine, SelectMenu,
         SelectMenuAction,
@@ -14,11 +14,15 @@ use crate::{
 struct FileEntry {
     pub selected: bool,
     pub name: String,
+    pub status: FileStatus,
 }
 impl Draw for FileEntry {
     fn draw(&self, drawer: &mut Drawer) {
-        drawer.toggle(self.selected);
-        drawer.text(&self.name);
+        let selected_text = if self.selected { '+' } else { ' ' };
+        drawer.fmt(format_args!(
+            "{} [{}] {}",
+            selected_text, &self.status, &self.name,
+        ));
     }
 }
 
@@ -63,27 +67,16 @@ impl Mode {
 
         let ctx = ctx.clone();
         thread::spawn(move || {
-            let response = match ctx.backend.status() {
-                Ok(_) => {
-                    // TODO: use the entries returned from backend
-                    let mut entries = Vec::new();
-                    entries.push(FileEntry {
+            let entries = ctx.backend.status().map(|mut r| {
+                r.drain(..)
+                    .map(|e| FileEntry {
                         selected: false,
-                        name: "matheus".into(),
-                    });
-                    entries.push(FileEntry {
-                        selected: false,
-                        name: "nuria".into(),
-                    });
-                    entries.push(FileEntry {
-                        selected: false,
-                        name: "pepper".into(),
-                    });
-                    Ok(entries)
-                }
-                Err(error) => Err(error),
-            };
-            let response = Response::Entries(response);
+                        name: e.name,
+                        status: e.status,
+                    })
+                    .collect()
+            });
+            let response = Response::Entries(entries);
             ctx.response_sender.send(ModeResponse::Status(response));
         });
     }
@@ -114,16 +107,22 @@ impl Mode {
 
                 match key {
                     Key::Char('c') => {
-                        self.state = State::CommitMessageInput;
-                        self.readline.clear();
+                        if !self.entries.is_empty() {
+                            self.state = State::CommitMessageInput;
+                            self.readline.clear();
+                        }
                     }
                     Key::Char('U') => {
-                        self.state = State::ViewRevertResult;
-                        self.output.set(String::new());
+                        if !self.entries.is_empty() {
+                            self.state = State::ViewRevertResult;
+                            self.output.set(String::new());
+                        }
                     }
                     Key::Char('d') => {
-                        self.state = State::ViewDiff;
-                        self.output.set(String::new());
+                        if !self.entries.is_empty() {
+                            self.state = State::ViewDiff;
+                            self.output.set(String::new());
+                        }
                     }
                     _ => (),
                 }
@@ -133,14 +132,24 @@ impl Mode {
                 if key.is_submit() {
                     self.state = State::ViewCommitResult;
 
-                    // TODO: send request
+                    let message = self.readline.input().to_string();
+                    let files: Vec<_> = self
+                        .entries
+                        .iter()
+                        .filter(|e| e.selected)
+                        .map(|e| e.name.clone())
+                        .collect();
+
                     let ctx = ctx.clone();
                     thread::spawn(move || {
-                        // TODO: change to commit selected
-                        let message = match ctx.backend.status() {
+                        let message = match ctx.backend.commit(&message, &files)
+                        {
                             Ok(message) => message,
                             Err(error) => error,
                         };
+                        let response = Response::Commit(message);
+                        ctx.response_sender
+                            .send(ModeResponse::Status(response));
                     });
                 } else if key.is_cancel() {
                     self.on_enter(ctx);

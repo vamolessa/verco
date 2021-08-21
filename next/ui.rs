@@ -1,4 +1,4 @@
-use std::io::{StdoutLock, Write};
+use std::{fmt, io::{StdoutLock, Write}};
 
 use crossterm::{self, cursor, style, terminal};
 
@@ -44,13 +44,8 @@ impl<'a> Drawer<'a> {
         .unwrap();
     }
 
-    pub fn text(&mut self, text: &str) {
-        self.stdout.write_all(text.as_bytes()).unwrap();
-    }
-
-    pub fn toggle(&mut self, on: bool) {
-        let state_text = if on { "+ " } else { "  " };
-        self.stdout.write_all(state_text.as_bytes()).unwrap();
+    pub fn fmt(&mut self, f: fmt::Arguments) {
+        write!(self.stdout, "{}", f).unwrap();
     }
 
     pub fn output(&mut self, output: &Output) {
