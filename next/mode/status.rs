@@ -117,6 +117,7 @@ impl Mode {
                     Key::Char('c') => {
                         if !self.entries.is_empty() {
                             self.state = State::CommitMessageInput;
+                            self.output.set(String::new());
                             self.readline.clear();
                         }
                     }
