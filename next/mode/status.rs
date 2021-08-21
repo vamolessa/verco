@@ -268,7 +268,7 @@ impl Mode {
                 };
                 HeaderInfo {
                     name,
-                    waiting_response: empty_output,
+                    waiting_response: false,
                 }
             }
             State::ViewCommitResult => {
