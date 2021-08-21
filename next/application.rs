@@ -87,7 +87,6 @@ impl Key {
 }
 
 enum Event {
-    Redraw,
     Key(Key),
     Resize(u16, u16),
     Response(ModeResponse),
@@ -151,21 +150,11 @@ pub fn run(backend: Arc<dyn Backend>) {
     let mut spinner_state = 0u8;
 
     loop {
-        let timeout = Duration::from_millis(500);
-        let event = match event_receiver.recv_timeout(timeout) {
-            Ok(event) => event,
-            Err(mpsc::RecvTimeoutError::Timeout) => Event::Redraw,
-            Err(mpsc::RecvTimeoutError::Disconnected) => break,
-        };
+        let mut draw_body = true;
 
-        let draw_body;
-        match event {
-            Event::Redraw => {
-                draw_body = false;
-                spinner_state = spinner_state.wrapping_add(1);
-            }
-            Event::Key(key) => {
-                draw_body = true;
+        let timeout = Duration::from_millis(100);
+        match event_receiver.recv_timeout(timeout) {
+            Ok(Event::Key(key)) => {
                 let input_status = match current_mode {
                     ModeKind::Status => status_mode.on_key(&mode_ctx, key),
                 };
@@ -184,19 +173,22 @@ pub fn run(backend: Arc<dyn Backend>) {
                     }
                 }
             }
-            Event::Resize(width, height) => {
-                draw_body = true;
+            Ok(Event::Resize(width, height)) => {
                 mode_ctx.viewport_size = (width, height);
             }
-            Event::Response(ModeResponse::Status(response)) => {
-                draw_body = true;
+            Ok(Event::Response(ModeResponse::Status(response))) => {
                 status_mode.on_response(response);
             }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                spinner_state = spinner_state.wrapping_add(1);
+                draw_body = false;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
 
         let mut drawer = Drawer::new(&mut stdout, viewport_size);
 
-        let header_info = match current_mode {
+        let mut header_info = match current_mode {
             ModeKind::Status => status_mode.header(),
         };
         drawer.header(header_info, spinner_state);
@@ -206,6 +198,9 @@ pub fn run(backend: Arc<dyn Backend>) {
                 ModeKind::Status => status_mode.draw(&mut drawer),
             }
             drawer.clear_to_bottom();
+        } else {
+            use io::Write;
+            stdout.flush().unwrap();
         }
     }
 }

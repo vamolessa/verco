@@ -40,9 +40,10 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         let background_color = style::Color::DarkYellow;
         let foreground_color = style::Color::Black;
 
-        let spinner_state = match info.waiting_response {
-            true => spinner_state % 4,
-            false => 0,
+        let spinner = ['-', '\\', '|', '/'];
+        let spinner = match info.waiting_response {
+            true => spinner[spinner_state as usize % spinner.len()],
+            false => ' ',
         };
 
         crossterm::queue!(
@@ -51,6 +52,8 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
             style::SetBackgroundColor(background_color),
             style::SetForegroundColor(foreground_color),
             style::Print(' '),
+            style::Print(spinner),
+            style::Print(' '),
             style::SetBackgroundColor(foreground_color),
             style::SetForegroundColor(background_color),
             style::Print(' '),
@@ -58,9 +61,6 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
             style::Print(' '),
             style::SetBackgroundColor(background_color),
             terminal::Clear(terminal::ClearType::UntilNewLine),
-            cursor::MoveToColumn(u16::MAX),
-            cursor::MoveLeft(4),
-            style::Print(&"..."[..spinner_state as usize]),
             cursor::MoveToNextLine(1),
             style::ResetColor,
         )
