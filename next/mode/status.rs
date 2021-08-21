@@ -19,7 +19,7 @@ struct FileEntry {
 impl Draw for FileEntry {
     fn draw(&self, drawer: &mut Drawer) {
         let selected_text = if self.selected { '+' } else { ' ' };
-        drawer.fmt(format_args!(
+        drawer.write(&format_args!(
             "{} [{}] {}",
             selected_text, &self.status, &self.name,
         ));
@@ -208,18 +208,20 @@ impl Mode {
         match self.state {
             State::Idle => {
                 drawer.header("status");
-                drawer.fmt(format_args!(
-                    "{}\n\n",
-                    self.output.lines_from_scroll().next().unwrap_or("")
-                ));
+                drawer.write(
+                    &self.output.lines_from_scroll().next().unwrap_or(""),
+                );
+                drawer.next_line();
+                drawer.next_line();
                 drawer.select_menu(&self.select, 1, self.entries.iter());
             }
             State::WaitingForEntries => {
                 drawer.header("status...");
-                drawer.fmt(format_args!(
-                    "{}\n\n",
-                    self.output.lines_from_scroll().next().unwrap_or("")
-                ));
+                drawer.write(
+                    &self.output.lines_from_scroll().next().unwrap_or(""),
+                );
+                drawer.next_line();
+                drawer.next_line();
                 drawer.select_menu(&self.select, 2, self.entries.iter());
             }
             State::CommitMessageInput => {

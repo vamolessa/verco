@@ -47,8 +47,17 @@ impl<'a> Drawer<'a> {
         .unwrap();
     }
 
-    pub fn fmt(&mut self, f: fmt::Arguments) {
-        write!(self.stdout, "{}", f).unwrap();
+    pub fn write(&mut self, display: &dyn fmt::Display) {
+        write!(self.stdout, "{}", display).unwrap();
+    }
+
+    pub fn next_line(&mut self) {
+        crossterm::queue!(
+            &mut self.stdout,
+            terminal::Clear(terminal::ClearType::UntilNewLine),
+            cursor::MoveToNextLine(1),
+        )
+        .unwrap();
     }
 
     pub fn output(&mut self, output: &Output) {
