@@ -1,4 +1,7 @@
-use std::{fmt, io::{StdoutLock, Write}};
+use std::{
+    fmt,
+    io::{StdoutLock, Write},
+};
 
 use crossterm::{self, cursor, style, terminal};
 
@@ -75,6 +78,7 @@ impl<'a> Drawer<'a> {
     pub fn select_menu<'entries, I, E>(
         &mut self,
         select: &SelectMenu,
+        header_height: u16,
         entries: I,
     ) where
         I: 'entries + Iterator<Item = &'entries E>,
@@ -89,10 +93,11 @@ impl<'a> Drawer<'a> {
         )
         .unwrap();
 
-        for (i, entry) in entries
-            .enumerate()
-            .skip(select.scroll())
-            .take(self.viewport_size.1 as _)
+        let take_count =
+            self.viewport_size.1.saturating_sub(1 + header_height) as usize;
+
+        for (i, entry) in
+            entries.enumerate().skip(select.scroll()).take(take_count)
         {
             if i == cursor_index {
                 crossterm::queue!(

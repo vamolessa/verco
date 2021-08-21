@@ -207,11 +207,19 @@ impl Mode {
         match self.state {
             State::Idle => {
                 drawer.header("status");
-                drawer.select_menu(&self.select, self.entries.iter());
+                drawer.fmt(format_args!(
+                    "{}\n\n",
+                    self.output.lines_from_scroll().next().unwrap_or("")
+                ));
+                drawer.select_menu(&self.select, 1, self.entries.iter());
             }
             State::WaitingForEntries => {
                 drawer.header("status...");
-                drawer.select_menu(&self.select, self.entries.iter());
+                drawer.fmt(format_args!(
+                    "{}\n\n",
+                    self.output.lines_from_scroll().next().unwrap_or("")
+                ));
+                drawer.select_menu(&self.select, 2, self.entries.iter());
             }
             State::CommitMessageInput => {
                 let header = if any_selected {

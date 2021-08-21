@@ -26,11 +26,12 @@ impl Backend for Git {
     }
 
     fn status(&self) -> BackendResult<StatusInfo> {
-        let entries = Process::spawn("git", &["status", "-z"])?
-            .wait()?
-            .trim()
-            .split('\0')
-            .map(str::trim)
+        let output =
+            Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
+        let mut splits = output.trim().split('\0').map(str::trim);
+
+        let header = splits.next().unwrap_or("").into();
+        let entries = splits
             .filter(|e| e.len() >= 2)
             .map(|e| {
                 let (status, filename) = e.split_at(2);
@@ -41,10 +42,7 @@ impl Backend for Git {
             })
             .collect();
 
-        let mut info = StatusInfo {
-            header: String::new(),
-            entries,
-        };
+        let mut info = StatusInfo { header, entries };
         info.entries.sort_unstable_by_key(|e| e.status as usize);
 
         Ok(info)

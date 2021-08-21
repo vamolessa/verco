@@ -178,7 +178,7 @@ impl SelectMenu {
             Key::Char(' ') if self.cursor < entries_len => {
                 SelectMenuAction::Toggle(self.cursor)
             }
-            Key::Ctrl('a') => SelectMenuAction::ToggleAll,
+            Key::Char('a') => SelectMenuAction::ToggleAll,
             _ => SelectMenuAction::None,
         }
     }
