@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::backend::{
-    Backend, BackendResult, FileStatus, Process, StatusEntry,
+    Backend, BackendResult, FileStatus, Process, StatusEntry, StatusInfo,
 };
 
 pub struct Git;
@@ -25,8 +25,8 @@ impl Backend for Git {
         "git"
     }
 
-    fn status(&self) -> BackendResult<Vec<StatusEntry>> {
-        let mut entries: Vec<_> = Process::spawn("git", &["status", "-z"])?
+    fn status(&self) -> BackendResult<StatusInfo> {
+        let entries = Process::spawn("git", &["status", "-z"])?
             .wait()?
             .trim()
             .split('\0')
@@ -40,8 +40,14 @@ impl Backend for Git {
                 }
             })
             .collect();
-        entries.sort_unstable_by_key(|e| e.status as usize);
-        Ok(entries)
+
+        let mut info = StatusInfo {
+            header: String::new(),
+            entries,
+        };
+        info.entries.sort_unstable_by_key(|e| e.status as usize);
+
+        Ok(info)
     }
 
     fn commit(&self, message: &str, files: &[String]) -> BackendResult<String> {

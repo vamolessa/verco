@@ -41,6 +41,11 @@ impl fmt::Display for FileStatus {
     }
 }
 
+pub struct StatusInfo {
+    pub header: String,
+    pub entries: Vec<StatusEntry>,
+}
+
 #[derive(Clone)]
 pub struct StatusEntry {
     pub name: String,
@@ -50,7 +55,7 @@ pub struct StatusEntry {
 pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 
-    fn status(&self) -> BackendResult<Vec<StatusEntry>>;
+    fn status(&self) -> BackendResult<StatusInfo>;
     fn commit(&self, message: &str, files: &[String]) -> BackendResult<String>;
 }
 
