@@ -65,7 +65,8 @@ impl<'a> Drawer<'a> {
             crossterm::queue!(
                 &mut self.stdout,
                 style::Print(line),
-                terminal::Clear(terminal::ClearType::UntilNewLine)
+                terminal::Clear(terminal::ClearType::UntilNewLine),
+                cursor::MoveToNextLine(1),
             )
             .unwrap();
         }

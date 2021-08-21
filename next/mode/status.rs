@@ -59,7 +59,7 @@ pub struct Mode {
     readline: ReadLine,
 }
 impl Mode {
-    pub fn take_selected_entries(&mut self) -> Vec<StatusEntry> {
+    pub fn get_selected_entries(&self) -> Vec<StatusEntry> {
         let entries: Vec<_> = self
             .entries
             .iter()
@@ -69,8 +69,11 @@ impl Mode {
                 status: e.status,
             })
             .collect();
-        self.entries.retain(|e| !e.selected);
         entries
+    }
+
+    pub fn remove_selected_entries(&mut self) {
+        self.entries.retain(|e| !e.selected);
     }
 
     pub fn on_enter(&mut self, ctx: &ModeContext) {
@@ -146,7 +149,8 @@ impl Mode {
                             self.state = State::ViewDiscardResult;
                             self.output.set(String::new());
 
-                            let entries = self.take_selected_entries();
+                            let entries = self.get_selected_entries();
+                            self.remove_selected_entries();
 
                             let ctx = ctx.clone();
                             thread::spawn(move || {
@@ -165,6 +169,20 @@ impl Mode {
                         if !self.entries.is_empty() {
                             self.state = State::ViewDiff;
                             self.output.set(String::new());
+
+                            let entries = self.get_selected_entries();
+
+                            let ctx = ctx.clone();
+                            thread::spawn(move || {
+                                let message =
+                                    match ctx.backend.diff(None, &entries) {
+                                        Ok(message) => message,
+                                        Err(error) => error,
+                                    };
+                                let response = Response::Diff(message);
+                                ctx.response_sender
+                                    .send(ModeResponse::Status(response));
+                            });
                         }
                     }
                     _ => (),
@@ -176,7 +194,8 @@ impl Mode {
                     self.state = State::ViewCommitResult;
 
                     let message = self.readline.input().to_string();
-                    let entries = self.take_selected_entries();
+                    let entries = self.get_selected_entries();
+                    self.remove_selected_entries();
 
                     let ctx = ctx.clone();
                     thread::spawn(move || {
