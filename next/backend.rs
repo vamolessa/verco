@@ -56,7 +56,8 @@ pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 
     fn status(&self) -> BackendResult<StatusInfo>;
-    fn commit(&self, message: &str, files: &[String]) -> BackendResult<String>;
+    fn commit(&self, message: &str, entries: &[StatusEntry]) -> BackendResult<String>;
+    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<String>;
 }
 
 /*

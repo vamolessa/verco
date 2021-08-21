@@ -2,7 +2,7 @@ use std::{io, thread};
 
 use crate::{
     application::Key,
-    backend::FileStatus,
+    backend::{FileStatus, StatusEntry},
     mode::{
         ModeContext, ModeResponse, Output, ReadLine, SelectMenu,
         SelectMenuAction,
@@ -27,8 +27,13 @@ impl Draw for FileEntry {
 }
 
 pub enum Response {
-    Output(String),
-    Entries(Vec<FileEntry>),
+    Refresh {
+        header: String,
+        entries: Vec<FileEntry>,
+    },
+    Commit(String),
+    Discard(String),
+    Diff(String),
 }
 
 enum State {
@@ -36,7 +41,7 @@ enum State {
     WaitingForEntries,
     CommitMessageInput,
     ViewCommitResult,
-    ViewRevertResult,
+    ViewDiscardResult,
     ViewDiff,
 }
 impl Default for State {
@@ -54,6 +59,20 @@ pub struct Mode {
     readline: ReadLine,
 }
 impl Mode {
+    pub fn take_selected_entries(&mut self) -> Vec<StatusEntry> {
+        let entries: Vec<_> = self
+            .entries
+            .iter()
+            .filter(|e| e.selected)
+            .map(|e| StatusEntry {
+                name: e.name.clone(),
+                status: e.status,
+            })
+            .collect();
+        self.entries.retain(|e| !e.selected);
+        entries
+    }
+
     pub fn on_enter(&mut self, ctx: &ModeContext) {
         if let State::WaitingForEntries = self.state {
             return;
@@ -65,9 +84,9 @@ impl Mode {
 
         let ctx = ctx.clone();
         thread::spawn(move || {
-            let (output, entries) = match ctx.backend.status() {
+            let (header, entries) = match ctx.backend.status() {
                 Ok(mut info) => {
-                    let output = info.header;
+                    let header = info.header;
                     let entries = info
                         .entries
                         .drain(..)
@@ -77,15 +96,16 @@ impl Mode {
                             status: e.status,
                         })
                         .collect();
-                    (output, entries)
+                    (header, entries)
                 }
                 Err(error) => (error, Vec::new()),
             };
 
             ctx.response_sender
-                .send(ModeResponse::Status(Response::Output(output)));
-            ctx.response_sender
-                .send(ModeResponse::Status(Response::Entries(entries)));
+                .send(ModeResponse::Status(Response::Refresh {
+                    header,
+                    entries,
+                }));
         });
     }
 
@@ -123,22 +143,21 @@ impl Mode {
                     }
                     Key::Char('U') => {
                         if !self.entries.is_empty() {
-                            self.state = State::ViewRevertResult;
+                            self.state = State::ViewDiscardResult;
                             self.output.set(String::new());
 
+                            let entries = self.take_selected_entries();
+
+                            let ctx = ctx.clone();
                             thread::spawn(move || {
-                                /*
-                                let message = match ctx
-                                    .backend
-                                    .commit(&message, &files)
-                                {
-                                    Ok(message) => message,
-                                    Err(error) => error,
-                                };
-                                let response = Response::Commit(message);
+                                let message =
+                                    match ctx.backend.discard(&entries) {
+                                        Ok(message) => message,
+                                        Err(error) => error,
+                                    };
+                                let response = Response::Discard(message);
                                 ctx.response_sender
                                     .send(ModeResponse::Status(response));
-                                */
                             });
                         }
                     }
@@ -157,21 +176,16 @@ impl Mode {
                     self.state = State::ViewCommitResult;
 
                     let message = self.readline.input().to_string();
-                    let files: Vec<_> = self
-                        .entries
-                        .iter()
-                        .filter(|e| e.selected)
-                        .map(|e| e.name.clone())
-                        .collect();
+                    let entries = self.take_selected_entries();
 
                     let ctx = ctx.clone();
                     thread::spawn(move || {
-                        let message = match ctx.backend.commit(&message, &files)
-                        {
-                            Ok(message) => message,
-                            Err(error) => error,
-                        };
-                        let response = Response::Output(message);
+                        let message =
+                            match ctx.backend.commit(&message, &entries) {
+                                Ok(message) => message,
+                                Err(error) => error,
+                            };
+                        let response = Response::Commit(message);
                         ctx.response_sender
                             .send(ModeResponse::Status(response));
                     });
@@ -187,14 +201,29 @@ impl Mode {
 
     pub fn on_response(&mut self, response: Response) {
         match response {
-            Response::Output(output) => {
-                self.output.set(output);
-            }
-            Response::Entries(entries) => {
+            Response::Refresh { header, entries } => {
                 if let State::WaitingForEntries = self.state {
                     self.state = State::Idle;
                 }
+                if let State::Idle = self.state {
+                    self.output.set(header);
+                }
                 self.entries = entries;
+            }
+            Response::Commit(output) => {
+                if let State::ViewCommitResult = self.state {
+                    self.output.set(output);
+                }
+            }
+            Response::Discard(output) => {
+                if let State::ViewDiscardResult = self.state {
+                    self.output.set(output);
+                }
+            }
+            Response::Diff(output) => {
+                if let State::ViewDiff = self.state {
+                    self.output.set(output);
+                }
             }
         }
     }
@@ -244,11 +273,11 @@ impl Mode {
                 drawer.header(header);
                 drawer.output(&self.output);
             }
-            State::ViewRevertResult => {
+            State::ViewDiscardResult => {
                 let header = if any_selected {
-                    "revert selected"
+                    "discard selected"
                 } else {
-                    "revert all"
+                    "discard all"
                 };
 
                 drawer.header(header);

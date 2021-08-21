@@ -48,18 +48,60 @@ impl Backend for Git {
         Ok(info)
     }
 
-    fn commit(&self, message: &str, files: &[String]) -> BackendResult<String> {
-        if files.is_empty() {
+    fn commit(
+        &self,
+        message: &str,
+        entries: &[StatusEntry],
+    ) -> BackendResult<String> {
+        if entries.is_empty() {
             Process::spawn("git", &["add", "--all"])?.wait()?;
         } else {
-            for file in files {
-                Process::spawn("git", &["add", "--", file])?.wait()?;
+            for entry in entries {
+                Process::spawn("git", &["add", "--", &entry.name])?.wait()?;
             }
         }
 
         let output =
             Process::spawn("git", &["commit", "-m", message])?.wait()?;
         Ok(output)
+    }
+
+    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<String> {
+        if entries.is_empty() {
+            let mut output = String::new();
+            output.push_str(
+                &Process::spawn("git", &["reset", "--hard"])?.wait()?,
+            );
+            output.push_str(
+                &Process::spawn("git", &["clean", "-d", "--force"])?.wait()?,
+            );
+            Ok(output)
+        } else {
+            let mut processes = Vec::new();
+            for entry in entries {
+                match entry.status {
+                    FileStatus::Untracked => processes.push(Process::spawn(
+                        "git",
+                        &["clean", "--force", "--", &entry.name],
+                    )?),
+                    FileStatus::Added => processes.push(Process::spawn(
+                        "git",
+                        &["rm", "--force", "--", &entry.name],
+                    )?),
+                    _ => processes.push(Process::spawn(
+                        "git",
+                        &["checkout", "--", &entry.name],
+                    )?),
+                }
+            }
+
+            let mut output = String::new();
+            for process in processes {
+                output.push_str(&process.wait()?);
+            }
+
+            Ok(output)
+        }
     }
 }
 
