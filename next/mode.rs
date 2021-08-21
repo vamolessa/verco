@@ -22,6 +22,15 @@ pub struct ModeContext {
     pub viewport_size: (u16, u16),
 }
 
+pub struct InputStatus {
+    pub pending: bool,
+}
+
+pub struct HeaderInfo {
+    pub name: &'static str,
+    pub waiting_response: bool,
+}
+
 #[derive(Default)]
 pub struct Output {
     text: String,
@@ -35,7 +44,13 @@ impl Output {
         self.scroll = 0;
     }
 
-    pub fn lines_from_scroll<'a>(&'a self) -> impl 'a + Iterator<Item = &'a str> {
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn lines_from_scroll<'a>(
+        &'a self,
+    ) -> impl 'a + Iterator<Item = &'a str> {
         self.text.lines().skip(self.scroll)
     }
 
@@ -143,13 +158,16 @@ impl SelectMenu {
         self.scroll
     }
 
+    pub fn saturate_cursor(&mut self, entries_len: usize) {
+        self.cursor = entries_len.saturating_sub(1).min(self.cursor);
+    }
+
     pub fn on_key(
         &mut self,
         entries_len: usize,
         available_height: usize,
         key: Key,
     ) -> SelectMenuAction {
-        let last_index = entries_len.saturating_sub(1);
         let half_height = available_height / 2;
 
         self.cursor = match key {
@@ -166,7 +184,7 @@ impl SelectMenu {
             _ => self.cursor,
         };
 
-        self.cursor = self.cursor.min(last_index);
+        self.saturate_cursor(entries_len);
 
         if self.cursor < self.scroll {
             self.scroll = self.cursor;

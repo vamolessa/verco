@@ -1,6 +1,8 @@
 use std::{
+    io,
     sync::{mpsc, Arc},
     thread,
+    time::Duration,
 };
 
 use crossterm::{event, terminal};
@@ -8,6 +10,7 @@ use crossterm::{event, terminal};
 use crate::{
     backend::Backend,
     mode::{self, ModeContext, ModeKind, ModeResponse},
+    ui::Drawer,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -84,6 +87,7 @@ impl Key {
 }
 
 enum Event {
+    Redraw,
     Key(Key),
     Resize(u16, u16),
     Response(ModeResponse),
@@ -142,18 +146,31 @@ pub fn run(backend: Arc<dyn Backend>) {
 
     thread::spawn(|| console_events_loop(event_sender));
 
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    let mut spinner_state = 0u8;
+
     loop {
-        let event = match event_receiver.recv() {
+        let timeout = Duration::from_millis(500);
+        let event = match event_receiver.recv_timeout(timeout) {
             Ok(event) => event,
-            Err(_) => break,
+            Err(mpsc::RecvTimeoutError::Timeout) => Event::Redraw,
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
         };
+
+        let draw_body;
         match event {
+            Event::Redraw => {
+                draw_body = false;
+                spinner_state = spinner_state.wrapping_add(1);
+            }
             Event::Key(key) => {
-                let input_blocked = match current_mode {
+                draw_body = true;
+                let input_status = match current_mode {
                     ModeKind::Status => status_mode.on_key(&mode_ctx, key),
                 };
 
-                if !input_blocked {
+                if !input_status.pending {
                     if key.is_cancel() {
                         break;
                     }
@@ -168,15 +185,28 @@ pub fn run(backend: Arc<dyn Backend>) {
                 }
             }
             Event::Resize(width, height) => {
+                draw_body = true;
                 mode_ctx.viewport_size = (width, height);
             }
             Event::Response(ModeResponse::Status(response)) => {
+                draw_body = true;
                 status_mode.on_response(response);
             }
         }
 
-        match current_mode {
-            ModeKind::Status => status_mode.draw(mode_ctx.viewport_size),
+        let mut drawer = Drawer::new(&mut stdout, viewport_size);
+
+        let header_info = match current_mode {
+            ModeKind::Status => status_mode.header(),
+        };
+        drawer.header(header_info, spinner_state);
+
+        if draw_body {
+            match current_mode {
+                ModeKind::Status => status_mode.draw(&mut drawer),
+            }
+            drawer.clear_to_bottom();
         }
     }
 }
+

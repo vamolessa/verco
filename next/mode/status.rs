@@ -1,17 +1,17 @@
-use std::{io, thread};
+use std::thread;
 
 use crate::{
     application::Key,
     backend::{FileStatus, StatusEntry},
     mode::{
-        ModeContext, ModeResponse, Output, ReadLine, SelectMenu,
-        SelectMenuAction,
+        HeaderInfo, InputStatus, ModeContext, ModeResponse, Output,
+        ReadLine, SelectMenu, SelectMenuAction,
     },
     ui::{Draw, Drawer},
 };
 
 #[derive(Clone)]
-struct FileEntry {
+pub struct FileEntry {
     pub selected: bool,
     pub name: String,
     pub status: FileStatus,
@@ -112,8 +112,8 @@ impl Mode {
         });
     }
 
-    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> bool {
-        let input_locked = matches!(self.state, State::CommitMessageInput);
+    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
+        let pending = matches!(self.state, State::CommitMessageInput);
         let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
 
         match self.state {
@@ -215,7 +215,7 @@ impl Mode {
             _ => self.output.on_key(available_height, key),
         }
 
-        input_locked
+        InputStatus { pending }
     }
 
     pub fn on_response(&mut self, response: Response) {
@@ -228,6 +228,7 @@ impl Mode {
                     self.output.set(header);
                 }
                 self.entries = entries;
+                self.select.saturate_cursor(self.entries.len());
             }
             Response::Commit(output) => {
                 if let State::ViewCommitResult = self.state {
@@ -247,15 +248,65 @@ impl Mode {
         }
     }
 
-    pub fn draw(&self, viewport_size: (u16, u16)) {
-        let stdout = io::stdout();
-        let mut drawer = Drawer::new(stdout.lock(), viewport_size);
-
+    pub fn header(&self) -> HeaderInfo {
         let any_selected = self.entries.iter().any(|e| e.selected);
+        let empty_output = self.output.text().is_empty();
 
         match self.state {
+            State::Idle => HeaderInfo {
+                name: "status",
+                waiting_response: false,
+            },
+            State::WaitingForEntries => HeaderInfo {
+                name: "status",
+                waiting_response: true,
+            },
+            State::CommitMessageInput => {
+                let name = match any_selected {
+                    true => "commit selected message",
+                    false => "commit all message",
+                };
+                HeaderInfo {
+                    name,
+                    waiting_response: empty_output,
+                }
+            }
+            State::ViewCommitResult => {
+                let name = match any_selected {
+                    true => "commit selected",
+                    false => "commit all",
+                };
+                HeaderInfo {
+                    name,
+                    waiting_response: empty_output,
+                }
+            }
+            State::ViewDiscardResult => {
+                let name = match any_selected {
+                    true => "discard selected",
+                    false => "discard all",
+                };
+                HeaderInfo {
+                    name,
+                    waiting_response: empty_output,
+                }
+            }
+            State::ViewDiff => {
+                let name = match any_selected {
+                    true => "diff selected",
+                    false => "diff all",
+                };
+                HeaderInfo {
+                    name,
+                    waiting_response: empty_output,
+                }
+            }
+        }
+    }
+
+    pub fn draw(&self, drawer: &mut Drawer) {
+        match self.state {
             State::Idle => {
-                drawer.header("status");
                 drawer.write(
                     &self.output.lines_from_scroll().next().unwrap_or(""),
                 );
@@ -264,7 +315,6 @@ impl Mode {
                 drawer.select_menu(&self.select, 1, self.entries.iter());
             }
             State::WaitingForEntries => {
-                drawer.header("status...");
                 drawer.write(
                     &self.output.lines_from_scroll().next().unwrap_or(""),
                 );
@@ -272,46 +322,10 @@ impl Mode {
                 drawer.next_line();
                 drawer.select_menu(&self.select, 2, self.entries.iter());
             }
-            State::CommitMessageInput => {
-                let header = if any_selected {
-                    "commit selected message"
-                } else {
-                    "commit all message"
-                };
-
-                drawer.header(header);
-                drawer.readline(&self.readline);
-            }
-            State::ViewCommitResult => {
-                let header = if any_selected {
-                    "commit selected"
-                } else {
-                    "commit all"
-                };
-
-                drawer.header(header);
-                drawer.output(&self.output);
-            }
-            State::ViewDiscardResult => {
-                let header = if any_selected {
-                    "discard selected"
-                } else {
-                    "discard all"
-                };
-
-                drawer.header(header);
-                drawer.output(&self.output);
-            }
-            State::ViewDiff => {
-                let header = if any_selected {
-                    "diff selected"
-                } else {
-                    "diff all"
-                };
-
-                drawer.header(header);
-                drawer.output(&self.output);
-            }
+            State::CommitMessageInput => drawer.readline(&self.readline),
+            State::ViewCommitResult => drawer.output(&self.output),
+            State::ViewDiscardResult => drawer.output(&self.output),
+            State::ViewDiff => drawer.output(&self.output),
         }
     }
 }

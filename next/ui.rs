@@ -5,31 +5,48 @@ use std::{
 
 use crossterm::{self, cursor, style, terminal};
 
-use crate::mode::{Output, ReadLine, SelectMenu};
+use crate::mode::{HeaderInfo, Output, ReadLine, SelectMenu};
 
 pub trait Draw {
     fn draw(&self, drawer: &mut Drawer);
 }
 
-pub struct Drawer<'a> {
-    stdout: StdoutLock<'a>,
+pub struct Drawer<'stdout, 'lock> {
+    stdout: &'lock mut StdoutLock<'stdout>,
     viewport_size: (u16, u16),
 }
 
-impl<'a> Drawer<'a> {
-    pub fn new(stdout: StdoutLock<'a>, viewport_size: (u16, u16)) -> Self {
+impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
+    pub fn new(
+        stdout: &'lock mut StdoutLock<'stdout>,
+        viewport_size: (u16, u16),
+    ) -> Self {
         Self {
             stdout,
             viewport_size,
         }
     }
 
-    pub fn header(&mut self, mode_name: &str) {
+    pub fn clear_to_bottom(&mut self) {
+        crossterm::execute!(
+            self.stdout,
+            style::SetBackgroundColor(style::Color::Black),
+            terminal::Clear(terminal::ClearType::FromCursorDown),
+        )
+        .unwrap();
+    }
+
+    pub fn header(&mut self, info: HeaderInfo, spinner_state: u8) {
         let background_color = style::Color::DarkYellow;
         let foreground_color = style::Color::Black;
 
+        let spinner_state = match info.waiting_response {
+            true => spinner_state % 4,
+            false => 0,
+        };
+
         crossterm::queue!(
-            &mut self.stdout,
+            self.stdout,
             cursor::MoveTo(0, 0),
             style::SetBackgroundColor(background_color),
             style::SetForegroundColor(foreground_color),
@@ -37,10 +54,13 @@ impl<'a> Drawer<'a> {
             style::SetBackgroundColor(foreground_color),
             style::SetForegroundColor(background_color),
             style::Print(' '),
-            style::Print(mode_name),
+            style::Print(info.name),
             style::Print(' '),
             style::SetBackgroundColor(background_color),
             terminal::Clear(terminal::ClearType::UntilNewLine),
+            cursor::MoveToColumn(u16::MAX),
+            cursor::MoveLeft(4),
+            style::Print(&"..."[..spinner_state as usize]),
             cursor::MoveToNextLine(1),
             style::ResetColor,
         )
@@ -53,7 +73,7 @@ impl<'a> Drawer<'a> {
 
     pub fn next_line(&mut self) {
         crossterm::queue!(
-            &mut self.stdout,
+            self.stdout,
             terminal::Clear(terminal::ClearType::UntilNewLine),
             cursor::MoveToNextLine(1),
         )
@@ -63,7 +83,7 @@ impl<'a> Drawer<'a> {
     pub fn output(&mut self, output: &Output) {
         for line in output.lines_from_scroll() {
             crossterm::queue!(
-                &mut self.stdout,
+                self.stdout,
                 style::Print(line),
                 terminal::Clear(terminal::ClearType::UntilNewLine),
                 cursor::MoveToNextLine(1),
@@ -74,7 +94,7 @@ impl<'a> Drawer<'a> {
 
     pub fn readline(&mut self, readline: &ReadLine) {
         crossterm::queue!(
-            &mut self.stdout,
+            self.stdout,
             style::SetBackgroundColor(style::Color::Black),
             style::SetForegroundColor(style::Color::White),
             style::Print(readline.input()),
@@ -97,7 +117,7 @@ impl<'a> Drawer<'a> {
         let cursor_index = select.cursor();
 
         crossterm::queue!(
-            &mut self.stdout,
+            self.stdout,
             style::SetBackgroundColor(style::Color::Black),
             style::SetForegroundColor(style::Color::White),
         )
@@ -111,7 +131,7 @@ impl<'a> Drawer<'a> {
         {
             if i == cursor_index {
                 crossterm::queue!(
-                    &mut self.stdout,
+                    self.stdout,
                     style::SetBackgroundColor(style::Color::DarkGrey),
                 )
                 .unwrap();
@@ -120,7 +140,7 @@ impl<'a> Drawer<'a> {
             entry.draw(self);
 
             crossterm::queue!(
-                &mut self.stdout,
+                self.stdout,
                 terminal::Clear(terminal::ClearType::UntilNewLine),
                 cursor::MoveToNextLine(1),
             )
@@ -128,23 +148,12 @@ impl<'a> Drawer<'a> {
 
             if i == cursor_index {
                 crossterm::queue!(
-                    &mut self.stdout,
+                    self.stdout,
                     style::SetBackgroundColor(style::Color::Black),
                 )
                 .unwrap();
             }
         }
-    }
-}
-
-impl<'a> Drop for Drawer<'a> {
-    fn drop(&mut self) {
-        crossterm::execute!(
-            &mut self.stdout,
-            style::SetBackgroundColor(style::Color::Black),
-            terminal::Clear(terminal::ClearType::FromCursorDown),
-        )
-        .unwrap();
     }
 }
 
