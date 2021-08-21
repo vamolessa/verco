@@ -103,6 +103,51 @@ impl Backend for Git {
             Ok(output)
         }
     }
+
+    fn diff(
+        &self,
+        revision: Option<&str>,
+        entries: &[StatusEntry],
+    ) -> BackendResult<String> {
+        match revision {
+            Some(revision) => {
+                let parent = format!("{}^@", revision);
+                if entries.is_empty() {
+                    Process::spawn(
+                        "git",
+                        &["diff", "--color", &parent, revision],
+                    )?
+                    .wait()
+                } else {
+                    let mut args = Vec::new();
+                    args.push("diff");
+                    args.push("--color");
+                    args.push(&parent);
+                    args.push(revision);
+                    args.push("--");
+                    for entry in entries {
+                        args.push(&entry.name);
+                    }
+
+                    Process::spawn("git", &args)?.wait()
+                }
+            }
+            None => {
+                if entries.is_empty() {
+                    Process::spawn("git", &["diff", "--color"])?.wait()
+                } else {
+                    let mut args = Vec::new();
+                    args.push("diff");
+                    args.push("--color");
+                    args.push("--");
+                    for entry in entries {
+                        args.push(&entry.name);
+                    }
+                    Process::spawn("git", &args)?.wait()
+                }
+            }
+        }
+    }
 }
 
 fn parse_file_status(s: &str) -> FileStatus {

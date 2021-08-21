@@ -58,6 +58,7 @@ pub trait Backend: 'static + Send + Sync {
     fn status(&self) -> BackendResult<StatusInfo>;
     fn commit(&self, message: &str, entries: &[StatusEntry]) -> BackendResult<String>;
     fn discard(&self, entries: &[StatusEntry]) -> BackendResult<String>;
+    fn diff(&self, revision: Option<&str>, entries: &[StatusEntry]) -> BackendResult<String>;
 }
 
 /*
