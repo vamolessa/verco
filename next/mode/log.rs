@@ -158,7 +158,7 @@ impl Mode {
                         }
                     }
                     Key::Char('d') => {
-                        // revision details
+                        // TODO revision details
                     }
                     Key::Char('f') => {
                         if let State::Idle = self.state {
@@ -242,7 +242,11 @@ impl Mode {
     pub fn draw(&self, drawer: &mut Drawer) {
         match self.state {
             State::Idle | State::WaitingForEntries(_) => {
-                drawer.select_menu(&self.select, 0, self.entries.iter());
+                if self.output.text().is_empty() {
+                    drawer.select_menu(&self.select, 0, self.entries.iter());
+                } else {
+                    drawer.output(&self.output);
+                }
             }
         }
     }
