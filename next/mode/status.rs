@@ -2,7 +2,7 @@ use std::thread;
 
 use crate::{
     application::Key,
-    backend::{FileStatus, StatusEntry},
+    backend::{Backend, BackendResult, FileStatus, StatusEntry, StatusInfo},
     mode::{
         HeaderInfo, InputStatus, ModeContext, ModeResponse, Output, ReadLine,
         SelectMenu, SelectMenuAction,
@@ -11,16 +11,10 @@ use crate::{
 };
 
 pub enum Response {
-    Refresh {
-        header: String,
-        entries: Vec<StatusEntry>,
-    },
-    Commit(String),
-    Discard(String),
+    Refresh(StatusInfo),
     Diff(String),
 }
 
-// TODO use this instead of extra State
 enum WaitOperation {
     None,
     Commit,
@@ -29,10 +23,8 @@ enum WaitOperation {
 
 enum State {
     Idle,
-    Waiting,
+    Waiting(WaitOperation),
     CommitMessageInput,
-    ViewCommitResult,
-    ViewDiscardResult,
     ViewDiff,
 }
 impl Default for State {
@@ -84,27 +76,15 @@ impl Mode {
     }
 
     pub fn on_enter(&mut self, ctx: &ModeContext) {
-        if let State::Waiting = self.state {
+        if let State::Waiting(_) = self.state {
             return;
         }
-        self.state = State::Waiting;
+        self.state = State::Waiting(WaitOperation::None);
 
         self.readline.clear();
         self.output.set(String::new());
 
-        let ctx = ctx.clone();
-        thread::spawn(move || {
-            let (header, entries) = match ctx.backend.status() {
-                Ok(info) => (info.header, info.entries),
-                Err(error) => (error, Vec::new()),
-            };
-
-            ctx.response_sender
-                .send(ModeResponse::Status(Response::Refresh {
-                    header,
-                    entries,
-                }));
-        });
+        request(ctx, |_| Ok(()));
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
@@ -112,21 +92,25 @@ impl Mode {
         let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
 
         match self.state {
-            State::Idle | State::Waiting => {
-                match self.select.on_key(
-                    self.entries.len(),
-                    available_height,
-                    key,
-                ) {
-                    SelectMenuAction::None => (),
-                    SelectMenuAction::Toggle(i) => {
-                        self.entries[i].selected = !self.entries[i].selected
-                    }
-                    SelectMenuAction::ToggleAll => {
-                        let all_selected =
-                            self.entries.iter().all(|e| e.selected);
-                        for entry in &mut self.entries {
-                            entry.selected = !all_selected;
+            State::Idle | State::Waiting(_) => {
+                if self.output.line_count() > 1 {
+                    self.output.on_key(available_height, key);
+                } else {
+                    match self.select.on_key(
+                        self.entries.len(),
+                        available_height,
+                        key,
+                    ) {
+                        SelectMenuAction::None => (),
+                        SelectMenuAction::Toggle(i) => {
+                            self.entries[i].selected = !self.entries[i].selected
+                        }
+                        SelectMenuAction::ToggleAll => {
+                            let all_selected =
+                                self.entries.iter().all(|e| e.selected);
+                            for entry in &mut self.entries {
+                                entry.selected = !all_selected;
+                            }
                         }
                     }
                 }
@@ -140,24 +124,14 @@ impl Mode {
                         }
                     }
                     Key::Char('U') => {
-                        if !self.entries.is_empty() {
-                            self.state = State::ViewDiscardResult;
-                            self.output.set(String::new());
-
+                        if matches!(self.state, State::Idle)
+                            && !self.entries.is_empty()
+                        {
+                            self.state = State::Waiting(WaitOperation::Discard);
                             let entries = self.get_selected_entries();
                             self.remove_selected_entries();
 
-                            let ctx = ctx.clone();
-                            thread::spawn(move || {
-                                let message =
-                                    match ctx.backend.discard(&entries) {
-                                        Ok(()) => String::new(),
-                                        Err(error) => error,
-                                    };
-                                ctx.response_sender.send(ModeResponse::Status(
-                                    Response::Discard(message),
-                                ));
-                            });
+                            request(ctx, move |b| b.discard(&entries));
                         }
                     }
                     Key::Char('d') => {
@@ -186,23 +160,13 @@ impl Mode {
             State::CommitMessageInput => {
                 self.readline.on_key(key);
                 if key.is_submit() {
-                    self.state = State::ViewCommitResult;
+                    self.state = State::Waiting(WaitOperation::Commit);
 
                     let message = self.readline.input().to_string();
                     let entries = self.get_selected_entries();
                     self.remove_selected_entries();
 
-                    let ctx = ctx.clone();
-                    thread::spawn(move || {
-                        let message =
-                            match ctx.backend.commit(&message, &entries) {
-                                Ok(()) => String::new(),
-                                Err(error) => error,
-                            };
-                        ctx.response_sender.send(ModeResponse::Status(
-                            Response::Commit(message),
-                        ));
-                    });
+                    request(ctx, move |b| b.commit(&message, &entries));
                 } else if key.is_cancel() {
                     self.on_enter(ctx);
                 }
@@ -215,18 +179,16 @@ impl Mode {
 
     pub fn on_response(&mut self, response: Response) {
         match response {
-            Response::Refresh {
-                header,
-                mut entries,
-            } => {
-                if let State::Waiting = self.state {
+            Response::Refresh(mut info) => {
+                if let State::Waiting(_) = self.state {
                     self.state = State::Idle;
                 }
                 if let State::Idle = self.state {
-                    self.output.set(header);
+                    self.output.set(info.header);
                 }
 
-                self.entries = entries
+                self.entries = info
+                    .entries
                     .drain(..)
                     .map(|e| Entry {
                         selected: false,
@@ -235,16 +197,6 @@ impl Mode {
                     })
                     .collect();
                 self.select.saturate_cursor(self.entries.len());
-            }
-            Response::Commit(output) => {
-                if let State::ViewCommitResult = self.state {
-                    self.output.set(output);
-                }
-            }
-            Response::Discard(output) => {
-                if let State::ViewDiscardResult = self.state {
-                    self.output.set(output);
-                }
             }
             Response::Diff(output) => {
                 if let State::ViewDiff = self.state {
@@ -255,7 +207,6 @@ impl Mode {
     }
 
     pub fn header(&self) -> HeaderInfo {
-        let any_selected = self.entries.iter().any(|e| e.selected);
         let empty_output = self.output.text().is_empty();
 
         match self.state {
@@ -263,66 +214,66 @@ impl Mode {
                 name: "status",
                 waiting_response: false,
             },
-            State::Waiting => HeaderInfo {
+            State::Waiting(WaitOperation::None) => HeaderInfo {
                 name: "status",
                 waiting_response: true,
             },
-            State::CommitMessageInput => {
-                let name = match any_selected {
-                    true => "commit selected message",
-                    false => "commit all message",
-                };
-                HeaderInfo {
-                    name,
-                    waiting_response: false,
-                }
-            }
-            State::ViewCommitResult => {
-                let name = match any_selected {
-                    true => "commit selected",
-                    false => "commit all",
-                };
-                HeaderInfo {
-                    name,
-                    waiting_response: empty_output,
-                }
-            }
-            State::ViewDiscardResult => {
-                let name = match any_selected {
-                    true => "discard selected",
-                    false => "discard all",
-                };
-                HeaderInfo {
-                    name,
-                    waiting_response: empty_output,
-                }
-            }
-            State::ViewDiff => {
-                let name = match any_selected {
-                    true => "diff selected",
-                    false => "diff all",
-                };
-                HeaderInfo {
-                    name,
-                    waiting_response: empty_output,
-                }
-            }
+            State::CommitMessageInput => HeaderInfo {
+                name: "commit message",
+                waiting_response: false,
+            },
+            State::Waiting(WaitOperation::Commit) => HeaderInfo {
+                name: "commit",
+                waiting_response: empty_output,
+            },
+            State::Waiting(WaitOperation::Discard) => HeaderInfo {
+                name: "discard",
+                waiting_response: empty_output,
+            },
+            State::ViewDiff => HeaderInfo {
+                name: "diff",
+                waiting_response: empty_output,
+            },
         }
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
         match self.state {
-            State::Idle | State::Waiting => {
-                drawer.write(&self.output.text());
-                drawer.next_line();
-                drawer.next_line();
-                drawer.select_menu(&self.select, 2, self.entries.iter());
+            State::Idle | State::Waiting(_) => {
+                if self.output.line_count() > 1 {
+                    drawer.output(&self.output);
+                } else {
+                    drawer.write(&self.output.text());
+                    drawer.next_line();
+                    drawer.next_line();
+                    drawer.select_menu(&self.select, 2, self.entries.iter());
+                }
             }
             State::CommitMessageInput => drawer.readline(&self.readline),
-            State::ViewCommitResult => drawer.output(&self.output),
-            State::ViewDiscardResult => drawer.output(&self.output),
             State::ViewDiff => drawer.output(&self.output),
         }
     }
+}
+
+fn request<F>(ctx: &ModeContext, f: F)
+where
+    F: 'static + Send + Sync + FnOnce(&dyn Backend) -> BackendResult<()>,
+{
+    let ctx = ctx.clone();
+    thread::spawn(move || {
+        use std::ops::Deref;
+
+        let info =
+            match f(ctx.backend.deref()).and_then(|_| ctx.backend.status()) {
+                Ok(info) => info,
+                Err(error) => StatusInfo {
+                    header: error,
+                    entries: Vec::new(),
+                },
+            };
+
+        ctx.response_sender
+            .send(ModeResponse::Status(Response::Refresh(info)));
+    });
 }
 

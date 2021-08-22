@@ -106,35 +106,10 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::None);
 
         self.output.set(String::new());
-
-        let ctx = ctx.clone();
-        thread::spawn(move || {
-            let entries = ctx
-                .backend
-                .log(0, ctx.viewport_size.1.saturating_sub(1) as _);
-            ctx.response_sender
-                .send(ModeResponse::Log(Response::Refresh(entries)));
-        });
+        request(ctx, |_| Ok(()));
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
-        fn request<F>(ctx: &ModeContext, available_height: usize, f: F)
-        where
-            F: 'static
-                + Send
-                + Sync
-                + FnOnce(&dyn Backend) -> BackendResult<()>,
-        {
-            let ctx = ctx.clone();
-            thread::spawn(move || {
-                use std::ops::Deref;
-                let result = f(ctx.backend.deref())
-                    .and_then(|_| ctx.backend.log(0, available_height));
-                ctx.response_sender
-                    .send(ModeResponse::Log(Response::Refresh(result)));
-            });
-        }
-
         match self.state {
             State::Idle | State::Waiting(_) => {
                 let available_height =
@@ -148,13 +123,10 @@ impl Mode {
                         if let (State::Idle, Some(entry)) =
                             (&self.state, self.entries.get(index))
                         {
-                            self.state = State::Waiting(
-                                WaitOperation::Checkout,
-                            );
+                            self.state =
+                                State::Waiting(WaitOperation::Checkout);
                             let revision = entry.hash.clone();
-                            request(ctx, available_height, move |b| {
-                                b.checkout(&revision)
-                            });
+                            request(ctx, move |b| b.checkout(&revision));
                         }
                     }
                     Key::Char('d') => {
@@ -162,23 +134,20 @@ impl Mode {
                     }
                     Key::Char('f') => {
                         if let State::Idle = self.state {
-                            self.state =
-                                State::Waiting(WaitOperation::Fetch);
-                            request(ctx, available_height, Backend::fetch);
+                            self.state = State::Waiting(WaitOperation::Fetch);
+                            request(ctx, Backend::fetch);
                         }
                     }
                     Key::Char('p') => {
                         if let State::Idle = self.state {
-                            self.state =
-                                State::Waiting(WaitOperation::Pull);
-                            request(ctx, available_height, Backend::pull);
+                            self.state = State::Waiting(WaitOperation::Pull);
+                            request(ctx, Backend::pull);
                         }
                     }
                     Key::Char('P') => {
                         if let State::Idle = self.state {
-                            self.state =
-                                State::Waiting(WaitOperation::Push);
-                            request(ctx, available_height, Backend::push);
+                            self.state = State::Waiting(WaitOperation::Push);
+                            request(ctx, Backend::push);
                         }
                     }
                     _ => (),
@@ -250,5 +219,21 @@ impl Mode {
             }
         }
     }
+}
+
+fn request<F>(ctx: &ModeContext, f: F)
+where
+    F: 'static + Send + Sync + FnOnce(&dyn Backend) -> BackendResult<()>,
+{
+    let ctx = ctx.clone();
+    thread::spawn(move || {
+        use std::ops::Deref;
+
+        let available_height = ctx.viewport_size.1.saturating_sub(1) as _;
+        let result = f(ctx.backend.deref())
+            .and_then(|_| ctx.backend.log(0, available_height));
+        ctx.response_sender
+            .send(ModeResponse::Log(Response::Refresh(result)));
+    });
 }
 

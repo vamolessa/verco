@@ -5,8 +5,8 @@ use crate::{
     backend::Backend,
 };
 
-pub mod status;
 pub mod log;
+pub mod status;
 
 pub enum ModeResponse {
     Status(status::Response),
@@ -49,6 +49,10 @@ impl Output {
 
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.line_count
     }
 
     pub fn lines_from_scroll<'a>(
