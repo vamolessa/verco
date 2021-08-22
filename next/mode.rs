@@ -1,17 +1,18 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{Key, EventSender},
+    application::{EventSender, Key},
     backend::Backend,
 };
 
 pub mod log;
+pub mod revision_details;
 pub mod status;
 
 pub enum ModeResponse {
     Status(status::Response),
     Log(log::Response),
-    RevisionDetails(()), // TODO
+    RevisionDetails(revision_details::Response),
 }
 
 pub enum ModeKind {

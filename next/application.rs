@@ -9,7 +9,7 @@ use crossterm::{event, terminal};
 
 use crate::{
     backend::Backend,
-    mode::{self, ModeContext, ModeKind, ModeResponse, ModeStatus},
+    mode::{self, ModeContext, ModeKind, ModeResponse},
     ui::Drawer,
 };
 
@@ -99,7 +99,7 @@ impl EventSender {
     pub fn send_response(&self, result: ModeResponse) {
         let _ = self.0.send(Event::Response(result));
     }
-    
+
     pub fn send_mode_change(&self, mode: ModeKind) {
         let _ = self.0.send(Event::ModeChange(mode));
     }
@@ -135,6 +135,7 @@ struct Application {
 
     status_mode: mode::status::Mode,
     log_mode: mode::log::Mode,
+    revision_details_mode: mode::revision_details::Mode,
 
     spinner_state: u8,
 }
@@ -144,7 +145,9 @@ impl Application {
         match &self.current_mode {
             ModeKind::Status => self.status_mode.on_enter(ctx),
             ModeKind::Log => self.log_mode.on_enter(ctx),
-            ModeKind::RevisionDetails(revision) => todo!(),
+            ModeKind::RevisionDetails(revision) => {
+                self.revision_details_mode.on_enter(ctx, revision);
+            }
         }
     }
 
@@ -152,7 +155,9 @@ impl Application {
         let status = match &self.current_mode {
             ModeKind::Status => self.status_mode.on_key(ctx, key),
             ModeKind::Log => self.log_mode.on_key(ctx, key),
-            ModeKind::RevisionDetails(revision) => todo!(),
+            ModeKind::RevisionDetails(revision) => {
+                self.revision_details_mode.on_key(ctx, revision, key)
+            }
         };
 
         if !status.pending_input {
@@ -173,10 +178,12 @@ impl Application {
     pub fn on_response(&mut self, response: ModeResponse) {
         match response {
             ModeResponse::Status(response) => {
-                self.status_mode.on_response(response)
+                self.status_mode.on_response(response);
             }
             ModeResponse::Log(response) => self.log_mode.on_response(response),
-            ModeResponse::RevisionDetails(response) => todo!(),
+            ModeResponse::RevisionDetails(response) => {
+                self.revision_details_mode.on_response(response);
+            }
         }
     }
 
@@ -186,7 +193,7 @@ impl Application {
         let header_info = match &self.current_mode {
             ModeKind::Status => self.status_mode.header(),
             ModeKind::Log => self.log_mode.header(),
-            ModeKind::RevisionDetails(_) => todo!(),
+            ModeKind::RevisionDetails(_) => self.revision_details_mode.header(),
         };
         drawer.header(header_info, self.spinner_state);
     }
@@ -195,7 +202,9 @@ impl Application {
         match &self.current_mode {
             ModeKind::Status => self.status_mode.draw(drawer),
             ModeKind::Log => self.log_mode.draw(drawer),
-            ModeKind::RevisionDetails(_) => todo!(),
+            ModeKind::RevisionDetails(_) => {
+                self.revision_details_mode.draw(drawer);
+            }
         }
         drawer.clear_to_bottom();
     }

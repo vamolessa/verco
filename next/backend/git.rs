@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::backend::{
     Backend, BackendResult, FileStatus, LogEntry, Process, RevisionEntry,
-    StatusInfo,
+    RevisionInfo, StatusInfo,
 };
 
 pub struct Git;
@@ -43,10 +43,7 @@ impl Backend for Git {
             })
             .collect();
 
-        let mut info = StatusInfo { header, entries };
-        info.entries.sort_unstable_by_key(|e| e.status as usize);
-
-        Ok(info)
+        Ok(StatusInfo { header, entries })
     }
 
     fn commit(
@@ -206,6 +203,39 @@ impl Backend for Git {
     fn push(&self) -> BackendResult<()> {
         Process::spawn("git", &["push"])?.wait()?;
         Ok(())
+    }
+
+    fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo> {
+        let message = Process::spawn("git", &["show", "-s", "--format=%B"])?;
+        let output = Process::spawn(
+            "git",
+            &[
+                "diff-tree",
+                "--no-commit-id",
+                "--name-status",
+                "-r",
+                "-z",
+                revision,
+            ],
+        )?;
+
+        let message = message.wait()?.trim().into();
+        let entries = output
+            .wait()?
+            .trim()
+            .split('\0')
+            .map(str::trim)
+            .filter(|e| e.len() >= 2)
+            .map(|e| {
+                let (status, filename) = e.split_at(2);
+                RevisionEntry {
+                    name: filename.trim().into(),
+                    status: parse_file_status(status.trim()),
+                }
+            })
+            .collect();
+
+        Ok(RevisionInfo { message, entries })
     }
 }
 

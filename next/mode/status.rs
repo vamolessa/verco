@@ -147,14 +147,14 @@ impl Mode {
 
                             let ctx = ctx.clone();
                             thread::spawn(move || {
-                                let message =
+                                let output =
                                     match ctx.backend.diff(None, &entries) {
-                                        Ok(message) => message,
+                                        Ok(output) => output,
                                         Err(error) => error,
                                     };
                                 ctx.event_sender.send_response(
                                     ModeResponse::Status(Response::Diff(
-                                        message,
+                                        output,
                                     )),
                                 );
                             });
@@ -174,8 +174,20 @@ impl Mode {
 
                     let ctx = ctx.clone();
                     thread::spawn(move || {
-                        ctx.backend.commit(&message, &entries);
-                        ctx.event_sender.send_mode_change(ModeKind::Log);
+                        match ctx.backend.commit(&message, &entries) {
+                            Ok(()) => {
+                                ctx.event_sender
+                                    .send_mode_change(ModeKind::Log);
+                            }
+                            Err(error) => ctx.event_sender.send_response(
+                                ModeResponse::Status(Response::Refresh(
+                                    StatusInfo {
+                                        header: error,
+                                        entries: Vec::new(),
+                                    },
+                                )),
+                            ),
+                        }
                     });
                 } else if key.is_cancel() {
                     self.on_enter(ctx);
@@ -189,7 +201,7 @@ impl Mode {
 
     pub fn on_response(&mut self, response: Response) {
         match response {
-            Response::Refresh(mut info) => {
+            Response::Refresh(info) => {
                 if let State::Waiting(_) = self.state {
                     self.state = State::Idle;
                 }
@@ -199,7 +211,7 @@ impl Mode {
 
                 self.entries = info
                     .entries
-                    .drain(..)
+                    .into_iter()
                     .map(|e| Entry {
                         selected: false,
                         name: e.name,
@@ -273,7 +285,7 @@ where
     thread::spawn(move || {
         use std::ops::Deref;
 
-        let info =
+        let mut info =
             match f(ctx.backend.deref()).and_then(|_| ctx.backend.status()) {
                 Ok(info) => info,
                 Err(error) => StatusInfo {
@@ -281,6 +293,7 @@ where
                     entries: Vec::new(),
                 },
             };
+        info.entries.sort_unstable_by_key(|e| e.status as usize);
 
         ctx.event_sender
             .send_response(ModeResponse::Status(Response::Refresh(info)));

@@ -46,6 +46,11 @@ pub struct StatusInfo {
     pub entries: Vec<RevisionEntry>,
 }
 
+pub struct RevisionInfo {
+    pub message: String,
+    pub entries: Vec<RevisionEntry>,
+}
+
 #[derive(Clone)]
 pub struct RevisionEntry {
     pub name: String,
@@ -82,6 +87,8 @@ pub trait Backend: 'static + Send + Sync {
     fn fetch(&self) -> BackendResult<()>;
     fn pull(&self) -> BackendResult<()>;
     fn push(&self) -> BackendResult<()>;
+
+    fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo>;
 }
 
 pub struct Process(Child);

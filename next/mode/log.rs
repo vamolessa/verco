@@ -4,7 +4,8 @@ use crate::{
     application::Key,
     backend::{Backend, BackendResult, LogEntry},
     mode::{
-        HeaderInfo, ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,
+        HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
+        SelectMenu,
     },
     ui::{Color, Drawer, SelectEntryDraw},
 };
@@ -117,7 +118,9 @@ impl Mode {
         if let Key::Char('d') = key {
             let index = self.select.cursor();
             if let Some(entry) = self.entries.get(index) {
-                // TODO revision details
+                ctx.event_sender.send_mode_change(ModeKind::RevisionDetails(
+                    entry.hash.clone(),
+                ));
             }
         }
 
@@ -155,7 +158,7 @@ impl Mode {
     pub fn on_response(&mut self, response: Response) {
         match response {
             Response::Refresh(entries) => {
-                self.entries.clear();
+                self.entries = Vec::new();
                 self.output.set(String::new());
 
                 if let State::Waiting(_) = self.state {
