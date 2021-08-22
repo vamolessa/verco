@@ -9,7 +9,7 @@ use crossterm::{event, terminal};
 
 use crate::{
     backend::Backend,
-    mode::{self, ModeContext, ModeKind, ModeOperation, ModeResponse},
+    mode::{self, ModeContext, ModeKind, ModeResponse, ModeStatus},
     ui::Drawer,
 };
 
@@ -90,13 +90,18 @@ enum Event {
     Key(Key),
     Resize(u16, u16),
     Response(ModeResponse),
+    ModeChange(ModeKind),
 }
 
 #[derive(Clone)]
-pub struct ModeResponseSender(mpsc::SyncSender<Event>);
-impl ModeResponseSender {
-    pub fn send(&self, result: ModeResponse) {
+pub struct EventSender(mpsc::SyncSender<Event>);
+impl EventSender {
+    pub fn send_response(&self, result: ModeResponse) {
         let _ = self.0.send(Event::Response(result));
+    }
+    
+    pub fn send_mode_change(&self, mode: ModeKind) {
+        let _ = self.0.send(Event::ModeChange(mode));
     }
 }
 
@@ -144,26 +149,22 @@ impl Application {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> bool {
-        let op = match &self.current_mode {
+        let status = match &self.current_mode {
             ModeKind::Status => self.status_mode.on_key(ctx, key),
             ModeKind::Log => self.log_mode.on_key(ctx, key),
             ModeKind::RevisionDetails(revision) => todo!(),
         };
 
-        match op {
-            ModeOperation::None => {
-                if key.is_cancel() {
-                    return false;
-                }
-
-                match key {
-                    Key::Char('s') => self.enter_mode(ctx, ModeKind::Status),
-                    Key::Char('l') => self.enter_mode(ctx, ModeKind::Log),
-                    _ => (),
-                }
+        if !status.pending_input {
+            if key.is_cancel() {
+                return false;
             }
-            ModeOperation::PendingInput => (),
-            ModeOperation::Change(mode) => self.enter_mode(ctx, mode),
+
+            match key {
+                Key::Char('s') => self.enter_mode(ctx, ModeKind::Status),
+                Key::Char('l') => self.enter_mode(ctx, ModeKind::Log),
+                _ => (),
+            }
         }
 
         true
@@ -210,7 +211,7 @@ pub fn run(backend: Arc<dyn Backend>) {
 
     let mut ctx = ModeContext {
         backend,
-        response_sender: ModeResponseSender(event_sender.clone()),
+        event_sender: EventSender(event_sender.clone()),
         viewport_size,
     };
 
@@ -236,6 +237,7 @@ pub fn run(backend: Arc<dyn Backend>) {
                 ctx.viewport_size = (width, height);
             }
             Ok(Event::Response(response)) => application.on_response(response),
+            Ok(Event::ModeChange(mode)) => application.enter_mode(&ctx, mode),
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 draw_body = false;
             }

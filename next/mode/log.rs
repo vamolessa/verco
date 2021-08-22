@@ -4,8 +4,7 @@ use crate::{
     application::Key,
     backend::{Backend, BackendResult, LogEntry},
     mode::{
-        HeaderInfo, ModeContext, ModeOperation, ModeResponse, Output,
-        SelectMenu,
+        HeaderInfo, ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,
     },
     ui::{Color, Drawer, SelectEntryDraw},
 };
@@ -110,7 +109,7 @@ impl Mode {
         request(ctx, |_| Ok(()));
     }
 
-    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeOperation {
+    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
         self.select
             .on_key(self.entries.len(), available_height, key);
@@ -148,7 +147,9 @@ impl Mode {
             }
         }
 
-        ModeOperation::None
+        ModeStatus {
+            pending_input: false,
+        }
     }
 
     pub fn on_response(&mut self, response: Response) {
@@ -221,8 +222,8 @@ where
         let available_height = ctx.viewport_size.1.saturating_sub(1) as _;
         let result = f(ctx.backend.deref())
             .and_then(|_| ctx.backend.log(0, available_height));
-        ctx.response_sender
-            .send(ModeResponse::Log(Response::Refresh(result)));
+        ctx.event_sender
+            .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
 

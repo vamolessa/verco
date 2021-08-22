@@ -4,7 +4,7 @@ use crate::{
     application::Key,
     backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
-        HeaderInfo, ModeContext, ModeKind, ModeOperation, ModeResponse, Output,
+        HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
         ReadLine, SelectMenu, SelectMenuAction,
     },
     ui::{Drawer, SelectEntryDraw},
@@ -91,7 +91,7 @@ impl Mode {
         request(ctx, |_| Ok(()));
     }
 
-    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeOperation {
+    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let pending_input = matches!(self.state, State::CommitMessageInput);
         let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
 
@@ -152,9 +152,11 @@ impl Mode {
                                         Ok(message) => message,
                                         Err(error) => error,
                                     };
-                                ctx.response_sender.send(ModeResponse::Status(
-                                    Response::Diff(message),
-                                ));
+                                ctx.event_sender.send_response(
+                                    ModeResponse::Status(Response::Diff(
+                                        message,
+                                    )),
+                                );
                             });
                         }
                     }
@@ -170,8 +172,11 @@ impl Mode {
                     let entries = self.get_selected_entries();
                     self.remove_selected_entries();
 
-                    request(ctx, move |b| b.commit(&message, &entries));
-                    return ModeOperation::Change(ModeKind::Log);
+                    let ctx = ctx.clone();
+                    thread::spawn(move || {
+                        ctx.backend.commit(&message, &entries);
+                        ctx.event_sender.send_mode_change(ModeKind::Log);
+                    });
                 } else if key.is_cancel() {
                     self.on_enter(ctx);
                 }
@@ -179,11 +184,7 @@ impl Mode {
             _ => self.output.on_key(available_height, key),
         }
 
-        if pending_input {
-            ModeOperation::PendingInput
-        } else {
-            ModeOperation::None
-        }
+        ModeStatus { pending_input }
     }
 
     pub fn on_response(&mut self, response: Response) {
@@ -281,8 +282,8 @@ where
                 },
             };
 
-        ctx.response_sender
-            .send(ModeResponse::Status(Response::Refresh(info)));
+        ctx.event_sender
+            .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
 

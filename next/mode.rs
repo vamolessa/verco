@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{Key, ModeResponseSender},
+    application::{Key, EventSender},
     backend::Backend,
 };
 
@@ -28,14 +28,12 @@ impl Default for ModeKind {
 #[derive(Clone)]
 pub struct ModeContext {
     pub backend: Arc<dyn Backend>,
-    pub response_sender: ModeResponseSender,
+    pub event_sender: EventSender,
     pub viewport_size: (u16, u16),
 }
 
-pub enum ModeOperation {
-    None,
-    PendingInput,
-    Change(ModeKind),
+pub struct ModeStatus {
+    pub pending_input: bool,
 }
 
 pub struct HeaderInfo {
