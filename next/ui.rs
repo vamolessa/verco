@@ -32,7 +32,7 @@ pub trait SelectEntryDraw {
 
 pub struct Drawer<'stdout, 'lock> {
     stdout: &'lock mut StdoutLock<'stdout>,
-    viewport_size: (u16, u16),
+    pub viewport_size: (u16, u16),
 }
 
 impl<'stdout, 'lock> Drawer<'stdout, 'lock> {

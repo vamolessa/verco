@@ -40,43 +40,53 @@ impl SelectEntryDraw for LogEntry {
             }
         }
 
-        let mut chars = self.author.char_indices();
-        let author = match chars.nth(12) {
-            Some((i, c)) => &self.author[..i + c.len_utf8()],
+        let author = match self.author.char_indices().nth(12) {
+            Some((i, _)) => &self.author[..i],
             None => &self.author,
         };
 
-        if self.refs.is_empty() {
-            drawer.write(&format_args!(
-                "{}{} {}{} {}{} {}{} {}{}",
-                color(Color::White, hovered),
-                &self.graph,
-                color(Color::Yellow, hovered),
-                &self.hash,
-                color(Color::Blue, hovered),
-                &self.date,
-                color(Color::Green, hovered),
-                author,
-                color(Color::White, hovered),
-                &self.message,
-            ));
-        } else {
-            drawer.write(&format_args!(
-                "{}{} {}{} {}{} {}{} {}({}) {}{}",
-                color(Color::White, hovered),
-                &self.graph,
-                color(Color::Yellow, hovered),
-                &self.hash,
-                color(Color::Blue, hovered),
-                &self.date,
-                color(Color::Green, hovered),
-                author,
-                color(Color::Red, hovered),
-                &self.refs,
-                color(Color::White, hovered),
-                &self.message,
-            ));
+        let mut total_chars = self.graph.chars().count()
+            + 1
+            + self.hash.chars().count()
+            + 1
+            + self.date.chars().count()
+            + 1
+            + author.chars().count()
+            + 1;
+
+        if !self.refs.is_empty() {
+            total_chars += self.refs.chars().count() + 3;
         }
+
+        let available_width =
+            (drawer.viewport_size.0 as usize).saturating_sub(total_chars);
+        let message = match self.message.char_indices().nth(available_width) {
+            Some((i, _)) => &self.message[..i],
+            None => &self.message,
+        };
+
+        let (refs_begin, refs_end) = match &self.refs[..] {
+            "" => ("", ""),
+            _ => ("(", ") "),
+        };
+
+        drawer.write(&format_args!(
+            "{}{} {}{} {}{} {}{} {}{}{}{}{}{}",
+            color(Color::White, hovered),
+            &self.graph,
+            color(Color::Yellow, hovered),
+            &self.hash,
+            color(Color::Blue, hovered),
+            &self.date,
+            color(Color::Green, hovered),
+            author,
+            color(Color::Red, hovered),
+            refs_begin,
+            &self.refs,
+            refs_end,
+            color(Color::White, hovered),
+            message,
+        ));
     }
 }
 
