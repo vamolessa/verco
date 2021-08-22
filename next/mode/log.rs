@@ -146,7 +146,7 @@ impl Mode {
                             let ctx = ctx.clone();
                             thread::spawn(move || {
                                 let result =
-                                    ctx.backend.fetch().and_then(|_| {
+                                    ctx.backend.pull().and_then(|_| {
                                         ctx.backend.log(0, available_height)
                                     });
                                 ctx.response_sender.send(ModeResponse::Log(
@@ -163,7 +163,7 @@ impl Mode {
                             let ctx = ctx.clone();
                             thread::spawn(move || {
                                 let result =
-                                    ctx.backend.fetch().and_then(|_| {
+                                    ctx.backend.push().and_then(|_| {
                                         ctx.backend.log(0, available_height)
                                     });
                                 ctx.response_sender.send(ModeResponse::Log(
