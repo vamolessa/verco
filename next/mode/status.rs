@@ -7,7 +7,7 @@ use crate::{
         HeaderInfo, InputStatus, ModeContext, ModeResponse, Output, ReadLine,
         SelectMenu, SelectMenuAction,
     },
-    ui::{SelectEntryDraw, Drawer},
+    ui::{Drawer, SelectEntryDraw},
 };
 
 pub enum Response {
@@ -147,9 +147,9 @@ impl Mode {
                                         Ok(message) => message,
                                         Err(error) => error,
                                     };
-                                let response = Response::Discard(message);
-                                ctx.response_sender
-                                    .send(ModeResponse::Status(response));
+                                ctx.response_sender.send(ModeResponse::Status(
+                                    Response::Discard(message),
+                                ));
                             });
                         }
                     }
@@ -167,9 +167,9 @@ impl Mode {
                                         Ok(message) => message,
                                         Err(error) => error,
                                     };
-                                let response = Response::Diff(message);
-                                ctx.response_sender
-                                    .send(ModeResponse::Status(response));
+                                ctx.response_sender.send(ModeResponse::Status(
+                                    Response::Diff(message),
+                                ));
                             });
                         }
                     }
@@ -192,9 +192,9 @@ impl Mode {
                                 Ok(message) => message,
                                 Err(error) => error,
                             };
-                        let response = Response::Commit(message);
-                        ctx.response_sender
-                            .send(ModeResponse::Status(response));
+                        ctx.response_sender.send(ModeResponse::Status(
+                            Response::Commit(message),
+                        ));
                     });
                 } else if key.is_cancel() {
                     self.on_enter(ctx);

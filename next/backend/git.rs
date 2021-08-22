@@ -194,6 +194,21 @@ impl Backend for Git {
 
         Ok(entries)
     }
+
+    fn fetch(&self) -> BackendResult<()> {
+        Process::spawn("git", &["fetch", "--all"])?.wait()?;
+        Ok(())
+    }
+
+    fn pull(&self) -> BackendResult<()> {
+        Process::spawn("git", &["pull", "--all"])?.wait()?;
+        Ok(())
+    }
+
+    fn push(&self) -> BackendResult<()> {
+        Process::spawn("git", &["push"])?.wait()?;
+        Ok(())
+    }
 }
 
 fn parse_file_status(s: &str) -> FileStatus {

@@ -13,9 +13,16 @@ pub enum Response {
     Refresh(BackendResult<Vec<LogEntry>>),
 }
 
+enum WaitOperation {
+    None,
+    Fetch,
+    Pull,
+    Push,
+}
+
 enum State {
     Idle,
-    WaitingForEntries,
+    WaitingForEntries(WaitOperation),
 }
 impl Default for State {
     fn default() -> Self {
@@ -82,10 +89,10 @@ pub struct Mode {
 }
 impl Mode {
     pub fn on_enter(&mut self, ctx: &ModeContext) {
-        if let State::WaitingForEntries = self.state {
+        if let State::WaitingForEntries(_) = self.state {
             return;
         }
-        self.state = State::WaitingForEntries;
+        self.state = State::WaitingForEntries(WaitOperation::None);
 
         self.output.set(String::new());
 
@@ -100,14 +107,77 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
-        InputStatus { pending: false }
+        match self.state {
+            State::Idle | State::WaitingForEntries(_) => {
+                let available_height =
+                    ctx.viewport_size.1.saturating_sub(1) as usize;
+                self.select
+                    .on_key(self.entries.len(), available_height, key);
 
-        // c checkout revision
-        // U revert revision
-        // d revision details
-        // f fetch
-        // p pull
-        // P push
+                match key {
+                    Key::Char('c') => {
+                        // checkout revision
+                    }
+                    Key::Char('d') => {
+                        // revision details
+                    }
+                    Key::Char('f') => {
+                        if let State::Idle = self.state {
+                            self.state =
+                                State::WaitingForEntries(WaitOperation::Fetch);
+
+                            let ctx = ctx.clone();
+                            thread::spawn(move || {
+                                let result =
+                                    ctx.backend.fetch().and_then(|_| {
+                                        ctx.backend.log(0, available_height)
+                                    });
+                                ctx.response_sender.send(ModeResponse::Log(
+                                    Response::Refresh(result),
+                                ));
+                            });
+                        }
+                    }
+                    Key::Char('p') => {
+                        if let State::Idle = self.state {
+                            self.state =
+                                State::WaitingForEntries(WaitOperation::Pull);
+
+                            let ctx = ctx.clone();
+                            thread::spawn(move || {
+                                let result =
+                                    ctx.backend.fetch().and_then(|_| {
+                                        ctx.backend.log(0, available_height)
+                                    });
+                                ctx.response_sender.send(ModeResponse::Log(
+                                    Response::Refresh(result),
+                                ));
+                            });
+                        }
+                    }
+                    Key::Char('P') => {
+                        if let State::Idle = self.state {
+                            self.state =
+                                State::WaitingForEntries(WaitOperation::Push);
+
+                            let ctx = ctx.clone();
+                            thread::spawn(move || {
+                                let result =
+                                    ctx.backend.fetch().and_then(|_| {
+                                        ctx.backend.log(0, available_height)
+                                    });
+                                ctx.response_sender.send(ModeResponse::Log(
+                                    Response::Refresh(result),
+                                ));
+                            });
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+
+        InputStatus { pending: false }
     }
 
     pub fn on_response(&mut self, response: Response) {
@@ -116,7 +186,7 @@ impl Mode {
                 self.entries.clear();
                 self.output.set(String::new());
 
-                if let State::WaitingForEntries = self.state {
+                if let State::WaitingForEntries(_) = self.state {
                     self.state = State::Idle;
                 }
                 if let State::Idle = self.state {
@@ -137,8 +207,20 @@ impl Mode {
                 name: "log",
                 waiting_response: false,
             },
-            State::WaitingForEntries => HeaderInfo {
+            State::WaitingForEntries(WaitOperation::None) => HeaderInfo {
                 name: "log",
+                waiting_response: true,
+            },
+            State::WaitingForEntries(WaitOperation::Fetch) => HeaderInfo {
+                name: "fetch",
+                waiting_response: true,
+            },
+            State::WaitingForEntries(WaitOperation::Pull) => HeaderInfo {
+                name: "pull",
+                waiting_response: true,
+            },
+            State::WaitingForEntries(WaitOperation::Push) => HeaderInfo {
+                name: "push",
                 waiting_response: true,
             },
         }
@@ -146,7 +228,7 @@ impl Mode {
 
     pub fn draw(&self, drawer: &mut Drawer) {
         match self.state {
-            State::Idle | State::WaitingForEntries => {
+            State::Idle | State::WaitingForEntries(_) => {
                 drawer.select_menu(&self.select, 0, self.entries.iter());
             }
         }
