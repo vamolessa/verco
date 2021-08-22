@@ -69,8 +69,8 @@ pub trait Backend: 'static + Send + Sync {
         &self,
         message: &str,
         entries: &[StatusEntry],
-    ) -> BackendResult<String>;
-    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<String>;
+    ) -> BackendResult<()>;
+    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<()>;
     fn diff(
         &self,
         revision: Option<&str>,

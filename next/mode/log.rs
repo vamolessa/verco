@@ -23,7 +23,7 @@ enum WaitOperation {
 
 enum State {
     Idle,
-    WaitingForEntries(WaitOperation),
+    Waiting(WaitOperation),
 }
 impl Default for State {
     fn default() -> Self {
@@ -100,10 +100,10 @@ pub struct Mode {
 }
 impl Mode {
     pub fn on_enter(&mut self, ctx: &ModeContext) {
-        if let State::WaitingForEntries(_) = self.state {
+        if let State::Waiting(_) = self.state {
             return;
         }
-        self.state = State::WaitingForEntries(WaitOperation::None);
+        self.state = State::Waiting(WaitOperation::None);
 
         self.output.set(String::new());
 
@@ -136,7 +136,7 @@ impl Mode {
         }
 
         match self.state {
-            State::Idle | State::WaitingForEntries(_) => {
+            State::Idle | State::Waiting(_) => {
                 let available_height =
                     ctx.viewport_size.1.saturating_sub(1) as usize;
                 self.select
@@ -148,7 +148,7 @@ impl Mode {
                         if let (State::Idle, Some(entry)) =
                             (&self.state, self.entries.get(index))
                         {
-                            self.state = State::WaitingForEntries(
+                            self.state = State::Waiting(
                                 WaitOperation::Checkout,
                             );
                             let revision = entry.hash.clone();
@@ -163,21 +163,21 @@ impl Mode {
                     Key::Char('f') => {
                         if let State::Idle = self.state {
                             self.state =
-                                State::WaitingForEntries(WaitOperation::Fetch);
+                                State::Waiting(WaitOperation::Fetch);
                             request(ctx, available_height, Backend::fetch);
                         }
                     }
                     Key::Char('p') => {
                         if let State::Idle = self.state {
                             self.state =
-                                State::WaitingForEntries(WaitOperation::Pull);
+                                State::Waiting(WaitOperation::Pull);
                             request(ctx, available_height, Backend::pull);
                         }
                     }
                     Key::Char('P') => {
                         if let State::Idle = self.state {
                             self.state =
-                                State::WaitingForEntries(WaitOperation::Push);
+                                State::Waiting(WaitOperation::Push);
                             request(ctx, available_height, Backend::push);
                         }
                     }
@@ -195,7 +195,7 @@ impl Mode {
                 self.entries.clear();
                 self.output.set(String::new());
 
-                if let State::WaitingForEntries(_) = self.state {
+                if let State::Waiting(_) = self.state {
                     self.state = State::Idle;
                 }
                 if let State::Idle = self.state {
@@ -216,23 +216,23 @@ impl Mode {
                 name: "log",
                 waiting_response: false,
             },
-            State::WaitingForEntries(WaitOperation::None) => HeaderInfo {
+            State::Waiting(WaitOperation::None) => HeaderInfo {
                 name: "log",
                 waiting_response: true,
             },
-            State::WaitingForEntries(WaitOperation::Checkout) => HeaderInfo {
+            State::Waiting(WaitOperation::Checkout) => HeaderInfo {
                 name: "checkout",
                 waiting_response: true,
             },
-            State::WaitingForEntries(WaitOperation::Fetch) => HeaderInfo {
+            State::Waiting(WaitOperation::Fetch) => HeaderInfo {
                 name: "fetch",
                 waiting_response: true,
             },
-            State::WaitingForEntries(WaitOperation::Pull) => HeaderInfo {
+            State::Waiting(WaitOperation::Pull) => HeaderInfo {
                 name: "pull",
                 waiting_response: true,
             },
-            State::WaitingForEntries(WaitOperation::Push) => HeaderInfo {
+            State::Waiting(WaitOperation::Push) => HeaderInfo {
                 name: "push",
                 waiting_response: true,
             },
@@ -241,7 +241,7 @@ impl Mode {
 
     pub fn draw(&self, drawer: &mut Drawer) {
         match self.state {
-            State::Idle | State::WaitingForEntries(_) => {
+            State::Idle | State::Waiting(_) => {
                 if self.output.text().is_empty() {
                     drawer.select_menu(&self.select, 0, self.entries.iter());
                 } else {

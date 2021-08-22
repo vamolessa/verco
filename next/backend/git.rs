@@ -53,7 +53,7 @@ impl Backend for Git {
         &self,
         message: &str,
         entries: &[StatusEntry],
-    ) -> BackendResult<String> {
+    ) -> BackendResult<()> {
         if entries.is_empty() {
             Process::spawn("git", &["add", "--all"])?.wait()?;
         } else {
@@ -62,21 +62,15 @@ impl Backend for Git {
             }
         }
 
-        let output =
-            Process::spawn("git", &["commit", "-m", message])?.wait()?;
-        Ok(output)
+        Process::spawn("git", &["commit", "-m", message])?.wait()?;
+        Ok(())
     }
 
-    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<String> {
+    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            let mut output = String::new();
-            output.push_str(
-                &Process::spawn("git", &["reset", "--hard"])?.wait()?,
-            );
-            output.push_str(
-                &Process::spawn("git", &["clean", "-d", "--force"])?.wait()?,
-            );
-            Ok(output)
+            Process::spawn("git", &["reset", "--hard"])?.wait()?;
+            Process::spawn("git", &["clean", "-d", "--force"])?.wait()?;
+            Ok(())
         } else {
             let mut processes = Vec::new();
             for entry in entries {
@@ -96,12 +90,11 @@ impl Backend for Git {
                 }
             }
 
-            let mut output = String::new();
             for process in processes {
-                output.push_str(&process.wait()?);
+                process.wait()?;
             }
 
-            Ok(output)
+            Ok(())
         }
     }
 

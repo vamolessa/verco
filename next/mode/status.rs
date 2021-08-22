@@ -20,9 +20,16 @@ pub enum Response {
     Diff(String),
 }
 
+// TODO use this instead of extra State
+enum WaitOperation {
+    None,
+    Commit,
+    Discard,
+}
+
 enum State {
     Idle,
-    WaitingForEntries,
+    Waiting,
     CommitMessageInput,
     ViewCommitResult,
     ViewDiscardResult,
@@ -77,10 +84,10 @@ impl Mode {
     }
 
     pub fn on_enter(&mut self, ctx: &ModeContext) {
-        if let State::WaitingForEntries = self.state {
+        if let State::Waiting = self.state {
             return;
         }
-        self.state = State::WaitingForEntries;
+        self.state = State::Waiting;
 
         self.readline.clear();
         self.output.set(String::new());
@@ -105,7 +112,7 @@ impl Mode {
         let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
 
         match self.state {
-            State::Idle | State::WaitingForEntries => {
+            State::Idle | State::Waiting => {
                 match self.select.on_key(
                     self.entries.len(),
                     available_height,
@@ -144,7 +151,7 @@ impl Mode {
                             thread::spawn(move || {
                                 let message =
                                     match ctx.backend.discard(&entries) {
-                                        Ok(message) => message,
+                                        Ok(()) => String::new(),
                                         Err(error) => error,
                                     };
                                 ctx.response_sender.send(ModeResponse::Status(
@@ -189,7 +196,7 @@ impl Mode {
                     thread::spawn(move || {
                         let message =
                             match ctx.backend.commit(&message, &entries) {
-                                Ok(message) => message,
+                                Ok(()) => String::new(),
                                 Err(error) => error,
                             };
                         ctx.response_sender.send(ModeResponse::Status(
@@ -212,7 +219,7 @@ impl Mode {
                 header,
                 mut entries,
             } => {
-                if let State::WaitingForEntries = self.state {
+                if let State::Waiting = self.state {
                     self.state = State::Idle;
                 }
                 if let State::Idle = self.state {
@@ -256,7 +263,7 @@ impl Mode {
                 name: "status",
                 waiting_response: false,
             },
-            State::WaitingForEntries => HeaderInfo {
+            State::Waiting => HeaderInfo {
                 name: "status",
                 waiting_response: true,
             },
@@ -305,7 +312,7 @@ impl Mode {
 
     pub fn draw(&self, drawer: &mut Drawer) {
         match self.state {
-            State::Idle | State::WaitingForEntries => {
+            State::Idle | State::Waiting => {
                 drawer.write(&self.output.text());
                 drawer.next_line();
                 drawer.next_line();
