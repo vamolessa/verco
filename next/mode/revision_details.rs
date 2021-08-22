@@ -207,6 +207,16 @@ impl Mode {
 
     pub fn draw(&self, drawer: &mut Drawer) {
         drawer.output(&self.output);
+
+        if let State::Idle = self.state {
+            drawer.next_line();
+            drawer.next_line();
+            drawer.select_menu(
+                &self.select,
+                (self.output.line_count() + 1).min(u16::MAX as _) as _,
+                self.entries.iter(),
+            );
+        }
     }
 }
 

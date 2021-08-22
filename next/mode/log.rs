@@ -122,9 +122,7 @@ impl Mode {
                     entry.hash.clone(),
                 ));
             }
-        }
-
-        if let State::Idle = self.state {
+        } else if let State::Idle = self.state {
             match key {
                 Key::Char('c') => {
                     let index = self.select.cursor();

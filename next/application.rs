@@ -97,11 +97,11 @@ enum Event {
 pub struct EventSender(mpsc::SyncSender<Event>);
 impl EventSender {
     pub fn send_response(&self, result: ModeResponse) {
-        let _ = self.0.send(Event::Response(result));
+        self.0.send(Event::Response(result)).unwrap();
     }
 
     pub fn send_mode_change(&self, mode: ModeKind) {
-        let _ = self.0.send(Event::ModeChange(mode));
+        self.0.send(Event::ModeChange(mode)).unwrap();
     }
 }
 
@@ -216,7 +216,7 @@ pub fn run(backend: Arc<dyn Backend>) {
         Err(_) => return,
     };
 
-    let (event_sender, event_receiver) = mpsc::sync_channel(0);
+    let (event_sender, event_receiver) = mpsc::sync_channel(1);
 
     let mut ctx = ModeContext {
         backend,
@@ -247,9 +247,7 @@ pub fn run(backend: Arc<dyn Backend>) {
             }
             Ok(Event::Response(response)) => application.on_response(response),
             Ok(Event::ModeChange(mode)) => application.enter_mode(&ctx, mode),
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                draw_body = false;
-            }
+            Err(mpsc::RecvTimeoutError::Timeout) => draw_body = false,
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
 

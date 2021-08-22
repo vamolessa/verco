@@ -220,20 +220,23 @@ impl Backend for Git {
         )?;
 
         let message = message.wait()?.trim().into();
-        let entries = output
-            .wait()?
-            .trim()
-            .split('\0')
-            .map(str::trim)
-            .filter(|e| e.len() >= 2)
-            .map(|e| {
-                let (status, filename) = e.split_at(2);
-                RevisionEntry {
-                    name: filename.trim().into(),
-                    status: parse_file_status(status.trim()),
-                }
-            })
-            .collect();
+
+        let output = output.wait()?;
+        let mut splits = output.split('\0').map(str::trim);
+
+        let mut entries = Vec::new();
+        loop {
+            let status = match splits.next() {
+                Some(status) => parse_file_status(status),
+                None => break,
+            };
+            let name = match splits.next() {
+                Some(name) => name.into(),
+                None => break,
+            };
+
+            entries.push(RevisionEntry { name, status });
+        }
 
         Ok(RevisionInfo { message, entries })
     }
