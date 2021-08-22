@@ -195,6 +195,11 @@ impl Backend for Git {
         Ok(entries)
     }
 
+    fn checkout(&self, revision: &str) -> BackendResult<()> {
+        Process::spawn("git", &["checkout", revision])?.wait()?;
+        Ok(())
+    }
+
     fn fetch(&self) -> BackendResult<()> {
         Process::spawn("git", &["fetch", "--all"])?.wait()?;
         Ok(())

@@ -78,6 +78,7 @@ pub trait Backend: 'static + Send + Sync {
     ) -> BackendResult<String>;
 
     fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>>;
+    fn checkout(&self, revision: &str) -> BackendResult<()>;
     fn fetch(&self) -> BackendResult<()>;
     fn pull(&self) -> BackendResult<()>;
     fn push(&self) -> BackendResult<()>;

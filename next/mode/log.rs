@@ -2,7 +2,7 @@ use std::thread;
 
 use crate::{
     application::Key,
-    backend::{BackendResult, LogEntry},
+    backend::{Backend, BackendResult, LogEntry},
     mode::{
         HeaderInfo, InputStatus, ModeContext, ModeResponse, Output, SelectMenu,
     },
@@ -15,6 +15,7 @@ pub enum Response {
 
 enum WaitOperation {
     None,
+    Checkout,
     Fetch,
     Pull,
     Push,
@@ -117,6 +118,23 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
+        fn request<F>(ctx: &ModeContext, available_height: usize, f: F)
+        where
+            F: 'static
+                + Send
+                + Sync
+                + FnOnce(&dyn Backend) -> BackendResult<()>,
+        {
+            let ctx = ctx.clone();
+            thread::spawn(move || {
+                use std::ops::Deref;
+                let result = f(ctx.backend.deref())
+                    .and_then(|_| ctx.backend.log(0, available_height));
+                ctx.response_sender
+                    .send(ModeResponse::Log(Response::Refresh(result)));
+            });
+        }
+
         match self.state {
             State::Idle | State::WaitingForEntries(_) => {
                 let available_height =
@@ -126,7 +144,18 @@ impl Mode {
 
                 match key {
                     Key::Char('c') => {
-                        // checkout revision
+                        let index = self.select.cursor();
+                        if let (State::Idle, Some(entry)) =
+                            (&self.state, self.entries.get(index))
+                        {
+                            self.state = State::WaitingForEntries(
+                                WaitOperation::Checkout,
+                            );
+                            let revision = entry.hash.clone();
+                            request(ctx, available_height, move |b| {
+                                b.checkout(&revision)
+                            });
+                        }
                     }
                     Key::Char('d') => {
                         // revision details
@@ -135,51 +164,21 @@ impl Mode {
                         if let State::Idle = self.state {
                             self.state =
                                 State::WaitingForEntries(WaitOperation::Fetch);
-
-                            let ctx = ctx.clone();
-                            thread::spawn(move || {
-                                let result =
-                                    ctx.backend.fetch().and_then(|_| {
-                                        ctx.backend.log(0, available_height)
-                                    });
-                                ctx.response_sender.send(ModeResponse::Log(
-                                    Response::Refresh(result),
-                                ));
-                            });
+                            request(ctx, available_height, Backend::fetch);
                         }
                     }
                     Key::Char('p') => {
                         if let State::Idle = self.state {
                             self.state =
                                 State::WaitingForEntries(WaitOperation::Pull);
-
-                            let ctx = ctx.clone();
-                            thread::spawn(move || {
-                                let result =
-                                    ctx.backend.pull().and_then(|_| {
-                                        ctx.backend.log(0, available_height)
-                                    });
-                                ctx.response_sender.send(ModeResponse::Log(
-                                    Response::Refresh(result),
-                                ));
-                            });
+                            request(ctx, available_height, Backend::pull);
                         }
                     }
                     Key::Char('P') => {
                         if let State::Idle = self.state {
                             self.state =
                                 State::WaitingForEntries(WaitOperation::Push);
-
-                            let ctx = ctx.clone();
-                            thread::spawn(move || {
-                                let result =
-                                    ctx.backend.push().and_then(|_| {
-                                        ctx.backend.log(0, available_height)
-                                    });
-                                ctx.response_sender.send(ModeResponse::Log(
-                                    Response::Refresh(result),
-                                ));
-                            });
+                            request(ctx, available_height, Backend::push);
                         }
                     }
                     _ => (),
@@ -219,6 +218,10 @@ impl Mode {
             },
             State::WaitingForEntries(WaitOperation::None) => HeaderInfo {
                 name: "log",
+                waiting_response: true,
+            },
+            State::WaitingForEntries(WaitOperation::Checkout) => HeaderInfo {
+                name: "checkout",
                 waiting_response: true,
             },
             State::WaitingForEntries(WaitOperation::Fetch) => HeaderInfo {
