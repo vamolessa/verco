@@ -160,6 +160,7 @@ pub fn run(backend: Arc<dyn Backend>) {
                 let input_status = match current_mode {
                     ModeKind::Status => status_mode.on_key(&mode_ctx, key),
                     ModeKind::Log => log_mode.on_key(&mode_ctx, key),
+                    ModeKind::RevisionDetails(revision) => todo!(),
                 };
 
                 if !input_status.pending {
@@ -201,6 +202,7 @@ pub fn run(backend: Arc<dyn Backend>) {
         let header_info = match current_mode {
             ModeKind::Status => status_mode.header(),
             ModeKind::Log => log_mode.header(),
+            ModeKind::RevisionDetails(_) => todo!(),
         };
         drawer.header(header_info, spinner_state);
 
@@ -208,6 +210,7 @@ pub fn run(backend: Arc<dyn Backend>) {
             match current_mode {
                 ModeKind::Status => status_mode.draw(&mut drawer),
                 ModeKind::Log => log_mode.draw(&mut drawer),
+                ModeKind::RevisionDetails(_) => todo!(),
             }
             drawer.clear_to_bottom();
         }

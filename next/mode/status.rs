@@ -2,7 +2,7 @@ use std::thread;
 
 use crate::{
     application::Key,
-    backend::{Backend, BackendResult, FileStatus, StatusEntry, StatusInfo},
+    backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
         HeaderInfo, InputStatus, ModeContext, ModeResponse, Output, ReadLine,
         SelectMenu, SelectMenuAction,
@@ -58,12 +58,12 @@ pub struct Mode {
     readline: ReadLine,
 }
 impl Mode {
-    fn get_selected_entries(&self) -> Vec<StatusEntry> {
+    fn get_selected_entries(&self) -> Vec<RevisionEntry> {
         let entries: Vec<_> = self
             .entries
             .iter()
             .filter(|e| e.selected)
-            .map(|e| StatusEntry {
+            .map(|e| RevisionEntry {
                 name: e.name.clone(),
                 status: e.status,
             })

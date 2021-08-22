@@ -1,24 +1,24 @@
 "MODES":
 
 - anywhere
-    - `s` => status
-    - `l` => log
+    x `s` => status
+    x `l` => log
     - `r` => conflicts
     - `b` => branches
     - `t` => tags
 
 - status (changed files, new files, etc) selectable!!
-    - `c` => commit selected if there are selected files, else commit all
-    - `U` => revert selected if there are selected files, else revert all
-    - `d` => diff selected if there are selected files, else diff all
+    x `c` => commit selected if there are selected files, else commit all
+    x `U` => revert selected if there are selected files, else revert all
+    x `d` => diff selected if there are selected files, else diff all
 
 - log
-    - `c` => checkout selected revision
+    x `c` => checkout selected revision
     - `d` => show revision details
 
-    - `f` => fetch
-    - `p` => pull
-    - `P` => push
+    x `f` => fetch
+    x `p` => pull
+    x `P` => push
 
 - revision details
     - `d` => diff selected files if there are selected files, else diff all

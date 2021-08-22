@@ -16,6 +16,7 @@ pub enum ModeResponse {
 pub enum ModeKind {
     Status,
     Log,
+    RevisionDetails(String),
 }
 
 #[derive(Clone)]

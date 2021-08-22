@@ -110,48 +110,40 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
-        match self.state {
-            State::Idle | State::Waiting(_) => {
-                let available_height =
-                    ctx.viewport_size.1.saturating_sub(1) as usize;
-                self.select
-                    .on_key(self.entries.len(), available_height, key);
+        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+        self.select
+            .on_key(self.entries.len(), available_height, key);
 
-                match key {
-                    Key::Char('c') => {
-                        let index = self.select.cursor();
-                        if let (State::Idle, Some(entry)) =
-                            (&self.state, self.entries.get(index))
-                        {
-                            self.state =
-                                State::Waiting(WaitOperation::Checkout);
-                            let revision = entry.hash.clone();
-                            request(ctx, move |b| b.checkout(&revision));
-                        }
+        if let Key::Char('d') = key {
+            let index = self.select.cursor();
+            if let Some(entry) = self.entries.get(index) {
+                // TODO revision details
+            }
+        }
+
+        if let State::Idle = self.state {
+            match key {
+                Key::Char('c') => {
+                    let index = self.select.cursor();
+                    if let Some(entry) = self.entries.get(index) {
+                        self.state = State::Waiting(WaitOperation::Checkout);
+                        let revision = entry.hash.clone();
+                        request(ctx, move |b| b.checkout(&revision));
                     }
-                    Key::Char('d') => {
-                        // TODO revision details
-                    }
-                    Key::Char('f') => {
-                        if let State::Idle = self.state {
-                            self.state = State::Waiting(WaitOperation::Fetch);
-                            request(ctx, Backend::fetch);
-                        }
-                    }
-                    Key::Char('p') => {
-                        if let State::Idle = self.state {
-                            self.state = State::Waiting(WaitOperation::Pull);
-                            request(ctx, Backend::pull);
-                        }
-                    }
-                    Key::Char('P') => {
-                        if let State::Idle = self.state {
-                            self.state = State::Waiting(WaitOperation::Push);
-                            request(ctx, Backend::push);
-                        }
-                    }
-                    _ => (),
                 }
+                Key::Char('f') => {
+                    self.state = State::Waiting(WaitOperation::Fetch);
+                    request(ctx, Backend::fetch);
+                }
+                Key::Char('p') => {
+                    self.state = State::Waiting(WaitOperation::Pull);
+                    request(ctx, Backend::pull);
+                }
+                Key::Char('P') => {
+                    self.state = State::Waiting(WaitOperation::Push);
+                    request(ctx, Backend::push);
+                }
+                _ => (),
             }
         }
 
@@ -209,14 +201,10 @@ impl Mode {
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
-        match self.state {
-            State::Idle | State::Waiting(_) => {
-                if self.output.text().is_empty() {
-                    drawer.select_menu(&self.select, 0, self.entries.iter());
-                } else {
-                    drawer.output(&self.output);
-                }
-            }
+        if self.output.text().is_empty() {
+            drawer.select_menu(&self.select, 0, self.entries.iter());
+        } else {
+            drawer.output(&self.output);
         }
     }
 }

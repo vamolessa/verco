@@ -43,11 +43,11 @@ impl fmt::Display for FileStatus {
 
 pub struct StatusInfo {
     pub header: String,
-    pub entries: Vec<StatusEntry>,
+    pub entries: Vec<RevisionEntry>,
 }
 
 #[derive(Clone)]
-pub struct StatusEntry {
+pub struct RevisionEntry {
     pub name: String,
     pub status: FileStatus,
 }
@@ -68,13 +68,13 @@ pub trait Backend: 'static + Send + Sync {
     fn commit(
         &self,
         message: &str,
-        entries: &[StatusEntry],
+        entries: &[RevisionEntry],
     ) -> BackendResult<()>;
-    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<()>;
+    fn discard(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
     fn diff(
         &self,
         revision: Option<&str>,
-        entries: &[StatusEntry],
+        entries: &[RevisionEntry],
     ) -> BackendResult<String>;
 
     fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>>;

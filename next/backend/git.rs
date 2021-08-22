@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::backend::{
-    Backend, BackendResult, FileStatus, LogEntry, Process, StatusEntry,
+    Backend, BackendResult, FileStatus, LogEntry, Process, RevisionEntry,
     StatusInfo,
 };
 
@@ -36,7 +36,7 @@ impl Backend for Git {
             .filter(|e| e.len() >= 2)
             .map(|e| {
                 let (status, filename) = e.split_at(2);
-                StatusEntry {
+                RevisionEntry {
                     name: filename.trim().into(),
                     status: parse_file_status(status.trim()),
                 }
@@ -52,7 +52,7 @@ impl Backend for Git {
     fn commit(
         &self,
         message: &str,
-        entries: &[StatusEntry],
+        entries: &[RevisionEntry],
     ) -> BackendResult<()> {
         if entries.is_empty() {
             Process::spawn("git", &["add", "--all"])?.wait()?;
@@ -66,7 +66,7 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<()> {
+    fn discard(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
             Process::spawn("git", &["reset", "--hard"])?.wait()?;
             Process::spawn("git", &["clean", "-d", "--force"])?.wait()?;
@@ -101,7 +101,7 @@ impl Backend for Git {
     fn diff(
         &self,
         revision: Option<&str>,
-        entries: &[StatusEntry],
+        entries: &[RevisionEntry],
     ) -> BackendResult<String> {
         match revision {
             Some(revision) => {
