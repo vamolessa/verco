@@ -4,7 +4,8 @@ use crate::{
     application::Key,
     backend::{Backend, BackendResult, LogEntry},
     mode::{
-        HeaderInfo, InputStatus, ModeContext, ModeResponse, Output, SelectMenu,
+        HeaderInfo, ModeContext, ModeOperation, ModeResponse, Output,
+        SelectMenu,
     },
     ui::{Color, Drawer, SelectEntryDraw},
 };
@@ -109,7 +110,7 @@ impl Mode {
         request(ctx, |_| Ok(()));
     }
 
-    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
+    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeOperation {
         let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
         self.select
             .on_key(self.entries.len(), available_height, key);
@@ -147,7 +148,7 @@ impl Mode {
             }
         }
 
-        InputStatus { pending: false }
+        ModeOperation::None
     }
 
     pub fn on_response(&mut self, response: Response) {

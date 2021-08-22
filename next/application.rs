@@ -9,7 +9,7 @@ use crossterm::{event, terminal};
 
 use crate::{
     backend::Backend,
-    mode::{self, ModeContext, ModeKind, ModeResponse},
+    mode::{self, ModeContext, ModeKind, ModeOperation, ModeResponse},
     ui::Drawer,
 };
 
@@ -124,6 +124,82 @@ fn console_events_loop(sender: mpsc::SyncSender<Event>) {
     }
 }
 
+#[derive(Default)]
+struct Application {
+    current_mode: ModeKind,
+
+    status_mode: mode::status::Mode,
+    log_mode: mode::log::Mode,
+
+    spinner_state: u8,
+}
+impl Application {
+    pub fn enter_mode(&mut self, ctx: &ModeContext, mode: ModeKind) {
+        self.current_mode = mode;
+        match &self.current_mode {
+            ModeKind::Status => self.status_mode.on_enter(ctx),
+            ModeKind::Log => self.log_mode.on_enter(ctx),
+            ModeKind::RevisionDetails(revision) => todo!(),
+        }
+    }
+
+    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> bool {
+        let op = match &self.current_mode {
+            ModeKind::Status => self.status_mode.on_key(ctx, key),
+            ModeKind::Log => self.log_mode.on_key(ctx, key),
+            ModeKind::RevisionDetails(revision) => todo!(),
+        };
+
+        match op {
+            ModeOperation::None => {
+                if key.is_cancel() {
+                    return false;
+                }
+
+                match key {
+                    Key::Char('s') => self.enter_mode(ctx, ModeKind::Status),
+                    Key::Char('l') => self.enter_mode(ctx, ModeKind::Log),
+                    _ => (),
+                }
+            }
+            ModeOperation::PendingInput => (),
+            ModeOperation::Change(mode) => self.enter_mode(ctx, mode),
+        }
+
+        true
+    }
+
+    pub fn on_response(&mut self, response: ModeResponse) {
+        match response {
+            ModeResponse::Status(response) => {
+                self.status_mode.on_response(response)
+            }
+            ModeResponse::Log(response) => self.log_mode.on_response(response),
+            ModeResponse::RevisionDetails(response) => todo!(),
+        }
+    }
+
+    pub fn draw_header(&mut self, drawer: &mut Drawer) {
+        self.spinner_state = self.spinner_state.wrapping_add(1);
+
+        let header_info = match &self.current_mode {
+            ModeKind::Status => self.status_mode.header(),
+            ModeKind::Log => self.log_mode.header(),
+            ModeKind::RevisionDetails(_) => todo!(),
+        };
+        drawer.header(header_info, self.spinner_state);
+    }
+
+    pub fn draw_body(&self, drawer: &mut Drawer) {
+        match &self.current_mode {
+            ModeKind::Status => self.status_mode.draw(drawer),
+            ModeKind::Log => self.log_mode.draw(drawer),
+            ModeKind::RevisionDetails(_) => todo!(),
+        }
+        drawer.clear_to_bottom();
+    }
+}
+
 pub fn run(backend: Arc<dyn Backend>) {
     let viewport_size = match terminal::size() {
         Ok((width, height)) => (width, height),
@@ -132,24 +208,19 @@ pub fn run(backend: Arc<dyn Backend>) {
 
     let (event_sender, event_receiver) = mpsc::sync_channel(0);
 
-    let mut mode_ctx = ModeContext {
+    let mut ctx = ModeContext {
         backend,
         response_sender: ModeResponseSender(event_sender.clone()),
         viewport_size,
     };
 
-    let mut current_mode = ModeKind::Status;
-
-    let mut status_mode = mode::status::Mode::default();
-    let mut log_mode = mode::log::Mode::default();
-
-    status_mode.on_enter(&mode_ctx);
+    let mut application = Application::default();
+    application.enter_mode(&ctx, ModeKind::default());
 
     thread::spawn(|| console_events_loop(event_sender));
 
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    let mut spinner_state = 0u8;
 
     loop {
         let mut draw_body = true;
@@ -157,62 +228,24 @@ pub fn run(backend: Arc<dyn Backend>) {
         let timeout = Duration::from_millis(100);
         match event_receiver.recv_timeout(timeout) {
             Ok(Event::Key(key)) => {
-                let input_status = match current_mode {
-                    ModeKind::Status => status_mode.on_key(&mode_ctx, key),
-                    ModeKind::Log => log_mode.on_key(&mode_ctx, key),
-                    ModeKind::RevisionDetails(revision) => todo!(),
-                };
-
-                if !input_status.pending {
-                    if key.is_cancel() {
-                        break;
-                    }
-
-                    match key {
-                        Key::Char('s') => {
-                            current_mode = ModeKind::Status;
-                            status_mode.on_enter(&mode_ctx);
-                        }
-                        Key::Char('l') => {
-                            current_mode = ModeKind::Log;
-                            log_mode.on_enter(&mode_ctx);
-                        }
-                        _ => (),
-                    }
+                if !application.on_key(&ctx, key) {
+                    break;
                 }
             }
             Ok(Event::Resize(width, height)) => {
-                mode_ctx.viewport_size = (width, height);
+                ctx.viewport_size = (width, height);
             }
-            Ok(Event::Response(ModeResponse::Status(response))) => {
-                status_mode.on_response(response);
-            }
-            Ok(Event::Response(ModeResponse::Log(response))) => {
-                log_mode.on_response(response);
-            }
+            Ok(Event::Response(response)) => application.on_response(response),
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                spinner_state = spinner_state.wrapping_add(1);
                 draw_body = false;
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
 
         let mut drawer = Drawer::new(&mut stdout, viewport_size);
-
-        let header_info = match current_mode {
-            ModeKind::Status => status_mode.header(),
-            ModeKind::Log => log_mode.header(),
-            ModeKind::RevisionDetails(_) => todo!(),
-        };
-        drawer.header(header_info, spinner_state);
-
+        application.draw_header(&mut drawer);
         if draw_body {
-            match current_mode {
-                ModeKind::Status => status_mode.draw(&mut drawer),
-                ModeKind::Log => log_mode.draw(&mut drawer),
-                ModeKind::RevisionDetails(_) => todo!(),
-            }
-            drawer.clear_to_bottom();
+            application.draw_body(&mut drawer);
         }
 
         use io::Write;

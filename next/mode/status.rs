@@ -4,8 +4,8 @@ use crate::{
     application::Key,
     backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
-        HeaderInfo, InputStatus, ModeContext, ModeResponse, Output, ReadLine,
-        SelectMenu, SelectMenuAction,
+        HeaderInfo, ModeContext, ModeKind, ModeOperation, ModeResponse, Output,
+        ReadLine, SelectMenu, SelectMenuAction,
     },
     ui::{Drawer, SelectEntryDraw},
 };
@@ -91,8 +91,8 @@ impl Mode {
         request(ctx, |_| Ok(()));
     }
 
-    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> InputStatus {
-        let pending = matches!(self.state, State::CommitMessageInput);
+    pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeOperation {
+        let pending_input = matches!(self.state, State::CommitMessageInput);
         let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
 
         match self.state {
@@ -171,6 +171,7 @@ impl Mode {
                     self.remove_selected_entries();
 
                     request(ctx, move |b| b.commit(&message, &entries));
+                    return ModeOperation::Change(ModeKind::Log);
                 } else if key.is_cancel() {
                     self.on_enter(ctx);
                 }
@@ -178,7 +179,11 @@ impl Mode {
             _ => self.output.on_key(available_height, key),
         }
 
-        InputStatus { pending }
+        if pending_input {
+            ModeOperation::PendingInput
+        } else {
+            ModeOperation::None
+        }
     }
 
     pub fn on_response(&mut self, response: Response) {

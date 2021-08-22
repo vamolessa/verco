@@ -11,12 +11,18 @@ pub mod status;
 pub enum ModeResponse {
     Status(status::Response),
     Log(log::Response),
+    RevisionDetails(()), // TODO
 }
 
 pub enum ModeKind {
     Status,
     Log,
     RevisionDetails(String),
+}
+impl Default for ModeKind {
+    fn default() -> Self {
+        Self::Status
+    }
 }
 
 #[derive(Clone)]
@@ -26,8 +32,10 @@ pub struct ModeContext {
     pub viewport_size: (u16, u16),
 }
 
-pub struct InputStatus {
-    pub pending: bool,
+pub enum ModeOperation {
+    None,
+    PendingInput,
+    Change(ModeKind),
 }
 
 pub struct HeaderInfo {
