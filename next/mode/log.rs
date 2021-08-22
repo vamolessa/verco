@@ -39,21 +39,37 @@ impl SelectEntryDraw for LogEntry {
             None => &self.author,
         };
 
-        drawer.write(&format_args!(
-            "{}{} {}{} {}{} {}{} {}{} {}{}",
-            color(Color::White, hovered),
-            &self.graph,
-            color(Color::Yellow, hovered),
-            &self.hash,
-            color(Color::Blue, hovered),
-            &self.date,
-            color(Color::Green, hovered),
-            author,
-            color(Color::Red, hovered),
-            &self.refs,
-            color(Color::White, hovered),
-            &self.message,
-        ));
+        if self.refs.is_empty() {
+            drawer.write(&format_args!(
+                "{}{} {}{} {}{} {}{} {}{}",
+                color(Color::White, hovered),
+                &self.graph,
+                color(Color::Yellow, hovered),
+                &self.hash,
+                color(Color::Blue, hovered),
+                &self.date,
+                color(Color::Green, hovered),
+                author,
+                color(Color::White, hovered),
+                &self.message,
+            ));
+        } else {
+            drawer.write(&format_args!(
+                "{}{} {}{} {}{} {}{} {}({}) {}{}",
+                color(Color::White, hovered),
+                &self.graph,
+                color(Color::Yellow, hovered),
+                &self.hash,
+                color(Color::Blue, hovered),
+                &self.date,
+                color(Color::Green, hovered),
+                author,
+                color(Color::Red, hovered),
+                &self.refs,
+                color(Color::White, hovered),
+                &self.message,
+            ));
+        }
     }
 }
 
