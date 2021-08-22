@@ -72,7 +72,11 @@ impl Mode {
     }
 
     fn remove_selected_entries(&mut self) {
+        let previous_len = self.entries.len();
         self.entries.retain(|e| !e.selected);
+        if self.entries.len() == previous_len {
+            self.entries.clear();
+        }
     }
 
     pub fn on_enter(&mut self, ctx: &ModeContext) {
