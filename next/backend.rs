@@ -53,89 +53,32 @@ pub struct StatusEntry {
 }
 
 pub struct LogEntry {
-    //
+    pub graph: String,
+    pub hash: String,
+    pub date: String,
+    pub author: String,
+    pub refs: String,
+    pub message: String,
 }
 
 pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 
     fn status(&self) -> BackendResult<StatusInfo>;
-    fn commit(&self, message: &str, entries: &[StatusEntry]) -> BackendResult<String>;
-    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<String>;
-    fn diff(&self, revision: Option<&str>, entries: &[StatusEntry]) -> BackendResult<String>;
-}
-
-/*
-pub trait VersionControlActions: Send {
-    fn executable_name(&self) -> &'static str;
-    fn current_dir(&self) -> &str;
-
-    fn command(&self) -> Command {
-        let mut command = Command::new(self.executable_name());
-        command.current_dir(self.current_dir());
-        command.stdin(Stdio::null());
-        command.stdout(Stdio::piped());
-        command.stderr(Stdio::piped());
-        command
-    }
-
-    /// Sets the root of the current repository
-    fn set_root(&mut self) -> Result<(), String>;
-    /// Get the root of the current repository
-    fn get_root(&self) -> &str;
-
-    fn get_current_changed_files(&self) -> Result<Vec<Entry>, String>;
-    fn get_revision_changed_files(
-        &self,
-        target: &str,
-    ) -> Result<Vec<Entry>, String>;
-
-    fn version(&self) -> Result<String, String>;
-
-    fn status(&self) -> Box<dyn ActionTask>;
-    /// Shows the header and all diffs for the current revision
-    fn current_export(&self) -> Box<dyn ActionTask>;
-    fn log(&self, count: usize) -> Box<dyn ActionTask>;
-
-    fn current_diff_all(&self) -> Box<dyn ActionTask>;
-    fn current_diff_selected(
-        &self,
-        entries: &Vec<Entry>,
-    ) -> Box<dyn ActionTask>;
-
-    fn revision_changes(&self, target: &str) -> Box<dyn ActionTask>;
-    fn revision_diff_all(&self, target: &str) -> Box<dyn ActionTask>;
-    fn revision_diff_selected(
-        &self,
-        target: &str,
-        entries: &Vec<Entry>,
-    ) -> Box<dyn ActionTask>;
-
-    fn commit_all(&self, message: &str) -> Box<dyn ActionTask>;
-    fn commit_selected(
+    fn commit(
         &self,
         message: &str,
-        entries: &Vec<Entry>,
-    ) -> Box<dyn ActionTask>;
-    fn revert_all(&self) -> Box<dyn ActionTask>;
-    fn revert_selected(&self, entries: &Vec<Entry>) -> Box<dyn ActionTask>;
-    fn update(&self, target: &str) -> Box<dyn ActionTask>;
-    fn merge(&self, target: &str) -> Box<dyn ActionTask>;
+        entries: &[StatusEntry],
+    ) -> BackendResult<String>;
+    fn discard(&self, entries: &[StatusEntry]) -> BackendResult<String>;
+    fn diff(
+        &self,
+        revision: Option<&str>,
+        entries: &[StatusEntry],
+    ) -> BackendResult<String>;
 
-    fn conflicts(&self) -> Box<dyn ActionTask>;
-    fn take_other(&self) -> Box<dyn ActionTask>;
-    fn take_local(&self) -> Box<dyn ActionTask>;
-
-    fn fetch(&self) -> Box<dyn ActionTask>;
-    fn pull(&self) -> Box<dyn ActionTask>;
-    fn push(&self) -> Box<dyn ActionTask>;
-
-    fn create_tag(&self, name: &str) -> Box<dyn ActionTask>;
-    fn list_branches(&self) -> Box<dyn ActionTask>;
-    fn create_branch(&self, name: &str) -> Box<dyn ActionTask>;
-    fn close_branch(&self, name: &str) -> Box<dyn ActionTask>;
+    fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>>;
 }
-*/
 
 pub struct Process(Child);
 impl Process {

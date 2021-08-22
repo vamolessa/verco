@@ -172,6 +172,10 @@ pub fn run(backend: Arc<dyn Backend>) {
                             current_mode = ModeKind::Status;
                             status_mode.on_enter(&mode_ctx);
                         }
+                        Key::Char('l') => {
+                            current_mode = ModeKind::Log;
+                            log_mode.on_enter(&mode_ctx);
+                        }
                         _ => (),
                     }
                 }

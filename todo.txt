@@ -13,7 +13,7 @@
     - `d` => diff selected if there are selected files, else diff all
 
 - log
-    - `u` => checkout selected revision
+    - `c` => checkout selected revision
     - `U` => revert to selected revision (??)
     - `d` => show revision details
 
@@ -25,15 +25,16 @@
     - `d` => diff selected files if there are selected files, else diff all
 
 - branches
-    - `u` => checkout selected branch
+    - `c` => checkout selected branch
     - `n` => new branch
     - `d` => delete branch
 
 - tags
-    - `u` => checkout selected tag
+    - `c` => checkout selected tag
     - `n` => new tag
     - `d` => delete tag
 
 - conflicts
-    - `o` => resolve taking other
-    - `l` => resolve taking local
+    - `c` => resolve taking local
+    - `C` => resolve taking other
+

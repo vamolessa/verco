@@ -7,8 +7,27 @@ use crossterm::{self, cursor, style, terminal};
 
 use crate::mode::{HeaderInfo, Output, ReadLine, SelectMenu};
 
-pub trait Draw {
-    fn draw(&self, drawer: &mut Drawer);
+pub enum Color {
+    White,
+    Red,
+    Green,
+    Blue,
+    Yellow,
+}
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::White => f.write_str("\x1b[38;5;15m"),
+            Self::Red => f.write_str("\x1b[38;5;1m"),
+            Self::Green => f.write_str("\x1b[38;5;2m"),
+            Self::Blue => f.write_str("\x1b[38;5;4m"),
+            Self::Yellow => f.write_str("\x1b[38;5;3m"),
+        }
+    }
+}
+
+pub trait SelectEntryDraw {
+    fn draw(&self, drawer: &mut Drawer, hovered: bool);
 }
 
 pub struct Drawer<'stdout, 'lock> {
@@ -112,7 +131,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         entries: I,
     ) where
         I: 'entries + Iterator<Item = &'entries E>,
-        E: 'entries + Draw,
+        E: 'entries + SelectEntryDraw,
     {
         let cursor_index = select.cursor();
 
@@ -129,15 +148,16 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         for (i, entry) in
             entries.enumerate().skip(select.scroll()).take(take_count)
         {
-            if i == cursor_index {
+            let hovered = i == cursor_index;
+            if hovered {
                 crossterm::queue!(
                     self.stdout,
-                    style::SetBackgroundColor(style::Color::DarkGrey),
+                    style::SetBackgroundColor(style::Color::DarkMagenta),
                 )
                 .unwrap();
             }
 
-            entry.draw(self);
+            entry.draw(self, hovered);
 
             crossterm::queue!(
                 self.stdout,
@@ -146,7 +166,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
             )
             .unwrap();
 
-            if i == cursor_index {
+            if hovered {
                 crossterm::queue!(
                     self.stdout,
                     style::SetBackgroundColor(style::Color::Black),

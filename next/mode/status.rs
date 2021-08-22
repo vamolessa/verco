@@ -4,32 +4,16 @@ use crate::{
     application::Key,
     backend::{FileStatus, StatusEntry},
     mode::{
-        HeaderInfo, InputStatus, ModeContext, ModeResponse, Output,
-        ReadLine, SelectMenu, SelectMenuAction,
+        HeaderInfo, InputStatus, ModeContext, ModeResponse, Output, ReadLine,
+        SelectMenu, SelectMenuAction,
     },
-    ui::{Draw, Drawer},
+    ui::{SelectEntryDraw, Drawer},
 };
-
-#[derive(Clone)]
-pub struct Entry {
-    pub selected: bool,
-    pub name: String,
-    pub status: FileStatus,
-}
-impl Draw for Entry {
-    fn draw(&self, drawer: &mut Drawer) {
-        let selected_text = if self.selected { '+' } else { ' ' };
-        drawer.write(&format_args!(
-            "{} [{}] {}",
-            selected_text, &self.status, &self.name,
-        ));
-    }
-}
 
 pub enum Response {
     Refresh {
         header: String,
-        entries: Vec<Entry>,
+        entries: Vec<StatusEntry>,
     },
     Commit(String),
     Discard(String),
@@ -47,6 +31,22 @@ enum State {
 impl Default for State {
     fn default() -> Self {
         Self::Idle
+    }
+}
+
+#[derive(Clone)]
+struct Entry {
+    pub selected: bool,
+    pub name: String,
+    pub status: FileStatus,
+}
+impl SelectEntryDraw for Entry {
+    fn draw(&self, drawer: &mut Drawer, _: bool) {
+        let selected_text = if self.selected { '+' } else { ' ' };
+        drawer.write(&format_args!(
+            "{} [{}] {}",
+            selected_text, &self.status, &self.name,
+        ));
     }
 }
 
@@ -88,19 +88,7 @@ impl Mode {
         let ctx = ctx.clone();
         thread::spawn(move || {
             let (header, entries) = match ctx.backend.status() {
-                Ok(mut info) => {
-                    let header = info.header;
-                    let entries = info
-                        .entries
-                        .drain(..)
-                        .map(|e| Entry {
-                            selected: false,
-                            name: e.name,
-                            status: e.status,
-                        })
-                        .collect();
-                    (header, entries)
-                }
+                Ok(info) => (info.header, info.entries),
                 Err(error) => (error, Vec::new()),
             };
 
@@ -220,14 +208,25 @@ impl Mode {
 
     pub fn on_response(&mut self, response: Response) {
         match response {
-            Response::Refresh { header, entries } => {
+            Response::Refresh {
+                header,
+                mut entries,
+            } => {
                 if let State::WaitingForEntries = self.state {
                     self.state = State::Idle;
                 }
                 if let State::Idle = self.state {
                     self.output.set(header);
                 }
-                self.entries = entries;
+
+                self.entries = entries
+                    .drain(..)
+                    .map(|e| Entry {
+                        selected: false,
+                        name: e.name,
+                        status: e.status,
+                    })
+                    .collect();
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Commit(output) => {
@@ -306,18 +305,8 @@ impl Mode {
 
     pub fn draw(&self, drawer: &mut Drawer) {
         match self.state {
-            State::Idle => {
-                drawer.write(
-                    &self.output.lines_from_scroll().next().unwrap_or(""),
-                );
-                drawer.next_line();
-                drawer.next_line();
-                drawer.select_menu(&self.select, 1, self.entries.iter());
-            }
-            State::WaitingForEntries => {
-                drawer.write(
-                    &self.output.lines_from_scroll().next().unwrap_or(""),
-                );
+            State::Idle | State::WaitingForEntries => {
+                drawer.write(&self.output.text());
                 drawer.next_line();
                 drawer.next_line();
                 drawer.select_menu(&self.select, 2, self.entries.iter());

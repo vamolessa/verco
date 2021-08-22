@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use crate::backend::{
-    Backend, BackendResult, FileStatus, Process, StatusEntry, StatusInfo,
+    Backend, BackendResult, FileStatus, LogEntry, Process, StatusEntry,
+    StatusInfo,
 };
 
 pub struct Git;
@@ -147,6 +148,51 @@ impl Backend for Git {
                 }
             }
         }
+    }
+
+    fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
+        let start = start.to_string();
+        let len = len.to_string();
+        let template = "--format=format:%x00%h%x00%as%x00%aN%x00%D%x00%s";
+        let output = Process::spawn(
+            "git",
+            &[
+                "log",
+                "--all",
+                "--decorate",
+                "--oneline",
+                "--graph",
+                "--skip",
+                &start,
+                "--max-count",
+                &len,
+                template,
+            ],
+        )?
+        .wait()?;
+
+        let mut entries = Vec::new();
+        for line in output.lines() {
+            let mut splits = line.splitn(6, '\0');
+
+            let graph = splits.next().unwrap_or("").into();
+            let hash = splits.next().unwrap_or("").into();
+            let date = splits.next().unwrap_or("").into();
+            let author = splits.next().unwrap_or("").into();
+            let refs = splits.next().unwrap_or("").into();
+            let message = splits.next().unwrap_or("").into();
+
+            entries.push(LogEntry {
+                graph,
+                hash,
+                date,
+                author,
+                refs,
+                message,
+            });
+        }
+
+        Ok(entries)
     }
 }
 
