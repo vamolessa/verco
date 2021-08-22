@@ -12,6 +12,7 @@ use crate::{
 
 pub enum Response {
     Refresh(StatusInfo),
+    Commit,
     Diff(String),
 }
 
@@ -176,6 +177,9 @@ impl Mode {
                     thread::spawn(move || {
                         match ctx.backend.commit(&message, &entries) {
                             Ok(()) => {
+                                ctx.event_sender.send_response(
+                                    ModeResponse::Status(Response::Commit),
+                                );
                                 ctx.event_sender
                                     .send_mode_change(ModeKind::Log);
                             }
@@ -220,6 +224,7 @@ impl Mode {
                     .collect();
                 self.select.saturate_cursor(self.entries.len());
             }
+            Response::Commit => self.state = State::Idle,
             Response::Diff(output) => {
                 if let State::ViewDiff = self.state {
                     self.output.set(output);
