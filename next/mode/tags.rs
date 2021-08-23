@@ -112,6 +112,7 @@ impl Mode {
                             self.state = State::Waiting(WaitOperation::Delete);
 
                             let name = entry.name.clone();
+                            self.entries.remove(index);
                             request(ctx, move |b| b.delete_tag(&name));
                         }
                     }
