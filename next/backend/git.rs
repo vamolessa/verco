@@ -254,6 +254,11 @@ impl Backend for Git {
         Ok(())
     }
 
+    fn merge(&self, revision: &str) -> BackendResult<()> {
+        Process::spawn("git", &["merge", revision])?.wait()?;
+        Ok(())
+    }
+
     fn fetch(&self) -> BackendResult<()> {
         Process::spawn("git", &["fetch", "--all"])?.wait()?;
         Ok(())
@@ -389,4 +394,3 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => FileStatus::Unmodified,
     }
 }
-

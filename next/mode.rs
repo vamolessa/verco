@@ -226,4 +226,3 @@ impl SelectMenu {
         }
     }
 }
-

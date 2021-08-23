@@ -176,4 +176,3 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         }
     }
 }
-

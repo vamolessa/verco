@@ -212,4 +212,3 @@ where
             .send_response(ModeResponse::Tags(Response::Refresh(result)));
     });
 }
-

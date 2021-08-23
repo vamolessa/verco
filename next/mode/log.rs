@@ -17,6 +17,7 @@ pub enum Response {
 enum WaitOperation {
     Refresh,
     Checkout,
+    Merge,
     Fetch,
     Pull,
     Push,
@@ -132,6 +133,14 @@ impl Mode {
                         request(ctx, move |b| b.checkout(&revision));
                     }
                 }
+                Key::Char('m') => {
+                    let index = self.select.cursor();
+                    if let Some(entry) = self.entries.get(index) {
+                        self.state = State::Waiting(WaitOperation::Merge);
+                        let revision = entry.hash.clone();
+                        request(ctx, move |b| b.merge(&revision));
+                    }
+                }
                 Key::Char('f') => {
                     self.state = State::Waiting(WaitOperation::Fetch);
                     request(ctx, Backend::fetch);
@@ -188,6 +197,10 @@ impl Mode {
                 name: "checkout",
                 waiting_response: true,
             },
+            State::Waiting(WaitOperation::Merge) => HeaderInfo {
+                name: "merge",
+                waiting_response: true,
+            },
             State::Waiting(WaitOperation::Fetch) => HeaderInfo {
                 name: "fetch",
                 waiting_response: true,
@@ -227,4 +240,3 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
-

@@ -279,4 +279,3 @@ pub fn run(backend: Arc<dyn Backend>) {
         stdout.flush().unwrap();
     }
 }
-

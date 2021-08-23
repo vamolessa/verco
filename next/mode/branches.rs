@@ -19,6 +19,7 @@ enum WaitOperation {
     Refresh,
     New,
     Delete,
+    Merge,
 }
 
 enum State {
@@ -121,6 +122,15 @@ impl Mode {
                             request(ctx, move |b| b.delete_branch(&name));
                         }
                     }
+                    Key::Char('m') => {
+                        let index = self.select.cursor();
+                        if let Some(entry) = self.entries.get(index) {
+                            self.state = State::Waiting(WaitOperation::Merge);
+
+                            let name = entry.name.clone();
+                            request(ctx, move |b| b.merge(&name));
+                        }
+                    }
                     _ => (),
                 }
             }
@@ -183,6 +193,10 @@ impl Mode {
                 name: "delete branch",
                 waiting_response: true,
             },
+            State::Waiting(WaitOperation::Merge) => HeaderInfo {
+                name: "merge branch",
+                waiting_response: true,
+            },
             State::NewNameInput => HeaderInfo {
                 name: "new branch name",
                 waiting_response: false,
@@ -222,4 +236,3 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
-
