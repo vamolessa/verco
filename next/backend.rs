@@ -19,9 +19,9 @@ pub enum FileStatus {
     Untracked,
     Copied,
     Unmerged,
-    Missing,
-    Ignored,
-    Clean,
+    //Missing,
+    //Ignored,
+    //Clean,
 }
 impl fmt::Display for FileStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -34,9 +34,9 @@ impl fmt::Display for FileStatus {
             Self::Untracked => f.write_str("untracked"),
             Self::Copied => f.write_str("copied"),
             Self::Unmerged => f.write_str("unmerged"),
-            Self::Missing => f.write_str("missing"),
-            Self::Ignored => f.write_str("ignored"),
-            Self::Clean => f.write_str("clean"),
+            //Self::Missing => f.write_str("missing"),
+            //Self::Ignored => f.write_str("ignored"),
+            //Self::Clean => f.write_str("clean"),
         }
     }
 }

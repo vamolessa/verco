@@ -147,13 +147,23 @@ impl Backend for Git {
         if entries.is_empty() {
             Process::spawn("git", &["checkout", ".", "--ours"])?.wait()?;
         } else {
+            if !entries
+                .iter()
+                .any(|e| matches!(e.status, FileStatus::Unmerged))
+            {
+                return Ok(());
+            }
+
             let mut args = Vec::new();
             args.push("checkout");
             args.push(".");
             args.push("--ours");
             args.push("--");
+
             for entry in entries {
-                args.push(&entry.name);
+                if let FileStatus::Unmerged = entry.status {
+                    args.push(&entry.name);
+                }
             }
 
             Process::spawn("git", &args)?.wait()?;
@@ -169,13 +179,23 @@ impl Backend for Git {
         if entries.is_empty() {
             Process::spawn("git", &["checkout", ".", "--theirs"])?.wait()?;
         } else {
+            if !entries
+                .iter()
+                .any(|e| matches!(e.status, FileStatus::Unmerged))
+            {
+                return Ok(());
+            }
+
             let mut args = Vec::new();
             args.push("checkout");
             args.push(".");
             args.push("--theirs");
             args.push("--");
+
             for entry in entries {
-                args.push(&entry.name);
+                if let FileStatus::Unmerged = entry.status {
+                    args.push(&entry.name);
+                }
             }
 
             Process::spawn("git", &args)?.wait()?;
