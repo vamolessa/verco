@@ -242,7 +242,15 @@ impl Backend for Git {
     }
 
     fn branches(&self) -> BackendResult<Vec<BranchEntry>> {
-        todo!();
+        let entries = Process::spawn(
+            "git",
+            &["branch", "--all", "--format=%(refname:short)"],
+        )?
+        .wait()?
+        .lines()
+        .map(|l| BranchEntry { name: l.trim().into() })
+        .collect();
+        Ok(entries)
     }
 
     fn new_branch(&self, name: &str) -> BackendResult<()> {

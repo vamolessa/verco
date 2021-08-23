@@ -130,15 +130,26 @@ impl Mode {
             }
         }
 
-        ModeStatus {
-            pending_input: false,
-        }
+        ModeStatus { pending_input }
     }
 
     pub fn on_repsonse(&mut self, response: Response) {
         match response {
             Response::Refresh(result) => {
-                //
+                self.entries = Vec::new();
+                self.output.set(String::new());
+
+                if let State::Waiting(_) = self.state {
+                    self.state = State::Idle;
+                }
+                if let State::Idle = self.state {
+                    match result {
+                        Ok(entries) => self.entries = entries,
+                        Err(error) => self.output.set(error),
+                    }
+                }
+
+                self.select.saturate_cursor(self.entries.len());
             }
             Response::Checkout => self.state = State::Idle,
         }
