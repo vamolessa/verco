@@ -76,7 +76,7 @@ impl Mode {
                 }
 
                 match key {
-                    Key::Char('c') => {
+                    Key::Char('g') => {
                         let index = self.select.cursor();
                         if let Some(entry) = self.entries.get(index) {
                             let name = entry.name.clone();

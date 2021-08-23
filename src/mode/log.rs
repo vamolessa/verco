@@ -125,7 +125,7 @@ impl Mode {
             }
         } else if let State::Idle = self.state {
             match key {
-                Key::Char('c') => {
+                Key::Char('g') => {
                     let index = self.select.cursor();
                     if let Some(entry) = self.entries.get(index) {
                         self.state = State::Waiting(WaitOperation::Checkout);
