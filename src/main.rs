@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{env, io::Write};
 
 mod application;
 mod backend;
@@ -6,6 +6,30 @@ mod mode;
 mod ui;
 
 fn main() {
+    let mut args = env::args();
+    args.next();
+    if let Some(arg) = args.next() {
+        if args.next().is_some() {
+            eprintln!("too many args");
+        } else {
+            match &arg[..] {
+                "-h" | "--help" => {
+                    let name = env!("CARGO_PKG_NAME");
+                    let version = env!("CARGO_PKG_VERSION");
+                    println!("{} v{}", name, version);
+                    println!();
+                    println!("\t-h --help\tprint this help message and exit");
+                    println!("\t-v --version\tprint version number and exit");
+                }
+                "-v" | "--version" => {
+                    print!("{}", env!("CARGO_PKG_VERSION"));
+                }
+                arg => eprintln!("invalid argument '{}'", arg),
+            }
+        }
+        return;
+    }
+
     if !crossterm::tty::IsTty::is_tty(&std::io::stdin()) {
         eprintln!("not tty");
         return;
@@ -54,3 +78,4 @@ fn main() {
         crossterm::terminal::disable_raw_mode().unwrap();
     }
 }
+
