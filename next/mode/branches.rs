@@ -34,7 +34,12 @@ impl Default for State {
 
 impl SelectEntryDraw for BranchEntry {
     fn draw(&self, drawer: &mut Drawer, _: bool) {
-        drawer.write(&self.name);
+        let status = if self.checked_out {
+            " (checked out)"
+        } else {
+            ""
+        };
+        drawer.write(&format_args!("{}{}", self.name, status));
     }
 }
 
@@ -149,7 +154,12 @@ impl Mode {
                     }
                 }
 
-                self.select.saturate_cursor(self.entries.len());
+                if let Some(i) = self.entries.iter().position(|e| e.checked_out)
+                {
+                    self.select.set_cursor(i);
+                } else {
+                    self.select.saturate_cursor(self.entries.len());
+                }
             }
             Response::Checkout => self.state = State::Idle,
         }

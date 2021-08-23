@@ -244,12 +244,20 @@ impl Backend for Git {
     fn branches(&self) -> BackendResult<Vec<BranchEntry>> {
         let entries = Process::spawn(
             "git",
-            &["branch", "--list", "--all", "--format=%(refname:short)"],
+            &[
+                "branch",
+                "--list",
+                "--all",
+                "--format=%(refname:short)%00%(HEAD)",
+            ],
         )?
         .wait()?
         .lines()
-        .map(|l| BranchEntry {
-            name: l.trim().into(),
+        .map(|l| {
+            let mut splits = l.splitn(2, '\0');
+            let name = splits.next().unwrap_or("").into();
+            let checked_out = splits.next().unwrap_or("") == "*";
+            BranchEntry { name, checked_out }
         })
         .collect();
         Ok(entries)

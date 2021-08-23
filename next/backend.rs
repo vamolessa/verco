@@ -68,6 +68,7 @@ pub struct LogEntry {
 
 pub struct BranchEntry {
     pub name: String,
+    pub checked_out: bool,
 }
 
 pub struct TagEntry {

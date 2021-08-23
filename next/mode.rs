@@ -183,6 +183,10 @@ impl SelectMenu {
         self.cursor = entries_len.saturating_sub(1).min(self.cursor);
     }
 
+    pub fn set_cursor(&mut self, cursor: usize) {
+        self.cursor = cursor;
+    }
+
     pub fn on_key(
         &mut self,
         entries_len: usize,

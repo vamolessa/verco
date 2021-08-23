@@ -3,14 +3,15 @@
 - anywhere
     x `s` => status
     x `l` => log
-    - `r` => conflicts
-    - `b` => branches
-    - `t` => tags
+    x `b` => branches
+    x `t` => tags
 
-x status (changed files, new files, etc) selectable!!
+- status (changed files, new files, etc) selectable!!
     x `c` => commit selected if there are selected files, else commit all
     x `U` => revert selected if there are selected files, else revert all
     x `d` => diff selected if there are selected files, else diff all
+    - `L` => resolve taking local
+    - `O` => resolve taking other
 
 x log
     x `c` => checkout selected revision
@@ -23,17 +24,13 @@ x log
 x revision details
     x `d` => diff selected files if there are selected files, else diff all
 
-- branches
-    - `c` => checkout selected branch
-    - `n` => new branch
-    - `D` => delete branch
+x branches
+    x `c` => checkout selected branch
+    x `n` => new branch
+    x `D` => delete branch
 
-- tags
-    - `c` => checkout selected tag
-    - `n` => new tag
-    - `D` => delete tag
-
-- conflicts
-    - `L` => resolve taking local
-    - `O` => resolve taking other
+x tags
+    x `c` => checkout selected tag
+    x `n` => new tag
+    x `D` => delete tag
 
