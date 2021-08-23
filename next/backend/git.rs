@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::backend::{
     Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
-    RevisionEntry, RevisionInfo, StatusInfo,
+    RevisionEntry, RevisionInfo, StatusInfo, TagEntry,
 };
 
 pub struct Git;
@@ -244,21 +244,59 @@ impl Backend for Git {
     fn branches(&self) -> BackendResult<Vec<BranchEntry>> {
         let entries = Process::spawn(
             "git",
-            &["branch", "--all", "--format=%(refname:short)"],
+            &["branch", "--list", "--all", "--format=%(refname:short)"],
         )?
         .wait()?
         .lines()
-        .map(|l| BranchEntry { name: l.trim().into() })
+        .map(|l| BranchEntry {
+            name: l.trim().into(),
+        })
         .collect();
         Ok(entries)
     }
 
     fn new_branch(&self, name: &str) -> BackendResult<()> {
-        todo!();
+        let remote = Process::spawn("git", &["remote"])?.wait()?;
+        Process::spawn("git", &["branch", name])?.wait()?;
+        Process::spawn("git", &["checkout", name])?.wait()?;
+        Process::spawn("git", &["push", "--set-upstream", &remote, name])?
+            .wait()?;
+        Ok(())
     }
 
     fn delete_branch(&self, name: &str) -> BackendResult<()> {
-        todo!();
+        let remote = Process::spawn("git", &["remote"])?.wait()?;
+        Process::spawn("git", &["branch", "--delete", name])?.wait()?;
+        Process::spawn("git", &["push", "--delete", &remote, name])?.wait()?;
+        Ok(())
+    }
+
+    fn tags(&self) -> BackendResult<Vec<TagEntry>> {
+        let entries = Process::spawn(
+            "git",
+            &["tag", "--list", "--format=%(refname:short)"],
+        )?
+        .wait()?
+        .lines()
+        .map(|l| TagEntry {
+            name: l.trim().into(),
+        })
+        .collect();
+        Ok(entries)
+    }
+
+    fn new_tag(&self, name: &str) -> BackendResult<()> {
+        let remote = Process::spawn("git", &["remote"])?.wait()?;
+        Process::spawn("git", &["tag", "--force", name])?.wait()?;
+        Process::spawn("git", &["push", &remote, name])?.wait()?;
+        Ok(())
+    }
+
+    fn delete_tag(&self, name: &str) -> BackendResult<()> {
+        let remote = Process::spawn("git", &["remote"])?.wait()?;
+        Process::spawn("git", &["tag", "--delete", name])?.wait()?;
+        Process::spawn("git", &["push", "--delete", &remote, name])?.wait()?;
+        Ok(())
     }
 }
 

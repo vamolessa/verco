@@ -2,7 +2,7 @@ use std::thread;
 
 use crate::{
     application::Key,
-    backend::{Backend, BackendResult, BranchEntry},
+    backend::{Backend, BackendResult, TagEntry},
     mode::{
         HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
         ReadLine, SelectMenu,
@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub enum Response {
-    Refresh(BackendResult<Vec<BranchEntry>>),
+    Refresh(BackendResult<Vec<TagEntry>>),
     Checkout,
 }
 
@@ -32,7 +32,7 @@ impl Default for State {
     }
 }
 
-impl SelectEntryDraw for BranchEntry {
+impl SelectEntryDraw for TagEntry {
     fn draw(&self, drawer: &mut Drawer, _: bool) {
         drawer.write(&self.name);
     }
@@ -41,7 +41,7 @@ impl SelectEntryDraw for BranchEntry {
 #[derive(Default)]
 pub struct Mode {
     state: State,
-    entries: Vec<BranchEntry>,
+    entries: Vec<TagEntry>,
     output: Output,
     select: SelectMenu,
     readline: ReadLine,
@@ -85,7 +85,7 @@ impl Mode {
                                 match ctx.backend.checkout(&name) {
                                     Ok(()) => {
                                         ctx.event_sender.send_response(
-                                            ModeResponse::Branches(
+                                            ModeResponse::Tags(
                                                 Response::Checkout,
                                             ),
                                         );
@@ -94,7 +94,7 @@ impl Mode {
                                     }
                                     Err(error) => ctx
                                         .event_sender
-                                        .send_response(ModeResponse::Branches(
+                                        .send_response(ModeResponse::Tags(
                                             Response::Refresh(Err(error)),
                                         )),
                                 }
@@ -112,7 +112,7 @@ impl Mode {
                             self.state = State::Waiting(WaitOperation::Delete);
 
                             let name = entry.name.clone();
-                            request(ctx, move |b| b.delete_branch(&name));
+                            request(ctx, move |b| b.delete_tag(&name));
                         }
                     }
                     _ => (),
@@ -124,7 +124,7 @@ impl Mode {
                     self.state = State::Waiting(WaitOperation::New);
 
                     let name = self.readline.input().to_string();
-                    request(ctx, move |b| b.new_branch(&name));
+                    request(ctx, move |b| b.new_tag(&name));
                 }
             }
         }
@@ -157,23 +157,23 @@ impl Mode {
     pub fn header(&self) -> HeaderInfo {
         match self.state {
             State::Idle => HeaderInfo {
-                name: "branches",
+                name: "tags",
                 waiting_response: false,
             },
             State::Waiting(WaitOperation::Refresh) => HeaderInfo {
-                name: "branches",
+                name: "tags",
                 waiting_response: true,
             },
             State::Waiting(WaitOperation::New) => HeaderInfo {
-                name: "new branch",
+                name: "new tag",
                 waiting_response: true,
             },
             State::Waiting(WaitOperation::Delete) => HeaderInfo {
-                name: "delete branch",
+                name: "delete tag",
                 waiting_response: true,
             },
             State::NewNameInput => HeaderInfo {
-                name: "new branch name",
+                name: "new tag name",
                 waiting_response: false,
             },
         }
@@ -202,13 +202,13 @@ where
         use std::ops::Deref;
 
         let mut result =
-            f(ctx.backend.deref()).and_then(|_| ctx.backend.branches());
+            f(ctx.backend.deref()).and_then(|_| ctx.backend.tags());
         if let Ok(entries) = &mut result {
             entries.sort_unstable_by(|a, b| a.name.cmp(&b.name));
         }
 
         ctx.event_sender
-            .send_response(ModeResponse::Branches(Response::Refresh(result)));
+            .send_response(ModeResponse::Tags(Response::Refresh(result)));
     });
 }
 

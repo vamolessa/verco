@@ -9,12 +9,14 @@ pub mod branches;
 pub mod log;
 pub mod revision_details;
 pub mod status;
+pub mod tags;
 
 pub enum ModeResponse {
     Status(status::Response),
     Log(log::Response),
     RevisionDetails(revision_details::Response),
     Branches(branches::Response),
+    Tags(tags::Response),
 }
 
 pub enum ModeKind {
@@ -22,6 +24,7 @@ pub enum ModeKind {
     Log,
     RevisionDetails(String),
     Branches,
+    Tags,
 }
 impl Default for ModeKind {
     fn default() -> Self {

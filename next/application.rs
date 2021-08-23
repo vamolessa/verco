@@ -137,6 +137,7 @@ struct Application {
     log_mode: mode::log::Mode,
     revision_details_mode: mode::revision_details::Mode,
     branches_mode: mode::branches::Mode,
+    tags_mode: mode::tags::Mode,
 
     spinner_state: u8,
 }
@@ -150,6 +151,7 @@ impl Application {
                 self.revision_details_mode.on_enter(ctx, revision);
             }
             ModeKind::Branches => self.branches_mode.on_enter(ctx),
+            ModeKind::Tags => self.tags_mode.on_enter(ctx),
         }
     }
 
@@ -161,6 +163,7 @@ impl Application {
                 self.revision_details_mode.on_key(ctx, revision, key)
             }
             ModeKind::Branches => self.branches_mode.on_key(ctx, key),
+            ModeKind::Tags => self.tags_mode.on_key(ctx, key),
         };
 
         if !status.pending_input {
@@ -172,6 +175,7 @@ impl Application {
                 Key::Char('s') => self.enter_mode(ctx, ModeKind::Status),
                 Key::Char('l') => self.enter_mode(ctx, ModeKind::Log),
                 Key::Char('b') => self.enter_mode(ctx, ModeKind::Branches),
+                Key::Char('t') => self.enter_mode(ctx, ModeKind::Tags),
                 _ => (),
             }
         }
@@ -189,7 +193,10 @@ impl Application {
                 self.revision_details_mode.on_response(response);
             }
             ModeResponse::Branches(response) => {
-                self.branches_mode.on_repsonse(response);
+                self.branches_mode.on_response(response);
+            }
+            ModeResponse::Tags(response) => {
+                self.tags_mode.on_response(response);
             }
         }
     }
@@ -202,6 +209,7 @@ impl Application {
             ModeKind::Log => self.log_mode.header(),
             ModeKind::RevisionDetails(_) => self.revision_details_mode.header(),
             ModeKind::Branches => self.branches_mode.header(),
+            ModeKind::Tags => self.tags_mode.header(),
         };
         drawer.header(header_info, self.spinner_state);
     }
@@ -214,6 +222,7 @@ impl Application {
                 self.revision_details_mode.draw(drawer);
             }
             ModeKind::Branches => self.branches_mode.draw(drawer),
+            ModeKind::Tags => self.tags_mode.draw(drawer),
         }
         drawer.clear_to_bottom();
     }
