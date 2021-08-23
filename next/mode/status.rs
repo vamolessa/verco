@@ -255,8 +255,11 @@ impl Mode {
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Commit => self.state = State::Idle,
-            Response::Diff(output) => {
+            Response::Diff(mut output) => {
                 if let State::ViewDiff = self.state {
+                    if output.is_empty() {
+                        output.push('\n');
+                    }
                     self.output.set(output);
                 }
             }
