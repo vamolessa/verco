@@ -24,6 +24,7 @@ impl Plastic {
 
 impl Backend for Plastic {
     fn status(&self) -> BackendResult<StatusInfo> {
+        let header = Process::spawn("cm", &["status", "--header"])?;
         let output = Process::spawn(
             "cm",
             &[
@@ -33,10 +34,11 @@ impl Backend for Plastic {
                 "--machinereadable",
                 "--fieldseparator=;",
             ],
-        )?
-        .wait()?;
+        )?;
 
-        let header = String::new();
+        let header = header.wait()?.trim().into();
+        let output = output.wait()?;
+
         let mut entries = Vec::new();
 
         for line in output.lines() {
@@ -413,7 +415,7 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => FileStatus::Other(s.into()),
     }
 
-/*
+    /*
     match s {
         "M" => FileStatus::Modified,
         "A" => FileStatus::Added,
