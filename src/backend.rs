@@ -11,9 +11,8 @@ pub mod plastic;
 
 pub type BackendResult<T> = std::result::Result<T, String>;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FileStatus {
-    Unmodified,
     Modified,
     Added,
     Deleted,
@@ -24,11 +23,11 @@ pub enum FileStatus {
     Missing,
     Ignored,
     Clean,
+    Other(String),
 }
 impl fmt::Display for FileStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Unmodified => f.write_str("unmodified"),
             Self::Modified => f.write_str("modified"),
             Self::Added => f.write_str("added"),
             Self::Deleted => f.write_str("deleted"),
@@ -39,6 +38,9 @@ impl fmt::Display for FileStatus {
             Self::Missing => f.write_str("missing"),
             Self::Ignored => f.write_str("ignored"),
             Self::Clean => f.write_str("clean"),
+            Self::Other(status) => {
+                f.write_fmt(format_args!("other {}", status))
+            }
         }
     }
 }

@@ -401,7 +401,7 @@ fn parse_file_status(s: &str) -> FileStatus {
         "??" => FileStatus::Untracked,
         "C" => FileStatus::Copied,
         "U" => FileStatus::Unmerged,
-        _ => FileStatus::Unmodified,
+        _ => FileStatus::Other(s.into()),
     }
 }
 

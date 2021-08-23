@@ -24,7 +24,33 @@ impl Plastic {
 
 impl Backend for Plastic {
     fn status(&self) -> BackendResult<StatusInfo> {
-        todo!();
+        let output = Process::spawn(
+            "cm",
+            &[
+                "status",
+                "--short",
+                "--nomergesinfo",
+                "--machinereadable",
+                "--fieldseparator=;",
+            ],
+        )?
+        .wait()?;
+
+        let header = String::new();
+        let mut entries = Vec::new();
+
+        for line in output.lines() {
+            let mut splits = line.split(';');
+            let status = splits.next().unwrap_or("").trim();
+            let status = parse_file_status(status);
+            let name = splits.next().unwrap_or("").trim().into();
+            splits.next();
+            let _mergeinfo = splits.next().unwrap_or("").trim();
+
+            entries.push(RevisionEntry { name, status });
+        }
+
+        Ok(StatusInfo { header, entries })
     }
 
     fn commit(
@@ -381,6 +407,14 @@ impl Backend for Plastic {
 
 fn parse_file_status(s: &str) -> FileStatus {
     match s {
+        "CH" => FileStatus::Modified,
+        "LD" => FileStatus::Deleted,
+        "PR" => FileStatus::Untracked,
+        _ => FileStatus::Other(s.into()),
+    }
+
+/*
+    match s {
         "M" => FileStatus::Modified,
         "A" => FileStatus::Added,
         "D" => FileStatus::Deleted,
@@ -390,5 +424,6 @@ fn parse_file_status(s: &str) -> FileStatus {
         "U" => FileStatus::Unmerged,
         _ => FileStatus::Unmodified,
     }
+    */
 }
 

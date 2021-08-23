@@ -57,7 +57,7 @@ impl Mode {
             .filter(|e| e.selected)
             .map(|e| RevisionEntry {
                 name: e.name.clone(),
-                status: e.status,
+                status: e.status.clone(),
             })
             .collect();
         entries
@@ -82,7 +82,7 @@ impl Mode {
                     entries: Vec::new(),
                 },
             };
-            info.entries.sort_unstable_by_key(|e| e.status as usize);
+            info.entries.sort_unstable_by(|a, b| a.status.cmp(&b.status));
 
             ctx.event_sender
                 .send_response(ModeResponse::RevisionDetails(Response::Info(
@@ -219,3 +219,4 @@ impl Mode {
         }
     }
 }
+
