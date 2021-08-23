@@ -259,15 +259,19 @@ impl Backend for Git {
         let remote = Process::spawn("git", &["remote"])?.wait()?;
         Process::spawn("git", &["branch", name])?.wait()?;
         Process::spawn("git", &["checkout", name])?.wait()?;
-        Process::spawn("git", &["push", "--set-upstream", &remote, name])?
-            .wait()?;
+        Process::spawn(
+            "git",
+            &["push", "--set-upstream", remote.trim(), name],
+        )?
+        .wait()?;
         Ok(())
     }
 
     fn delete_branch(&self, name: &str) -> BackendResult<()> {
         let remote = Process::spawn("git", &["remote"])?.wait()?;
         Process::spawn("git", &["branch", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", &remote, name])?.wait()?;
+        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
+            .wait()?;
         Ok(())
     }
 
@@ -288,14 +292,15 @@ impl Backend for Git {
     fn new_tag(&self, name: &str) -> BackendResult<()> {
         let remote = Process::spawn("git", &["remote"])?.wait()?;
         Process::spawn("git", &["tag", "--force", name])?.wait()?;
-        Process::spawn("git", &["push", &remote, name])?.wait()?;
+        Process::spawn("git", &["push", remote.trim(), name])?.wait()?;
         Ok(())
     }
 
     fn delete_tag(&self, name: &str) -> BackendResult<()> {
         let remote = Process::spawn("git", &["remote"])?.wait()?;
         Process::spawn("git", &["tag", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", &remote, name])?.wait()?;
+        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
+            .wait()?;
         Ok(())
     }
 }
