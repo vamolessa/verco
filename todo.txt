@@ -8,10 +8,10 @@
 
 - status (changed files, new files, etc) selectable!!
     x `c` => commit selected if there are selected files, else commit all
-    x `U` => revert selected if there are selected files, else revert all
+    x `R` => revert selected if there are selected files, else revert all
     x `d` => diff selected if there are selected files, else diff all
-    - `L` => resolve taking local
-    - `O` => resolve taking other
+    x `L` => resolve taking local
+    x `O` => resolve taking other
 
 x log
     x `c` => checkout selected revision
