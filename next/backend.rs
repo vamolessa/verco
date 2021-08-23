@@ -90,6 +90,8 @@ pub trait Backend: 'static + Send + Sync {
         revision: Option<&str>,
         entries: &[RevisionEntry],
     ) -> BackendResult<String>;
+    fn resolve_taking_local(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
+    fn resolve_taking_other(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
 
     fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>>;
     fn checkout(&self, revision: &str) -> BackendResult<()>;

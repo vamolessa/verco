@@ -20,6 +20,8 @@ enum WaitOperation {
     Refresh,
     Commit,
     Discard,
+    ResolveTakingLocal,
+    ResolveTakingOther,
 }
 
 enum State {
@@ -139,6 +141,34 @@ impl Mode {
                             request(ctx, move |b| b.discard(&entries));
                         }
                     }
+                    Key::Char('L') => {
+                        if matches!(self.state, State::Idle)
+                            && !self.entries.is_empty()
+                        {
+                            self.state = State::Waiting(
+                                WaitOperation::ResolveTakingLocal,
+                            );
+                            let entries = self.get_selected_entries();
+
+                            request(ctx, move |b| {
+                                b.resolve_taking_local(&entries)
+                            });
+                        }
+                    }
+                    Key::Char('O') => {
+                        if matches!(self.state, State::Idle)
+                            && !self.entries.is_empty()
+                        {
+                            self.state = State::Waiting(
+                                WaitOperation::ResolveTakingOther,
+                            );
+                            let entries = self.get_selected_entries();
+
+                            request(ctx, move |b| {
+                                b.resolve_taking_other(&entries)
+                            });
+                        }
+                    }
                     Key::Char('d') => {
                         if !self.entries.is_empty() {
                             self.state = State::ViewDiff;
@@ -255,6 +285,14 @@ impl Mode {
             },
             State::Waiting(WaitOperation::Discard) => HeaderInfo {
                 name: "discard",
+                waiting_response: empty_output,
+            },
+            State::Waiting(WaitOperation::ResolveTakingLocal) => HeaderInfo {
+                name: "resolve taking local",
+                waiting_response: empty_output,
+            },
+            State::Waiting(WaitOperation::ResolveTakingOther) => HeaderInfo {
+                name: "resolve taking other",
                 waiting_response: empty_output,
             },
             State::ViewDiff => HeaderInfo {

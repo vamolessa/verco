@@ -140,6 +140,50 @@ impl Backend for Git {
         }
     }
 
+    fn resolve_taking_local(
+        &self,
+        entries: &[RevisionEntry],
+    ) -> BackendResult<()> {
+        if entries.is_empty() {
+            Process::spawn("git", &["checkout", ".", "--ours"])?.wait()?;
+        } else {
+            let mut args = Vec::new();
+            args.push("checkout");
+            args.push(".");
+            args.push("--ours");
+            args.push("--");
+            for entry in entries {
+                args.push(&entry.name);
+            }
+
+            Process::spawn("git", &args)?.wait()?;
+        }
+
+        Ok(())
+    }
+
+    fn resolve_taking_other(
+        &self,
+        entries: &[RevisionEntry],
+    ) -> BackendResult<()> {
+        if entries.is_empty() {
+            Process::spawn("git", &["checkout", ".", "--theirs"])?.wait()?;
+        } else {
+            let mut args = Vec::new();
+            args.push("checkout");
+            args.push(".");
+            args.push("--theirs");
+            args.push("--");
+            for entry in entries {
+                args.push(&entry.name);
+            }
+
+            Process::spawn("git", &args)?.wait()?;
+        }
+
+        Ok(())
+    }
+
     fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
         let start = start.to_string();
         let len = len.to_string();
