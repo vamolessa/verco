@@ -25,7 +25,7 @@ impl Backend for Git {
     fn status(&self) -> BackendResult<StatusInfo> {
         let output =
             Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
-        let mut splits = output.trim().split('\0').map(str::trim);
+        let mut splits = output.split('\0').map(str::trim);
 
         let header = splits.next().unwrap_or("").into();
         let entries = splits
@@ -63,32 +63,48 @@ impl Backend for Git {
         if entries.is_empty() {
             Process::spawn("git", &["reset", "--hard"])?.wait()?;
             Process::spawn("git", &["clean", "-d", "--force"])?.wait()?;
-            Ok(())
         } else {
-            let mut processes = Vec::new();
+            let mut args = Vec::new();
+            args.push("clean");
+            args.push("--force");
+            args.push("--");
             for entry in entries {
-                match entry.status {
-                    FileStatus::Untracked => processes.push(Process::spawn(
-                        "git",
-                        &["clean", "--force", "--", &entry.name],
-                    )?),
-                    FileStatus::Added => processes.push(Process::spawn(
-                        "git",
-                        &["rm", "--force", "--", &entry.name],
-                    )?),
-                    _ => processes.push(Process::spawn(
-                        "git",
-                        &["checkout", "--", &entry.name],
-                    )?),
+                if let FileStatus::Untracked = entry.status {
+                    args.push(&entry.name);
                 }
             }
+            let clean = Process::spawn("git", &args)?;
 
-            for process in processes {
-                process.wait()?;
+            args.clear();
+            args.push("rm");
+            args.push("--force");
+            args.push("--");
+            for entry in entries {
+                if let FileStatus::Added = entry.status {
+                    args.push(&entry.name);
+                }
             }
+            let rm = Process::spawn("git", &args)?;
 
-            Ok(())
+            args.clear();
+            args.push("checkout");
+            args.push("--");
+            for entry in entries {
+                if !matches!(
+                    entry.status,
+                    FileStatus::Untracked | FileStatus::Added,
+                ) {
+                    args.push(&entry.name);
+                }
+            }
+            let checkout = Process::spawn("git", &args)?;
+
+            clean.wait()?;
+            rm.wait()?;
+            checkout.wait()?;
         }
+
+        Ok(())
     }
 
     fn diff(

@@ -20,16 +20,18 @@ impl Hg {
 
 impl Backend for Hg {
     fn status(&self) -> BackendResult<StatusInfo> {
-        //let 
-        let output =
-            Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
-        let mut splits = output.trim().split('\0').map(str::trim);
+        let header = Process::spawn("hg", &["summary"])?;
+        let output = Process::spawn("hg", &["status"])?;
 
-        let header = splits.next().unwrap_or("").into();
-        let entries = splits
-            .filter(|e| e.len() >= 2)
+        let header = header.wait()?;
+        let output = output.wait()?;
+
+        let entries = output
+            .lines()
+            .map(str::trim)
+            .filter(|e| e.len() > 1)
             .map(|e| {
-                let (status, filename) = e.split_at(2);
+                let (status, filename) = e.split_at(1);
                 RevisionEntry {
                     name: filename.trim().into(),
                     status: parse_file_status(status.trim()),
@@ -46,49 +48,69 @@ impl Backend for Hg {
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["add", "--all"])?.wait()?;
+            Process::spawn("hg", &["commit", "--addremove", "-m", message])?
+                .wait()?;
         } else {
+            let mut args = Vec::new();
+            args.push("remove");
             for entry in entries {
-                Process::spawn("git", &["add", "--", &entry.name])?.wait()?;
+                if let FileStatus::Missing | FileStatus::Deleted = entry.status
+                {
+                    args.push(&entry.name);
+                }
             }
+            let remove = Process::spawn("hg", &args)?;
+
+            args.clear();
+            args.push("add");
+            for entry in entries {
+                if let FileStatus::Untracked = entry.status {
+                    args.push(&entry.name);
+                }
+            }
+            let add = Process::spawn("hg", &args)?;
+
+            remove.wait()?;
+            add.wait()?;
+
+            Process::spawn("git", &["commit", "-m", message])?.wait()?;
         }
 
-        Process::spawn("git", &["commit", "-m", message])?.wait()?;
         Ok(())
     }
 
     fn discard(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["reset", "--hard"])?.wait()?;
-            Process::spawn("git", &["clean", "-d", "--force"])?.wait()?;
-            Ok(())
+            Process::spawn("hg", &["revert", "-C", "--all"])?.wait()?;
+            Process::spawn("hg", &["purge"])?.wait()?;
         } else {
-            let mut processes = Vec::new();
+            let mut args = Vec::new();
+            args.push("purge");
             for entry in entries {
-                match entry.status {
-                    FileStatus::Untracked => processes.push(Process::spawn(
-                        "git",
-                        &["clean", "--force", "--", &entry.name],
-                    )?),
-                    FileStatus::Added => processes.push(Process::spawn(
-                        "git",
-                        &["rm", "--force", "--", &entry.name],
-                    )?),
-                    _ => processes.push(Process::spawn(
-                        "git",
-                        &["checkout", "--", &entry.name],
-                    )?),
+                if let FileStatus::Untracked = entry.status {
+                    args.push(&entry.name);
                 }
             }
+            let purge = Process::spawn("hg", &args)?;
 
-            for process in processes {
-                process.wait()?;
+            args.clear();
+            args.push("revert");
+            args.push("-C");
+            for entry in entries {
+                if !matches!(entry.status, FileStatus::Untracked) {
+                    args.push(&entry.name);
+                }
             }
+            let revert = Process::spawn("hg", &args)?;
 
-            Ok(())
+            purge.wait()?;
+            revert.wait()?;
         }
+
+        Ok(())
     }
 
+    // TODO: stopped here
     fn diff(
         &self,
         revision: Option<&str>,
@@ -378,14 +400,13 @@ impl Backend for Hg {
 
 fn parse_file_status(s: &str) -> FileStatus {
     match s {
+        "?" => FileStatus::Untracked,
         "M" => FileStatus::Modified,
         "A" => FileStatus::Added,
-        "D" => FileStatus::Deleted,
-        "R" => FileStatus::Renamed,
-        "?" => FileStatus::Untracked,
-        "C" => FileStatus::Copied,
-        "U" => FileStatus::Unmerged,
-        _ => FileStatus::Unmodified,
+        "R" => FileStatus::Deleted,
+        "!" => FileStatus::Missing,
+        "I" => FileStatus::Ignored,
+        "C" => FileStatus::Clean,
+        _ => FileStatus::Copied,
     }
 }
-
