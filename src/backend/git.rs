@@ -22,10 +22,6 @@ impl Git {
 }
 
 impl Backend for Git {
-    fn name(&self) -> &str {
-        "git"
-    }
-
     fn status(&self) -> BackendResult<StatusInfo> {
         let output =
             Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;

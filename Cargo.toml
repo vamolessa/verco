@@ -19,7 +19,7 @@ categories = ["command-line-utilities"]
 
 [[bin]]
 name = "verco"
-path = "next/main.rs"
+path = "src/main.rs"
 
 [dependencies]
 crossterm = "0.20"

@@ -6,6 +6,7 @@ use std::{
 };
 
 pub mod git;
+pub mod hg;
 
 pub type BackendResult<T> = std::result::Result<T, String>;
 
@@ -76,8 +77,6 @@ pub struct TagEntry {
 }
 
 pub trait Backend: 'static + Send + Sync {
-    fn name(&self) -> &str;
-
     fn status(&self) -> BackendResult<StatusInfo>;
     fn commit(
         &self,
@@ -161,7 +160,10 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)>
 {
     if let Some((root, git)) = git::Git::try_new() {
         Some((root, Arc::new(git)))
+    } else if let Some((root, hg)) = hg::Hg::try_new() {
+        Some((root, Arc::new(hg)))
     } else {
         None
     }
 }
+
