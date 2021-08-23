@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "verco"
-version = "5.5.4"
+version = "6.0.0"
 dependencies = [
  "crossterm",
  "ctrlc",
