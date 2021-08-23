@@ -7,33 +7,33 @@
     - `b` => branches
     - `t` => tags
 
-- status (changed files, new files, etc) selectable!!
+x status (changed files, new files, etc) selectable!!
     x `c` => commit selected if there are selected files, else commit all
     x `U` => revert selected if there are selected files, else revert all
     x `d` => diff selected if there are selected files, else diff all
 
-- log
+x log
     x `c` => checkout selected revision
-    - `d` => show revision details
+    x `d` => show revision details
 
     x `f` => fetch
     x `p` => pull
     x `P` => push
 
-- revision details
-    - `d` => diff selected files if there are selected files, else diff all
+x revision details
+    x `d` => diff selected files if there are selected files, else diff all
 
 - branches
     - `c` => checkout selected branch
     - `n` => new branch
-    - `d` => delete branch
+    - `D` => delete branch
 
 - tags
     - `c` => checkout selected tag
     - `n` => new tag
-    - `d` => delete tag
+    - `D` => delete tag
 
 - conflicts
-    - `c` => resolve taking local
-    - `C` => resolve taking other
+    - `L` => resolve taking local
+    - `O` => resolve taking other
 

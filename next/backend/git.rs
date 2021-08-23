@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use crate::backend::{
-    Backend, BackendResult, FileStatus, LogEntry, Process, RevisionEntry,
-    RevisionInfo, StatusInfo,
+    Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
+    RevisionEntry, RevisionInfo, StatusInfo,
 };
 
 pub struct Git;
@@ -239,6 +239,18 @@ impl Backend for Git {
         }
 
         Ok(RevisionInfo { message, entries })
+    }
+
+    fn branches(&self) -> BackendResult<Vec<BranchEntry>> {
+        todo!();
+    }
+
+    fn new_branch(&self, name: &str) -> BackendResult<()> {
+        todo!();
+    }
+
+    fn delete_branch(&self, name: &str) -> BackendResult<()> {
+        todo!();
     }
 }
 

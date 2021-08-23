@@ -136,6 +136,7 @@ struct Application {
     status_mode: mode::status::Mode,
     log_mode: mode::log::Mode,
     revision_details_mode: mode::revision_details::Mode,
+    branches_mode: mode::branches::Mode,
 
     spinner_state: u8,
 }
@@ -148,6 +149,7 @@ impl Application {
             ModeKind::RevisionDetails(revision) => {
                 self.revision_details_mode.on_enter(ctx, revision);
             }
+            ModeKind::Branches => self.branches_mode.on_enter(ctx),
         }
     }
 
@@ -158,6 +160,7 @@ impl Application {
             ModeKind::RevisionDetails(revision) => {
                 self.revision_details_mode.on_key(ctx, revision, key)
             }
+            ModeKind::Branches => self.branches_mode.on_key(ctx, key),
         };
 
         if !status.pending_input {
@@ -168,6 +171,7 @@ impl Application {
             match key {
                 Key::Char('s') => self.enter_mode(ctx, ModeKind::Status),
                 Key::Char('l') => self.enter_mode(ctx, ModeKind::Log),
+                Key::Char('b') => self.enter_mode(ctx, ModeKind::Branches),
                 _ => (),
             }
         }
@@ -184,6 +188,9 @@ impl Application {
             ModeResponse::RevisionDetails(response) => {
                 self.revision_details_mode.on_response(response);
             }
+            ModeResponse::Branches(response) => {
+                self.branches_mode.on_repsonse(response);
+            }
         }
     }
 
@@ -194,6 +201,7 @@ impl Application {
             ModeKind::Status => self.status_mode.header(),
             ModeKind::Log => self.log_mode.header(),
             ModeKind::RevisionDetails(_) => self.revision_details_mode.header(),
+            ModeKind::Branches => self.branches_mode.header(),
         };
         drawer.header(header_info, self.spinner_state);
     }
@@ -205,6 +213,7 @@ impl Application {
             ModeKind::RevisionDetails(_) => {
                 self.revision_details_mode.draw(drawer);
             }
+            ModeKind::Branches => self.branches_mode.draw(drawer),
         }
         drawer.clear_to_bottom();
     }

@@ -17,7 +17,7 @@ pub enum Response {
 }
 
 enum WaitOperation {
-    None,
+    Refresh,
     Commit,
     Discard,
 }
@@ -84,10 +84,10 @@ impl Mode {
         if let State::Waiting(_) = self.state {
             return;
         }
-        self.state = State::Waiting(WaitOperation::None);
+        self.state = State::Waiting(WaitOperation::Refresh);
 
-        self.readline.clear();
         self.output.set(String::new());
+        self.readline.clear();
 
         request(ctx, |_| Ok(()));
     }
@@ -241,7 +241,7 @@ impl Mode {
                 name: "status",
                 waiting_response: false,
             },
-            State::Waiting(WaitOperation::None) => HeaderInfo {
+            State::Waiting(WaitOperation::Refresh) => HeaderInfo {
                 name: "status",
                 waiting_response: true,
             },

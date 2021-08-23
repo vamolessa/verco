@@ -15,7 +15,7 @@ pub enum Response {
 }
 
 enum WaitOperation {
-    None,
+    Refresh,
     Checkout,
     Fetch,
     Pull,
@@ -104,7 +104,7 @@ impl Mode {
         if let State::Waiting(_) = self.state {
             return;
         }
-        self.state = State::Waiting(WaitOperation::None);
+        self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
         request(ctx, |_| Ok(()));
@@ -155,7 +155,7 @@ impl Mode {
 
     pub fn on_response(&mut self, response: Response) {
         match response {
-            Response::Refresh(entries) => {
+            Response::Refresh(result) => {
                 self.entries = Vec::new();
                 self.output.set(String::new());
 
@@ -163,7 +163,7 @@ impl Mode {
                     self.state = State::Idle;
                 }
                 if let State::Idle = self.state {
-                    match entries {
+                    match result {
                         Ok(entries) => self.entries = entries,
                         Err(error) => self.output.set(error),
                     }
@@ -180,7 +180,7 @@ impl Mode {
                 name: "log",
                 waiting_response: false,
             },
-            State::Waiting(WaitOperation::None) => HeaderInfo {
+            State::Waiting(WaitOperation::Refresh) => HeaderInfo {
                 name: "log",
                 waiting_response: true,
             },

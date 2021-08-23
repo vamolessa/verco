@@ -66,6 +66,10 @@ pub struct LogEntry {
     pub message: String,
 }
 
+pub struct BranchEntry {
+    pub name: String,
+}
+
 pub trait Backend: 'static + Send + Sync {
     fn name(&self) -> &str;
 
@@ -89,6 +93,10 @@ pub trait Backend: 'static + Send + Sync {
     fn push(&self) -> BackendResult<()>;
 
     fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo>;
+
+    fn branches(&self) -> BackendResult<Vec<BranchEntry>>;
+    fn new_branch(&self, name: &str) -> BackendResult<()>;
+    fn delete_branch(&self, name: &str) -> BackendResult<()>;
 }
 
 pub struct Process(Child);
