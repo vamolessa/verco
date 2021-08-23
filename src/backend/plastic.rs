@@ -5,9 +5,9 @@ use crate::backend::{
     RevisionEntry, RevisionInfo, StatusInfo, TagEntry,
 };
 
-pub struct Git;
+pub struct Plastic;
 
-impl Git {
+impl Plastic {
     pub fn try_new() -> Option<(PathBuf, Self)> {
         let output = Process::spawn("git", &["rev-parse", "--show-toplevel"])
             .ok()?
@@ -21,7 +21,7 @@ impl Git {
     }
 }
 
-impl Backend for Git {
+impl Backend for Plastic {
     fn status(&self) -> BackendResult<StatusInfo> {
         let output =
             Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
@@ -400,7 +400,7 @@ fn parse_file_status(s: &str) -> FileStatus {
         "A" => FileStatus::Added,
         "D" => FileStatus::Deleted,
         "R" => FileStatus::Renamed,
-        "??" => FileStatus::Untracked,
+        "?" => FileStatus::Untracked,
         "C" => FileStatus::Copied,
         "U" => FileStatus::Unmerged,
         _ => FileStatus::Unmodified,

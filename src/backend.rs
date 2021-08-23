@@ -7,6 +7,7 @@ use std::{
 
 pub mod git;
 pub mod hg;
+pub mod plastic;
 
 pub type BackendResult<T> = std::result::Result<T, String>;
 
@@ -161,8 +162,13 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)>
     if let Some((root, git)) = git::Git::try_new() {
         Some((root, Arc::new(git)))
     } else if let Some((root, hg)) = hg::Hg::try_new() {
-        Some((root, Arc::new(hg)))
+        eprintln!("hg support not yet fully implemented!");
+        None
+        //Some((root, Arc::new(hg)))
+    } else if let Some((root, plastic)) = plastic::Plastic::try_new() {
+        Some((root, Arc::new(plastic)))
     } else {
         None
     }
 }
+
