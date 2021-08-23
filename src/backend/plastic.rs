@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::backend::{
     Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
@@ -9,37 +9,22 @@ pub struct Plastic;
 
 impl Plastic {
     pub fn try_new() -> Option<(PathBuf, Self)> {
-        let output = Process::spawn("git", &["rev-parse", "--show-toplevel"])
-            .ok()?
-            .wait()
-            .ok()?;
+        let output = Process::spawn(
+            "cm",
+            &["getworkspacefrompath", "--format={wkpath}", "."],
+        )
+        .ok()?
+        .wait()
+        .ok()?;
 
-        let dir = output.lines().next()?;
-        let mut root = PathBuf::new();
-        root.push(dir);
-        Some((root, Self {}))
+        let root = Path::new(output.trim()).into();
+        Some((root, Self))
     }
 }
 
 impl Backend for Plastic {
     fn status(&self) -> BackendResult<StatusInfo> {
-        let output =
-            Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
-        let mut splits = output.split('\0').map(str::trim);
-
-        let header = splits.next().unwrap_or("").into();
-        let entries = splits
-            .filter(|e| e.len() >= 2)
-            .map(|e| {
-                let (status, filename) = e.split_at(2);
-                RevisionEntry {
-                    name: filename.trim().into(),
-                    status: parse_file_status(status.trim()),
-                }
-            })
-            .collect();
-
-        Ok(StatusInfo { header, entries })
+        todo!();
     }
 
     fn commit(
@@ -406,3 +391,4 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => FileStatus::Unmodified,
     }
 }
+

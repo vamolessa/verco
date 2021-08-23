@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::backend::{
     Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
@@ -10,11 +10,8 @@ pub struct Hg;
 impl Hg {
     pub fn try_new() -> Option<(PathBuf, Self)> {
         let output = Process::spawn("hg", &["root"]).ok()?.wait().ok()?;
-
-        let dir = output.lines().next()?;
-        let mut root = PathBuf::new();
-        root.push(dir);
-        Some((root, Self {}))
+        let root = Path::new(output.trim()).into();
+        Some((root, Self))
     }
 }
 
@@ -410,3 +407,4 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => FileStatus::Copied,
     }
 }
+

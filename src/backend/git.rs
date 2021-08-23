@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use crate::backend::{
     Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
@@ -14,10 +14,8 @@ impl Git {
             .wait()
             .ok()?;
 
-        let dir = output.lines().next()?;
-        let mut root = PathBuf::new();
-        root.push(dir);
-        Some((root, Self {}))
+        let root = Path::new(output.trim()).into();
+        Some((root, Self))
     }
 }
 
@@ -406,3 +404,4 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => FileStatus::Unmodified,
     }
 }
+
