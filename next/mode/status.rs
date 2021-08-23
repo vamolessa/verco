@@ -130,7 +130,7 @@ impl Mode {
                             self.readline.clear();
                         }
                     }
-                    Key::Char('U') => {
+                    Key::Char('R') => {
                         if matches!(self.state, State::Idle)
                             && !self.entries.is_empty()
                         {
