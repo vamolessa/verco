@@ -7,7 +7,7 @@ use crate::{
         HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
         ReadLine, SelectMenu, SelectMenuAction,
     },
-    ui::{Drawer, SelectEntryDraw},
+    ui::{Color, Drawer, SelectEntryDraw},
 };
 
 pub enum Response {
@@ -322,6 +322,13 @@ impl Mode {
                     drawer.next_line();
                     drawer.next_line();
                     drawer.select_menu(&self.select, 2, self.entries.iter());
+
+                    if self.entries.is_empty() {
+                        drawer.write(&format_args!(
+                            "{}nothing to commit!",
+                            Color::Yellow
+                        ));
+                    }
                 }
             }
             State::CommitMessageInput => drawer.readline(&self.readline),
