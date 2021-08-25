@@ -33,8 +33,9 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for TagEntry {
-    fn draw(&self, drawer: &mut Drawer, _: bool) {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
         drawer.write(&self.name);
+        1
     }
 }
 
@@ -187,7 +188,7 @@ impl Mode {
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
-                    drawer.select_menu(&self.select, 0, self.entries.iter());
+                    drawer.select_menu(&self.select, 0, false, self.entries.iter());
                 } else {
                     drawer.output(&self.output);
                 }

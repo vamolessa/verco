@@ -33,12 +33,13 @@ struct Entry {
     pub status: FileStatus,
 }
 impl SelectEntryDraw for Entry {
-    fn draw(&self, drawer: &mut Drawer, _: bool) {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
         let selected_text = if self.selected { '+' } else { ' ' };
         drawer.write(&format_args!(
             "{} [{}] {}",
             selected_text, &self.status, &self.name,
         ));
+        1
     }
 }
 
@@ -214,6 +215,7 @@ impl Mode {
             drawer.select_menu(
                 &self.select,
                 (self.output.line_count() + 1).min(u16::MAX as _) as _,
+                false,
                 self.entries.iter(),
             );
         }

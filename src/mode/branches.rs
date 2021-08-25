@@ -35,13 +35,14 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for BranchEntry {
-    fn draw(&self, drawer: &mut Drawer, _: bool) {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
         let status = if self.checked_out {
             " (checked out)"
         } else {
             ""
         };
         drawer.write(&format_args!("{}{}", self.name, status));
+        1
     }
 }
 
@@ -232,7 +233,7 @@ impl Mode {
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
-                    drawer.select_menu(&self.select, 0, self.entries.iter());
+                    drawer.select_menu(&self.select, 0, false, self.entries.iter());
                 } else {
                     drawer.output(&self.output);
                 }

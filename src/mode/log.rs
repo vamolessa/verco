@@ -34,7 +34,7 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for LogEntry {
-    fn draw(&self, drawer: &mut Drawer, hovered: bool) {
+    fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool) -> usize {
         fn color(color: Color, hovered: bool) -> Color {
             if hovered {
                 Color::White
@@ -90,6 +90,8 @@ impl SelectEntryDraw for LogEntry {
             color(Color::White, hovered),
             message,
         ));
+
+        1
     }
 }
 
@@ -218,7 +220,8 @@ impl Mode {
 
     pub fn draw(&self, drawer: &mut Drawer) {
         if self.output.text().is_empty() {
-            drawer.select_menu(&self.select, 0, self.entries.iter());
+            // TODO: toggle full entry
+            drawer.select_menu(&self.select, 0, false, self.entries.iter());
         } else {
             drawer.output(&self.output);
         }
@@ -240,3 +243,4 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
+

@@ -43,12 +43,13 @@ struct Entry {
     pub status: FileStatus,
 }
 impl SelectEntryDraw for Entry {
-    fn draw(&self, drawer: &mut Drawer, _: bool) {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
         let selected_text = if self.selected { '+' } else { ' ' };
         drawer.write(&format_args!(
             "{} [{}] {}",
             selected_text, &self.status, &self.name,
         ));
+        1
     }
 }
 
@@ -321,7 +322,7 @@ impl Mode {
                     drawer.write(&self.output.text());
                     drawer.next_line();
                     drawer.next_line();
-                    drawer.select_menu(&self.select, 2, self.entries.iter());
+                    drawer.select_menu(&self.select, 2, false, self.entries.iter());
 
                     if self.entries.is_empty() {
                         drawer.write(&format_args!(

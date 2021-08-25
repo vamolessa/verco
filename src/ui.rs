@@ -27,7 +27,7 @@ impl fmt::Display for Color {
 }
 
 pub trait SelectEntryDraw {
-    fn draw(&self, drawer: &mut Drawer, hovered: bool);
+    fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool) -> usize;
 }
 
 pub struct Drawer<'stdout, 'lock> {
@@ -128,6 +128,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         &mut self,
         select: &SelectMenu,
         header_height: u16,
+        show_full_hovered_entry: bool,
         entries: I,
     ) where
         I: 'entries + Iterator<Item = &'entries E>,
@@ -142,12 +143,11 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         )
         .unwrap();
 
-        let take_count =
+        let mut line_count = 0;
+        let max_line_count =
             self.viewport_size.1.saturating_sub(1 + header_height) as usize;
 
-        for (i, entry) in
-            entries.enumerate().skip(select.scroll()).take(take_count)
-        {
+        for (i, entry) in entries.enumerate().skip(select.scroll()) {
             let hovered = i == cursor_index;
             if hovered {
                 crossterm::queue!(
@@ -157,7 +157,8 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
                 .unwrap();
             }
 
-            entry.draw(self, hovered);
+            line_count +=
+                entry.draw(self, hovered, hovered && show_full_hovered_entry);
 
             crossterm::queue!(
                 self.stdout,
@@ -173,6 +174,11 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
                 )
                 .unwrap();
             }
+
+            if line_count >= max_line_count {
+                break;
+            }
         }
     }
 }
+
