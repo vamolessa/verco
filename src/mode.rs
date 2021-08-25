@@ -188,8 +188,8 @@ impl SelectMenu {
     }
 
     pub fn on_remove_entry(&mut self, index: usize) {
-        if self.cursor >= index {
-            self.cursor.saturating_sub(1);
+        if index <= self.cursor {
+            self.cursor = self.cursor.saturating_sub(1);
         }
     }
 
