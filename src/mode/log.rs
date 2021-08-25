@@ -34,6 +34,7 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for LogEntry {
+    // TODO: show full message
     fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool) -> usize {
         fn color(color: Color, hovered: bool) -> Color {
             if hovered {
