@@ -187,6 +187,12 @@ impl SelectMenu {
         self.cursor = cursor;
     }
 
+    pub fn on_remove_entry(&mut self, index: usize) {
+        if self.cursor >= index {
+            self.cursor.saturating_sub(1);
+        }
+    }
+
     pub fn on_key(
         &mut self,
         entries_len: usize,
@@ -226,3 +232,4 @@ impl SelectMenu {
         }
     }
 }
+

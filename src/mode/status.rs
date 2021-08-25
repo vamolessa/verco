@@ -76,9 +76,15 @@ impl Mode {
 
     fn remove_selected_entries(&mut self) {
         let previous_len = self.entries.len();
-        self.entries.retain(|e| !e.selected);
+        for i in (0..self.entries.len()).rev() {
+            if self.entries[i].selected {
+                self.entries.remove(i);
+                self.select.on_remove_entry(i);
+            }
+        }
         if self.entries.len() == previous_len {
             self.entries.clear();
+            self.select.set_cursor(0);
         }
     }
 
@@ -141,7 +147,7 @@ impl Mode {
                             request(ctx, move |b| b.discard(&entries));
                         }
                     }
-                    Key::Char('L') => {
+                    Key::Char('O') => {
                         if matches!(self.state, State::Idle)
                             && !self.entries.is_empty()
                         {
@@ -151,11 +157,11 @@ impl Mode {
                             let entries = self.get_selected_entries();
 
                             request(ctx, move |b| {
-                                b.resolve_taking_local(&entries)
+                                b.resolve_taking_ours(&entries)
                             });
                         }
                     }
-                    Key::Char('O') => {
+                    Key::Char('T') => {
                         if matches!(self.state, State::Idle)
                             && !self.entries.is_empty()
                         {
@@ -165,7 +171,7 @@ impl Mode {
                             let entries = self.get_selected_entries();
 
                             request(ctx, move |b| {
-                                b.resolve_taking_other(&entries)
+                                b.resolve_taking_theirs(&entries)
                             });
                         }
                     }
@@ -205,13 +211,14 @@ impl Mode {
 
                     let ctx = ctx.clone();
                     thread::spawn(move || {
+                        ctx.event_sender.send_mode_change(ModeKind::Log);
                         match ctx.backend.commit(&message, &entries) {
                             Ok(()) => {
                                 ctx.event_sender.send_response(
                                     ModeResponse::Status(Response::Commit),
                                 );
                                 ctx.event_sender
-                                    .send_mode_change(ModeKind::Log);
+                                    .send_mode_refresh(ModeKind::Log);
                             }
                             Err(error) => ctx.event_sender.send_response(
                                 ModeResponse::Status(Response::Refresh(
@@ -339,9 +346,11 @@ where
                     entries: Vec::new(),
                 },
             };
-        info.entries.sort_unstable_by(|a, b| a.status.cmp(&b.status));
+        info.entries
+            .sort_unstable_by(|a, b| a.status.cmp(&b.status));
 
         ctx.event_sender
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+

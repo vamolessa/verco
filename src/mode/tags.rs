@@ -82,6 +82,8 @@ impl Mode {
                             let name = entry.name.clone();
                             let ctx = ctx.clone();
                             thread::spawn(move || {
+                                ctx.event_sender
+                                    .send_mode_change(ModeKind::Log);
                                 match ctx.backend.checkout(&name) {
                                     Ok(()) => {
                                         ctx.event_sender.send_response(
@@ -90,7 +92,7 @@ impl Mode {
                                             ),
                                         );
                                         ctx.event_sender
-                                            .send_mode_change(ModeKind::Log);
+                                            .send_mode_refresh(ModeKind::Log);
                                     }
                                     Err(error) => ctx
                                         .event_sender
@@ -113,6 +115,7 @@ impl Mode {
 
                             let name = entry.name.clone();
                             self.entries.remove(index);
+                            self.select.on_remove_entry(index);
                             request(ctx, move |b| b.delete_tag(&name));
                         }
                     }
@@ -212,3 +215,4 @@ where
             .send_response(ModeResponse::Tags(Response::Refresh(result)));
     });
 }
+

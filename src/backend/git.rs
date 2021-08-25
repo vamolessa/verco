@@ -150,7 +150,7 @@ impl Backend for Git {
         }
     }
 
-    fn resolve_taking_local(
+    fn resolve_taking_ours(
         &self,
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
@@ -182,7 +182,7 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn resolve_taking_other(
+    fn resolve_taking_theirs(
         &self,
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {

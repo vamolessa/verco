@@ -92,11 +92,11 @@ pub trait Backend: 'static + Send + Sync {
         revision: Option<&str>,
         entries: &[RevisionEntry],
     ) -> BackendResult<String>;
-    fn resolve_taking_local(
+    fn resolve_taking_ours(
         &self,
         entries: &[RevisionEntry],
     ) -> BackendResult<()>;
-    fn resolve_taking_other(
+    fn resolve_taking_theirs(
         &self,
         entries: &[RevisionEntry],
     ) -> BackendResult<()>;

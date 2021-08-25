@@ -165,7 +165,7 @@ impl Backend for Plastic {
         }
     }
 
-    fn resolve_taking_local(
+    fn resolve_taking_ours(
         &self,
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
@@ -197,7 +197,7 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    fn resolve_taking_other(
+    fn resolve_taking_theirs(
         &self,
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {

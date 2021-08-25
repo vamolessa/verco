@@ -91,6 +91,7 @@ enum Event {
     Resize(u16, u16),
     Response(ModeResponse),
     ModeChange(ModeKind),
+    ModeRefresh(ModeKind),
 }
 
 #[derive(Clone)]
@@ -102,6 +103,10 @@ impl EventSender {
 
     pub fn send_mode_change(&self, mode: ModeKind) {
         self.0.send(Event::ModeChange(mode)).unwrap();
+    }
+
+    pub fn send_mode_refresh(&self, mode: ModeKind) {
+        self.0.send(Event::ModeRefresh(mode)).unwrap();
     }
 }
 
@@ -152,6 +157,14 @@ impl Application {
             }
             ModeKind::Branches => self.branches_mode.on_enter(ctx),
             ModeKind::Tags => self.tags_mode.on_enter(ctx),
+        }
+    }
+
+    pub fn refresh_mode(&mut self, ctx: &ModeContext, mode: ModeKind) {
+        if std::mem::discriminant(&self.current_mode)
+            == std::mem::discriminant(&mode)
+        {
+            self.enter_mode(ctx, mode);
         }
     }
 
@@ -265,6 +278,9 @@ pub fn run(backend: Arc<dyn Backend>) {
             }
             Ok(Event::Response(response)) => application.on_response(response),
             Ok(Event::ModeChange(mode)) => application.enter_mode(&ctx, mode),
+            Ok(Event::ModeRefresh(mode)) => {
+                application.refresh_mode(&ctx, mode)
+            }
             Err(mpsc::RecvTimeoutError::Timeout) => draw_body = false,
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
@@ -279,3 +295,4 @@ pub fn run(backend: Arc<dyn Backend>) {
         stdout.flush().unwrap();
     }
 }
+

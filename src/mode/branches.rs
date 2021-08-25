@@ -13,6 +13,7 @@ use crate::{
 pub enum Response {
     Refresh(BackendResult<Vec<BranchEntry>>),
     Checkout,
+    Merge,
 }
 
 enum WaitOperation {
@@ -88,6 +89,8 @@ impl Mode {
                             let name = entry.name.clone();
                             let ctx = ctx.clone();
                             thread::spawn(move || {
+                                ctx.event_sender
+                                    .send_mode_change(ModeKind::Log);
                                 match ctx.backend.checkout(&name) {
                                     Ok(()) => {
                                         ctx.event_sender.send_response(
@@ -96,7 +99,7 @@ impl Mode {
                                             ),
                                         );
                                         ctx.event_sender
-                                            .send_mode_change(ModeKind::Log);
+                                            .send_mode_refresh(ModeKind::Log);
                                     }
                                     Err(error) => ctx
                                         .event_sender
@@ -119,6 +122,7 @@ impl Mode {
 
                             let name = entry.name.clone();
                             self.entries.remove(index);
+                            self.select.on_remove_entry(index);
                             request(ctx, move |b| b.delete_branch(&name));
                         }
                     }
@@ -128,7 +132,27 @@ impl Mode {
                             self.state = State::Waiting(WaitOperation::Merge);
 
                             let name = entry.name.clone();
-                            request(ctx, move |b| b.merge(&name));
+                            let ctx = ctx.clone();
+                            thread::spawn(move || {
+                                ctx.event_sender
+                                    .send_mode_change(ModeKind::Log);
+                                match ctx.backend.merge(&name) {
+                                    Ok(()) => {
+                                        ctx.event_sender.send_response(
+                                            ModeResponse::Branches(
+                                                Response::Merge,
+                                            ),
+                                        );
+                                        ctx.event_sender
+                                            .send_mode_refresh(ModeKind::Log);
+                                    }
+                                    Err(error) => ctx
+                                        .event_sender
+                                        .send_response(ModeResponse::Branches(
+                                            Response::Refresh(Err(error)),
+                                        )),
+                                }
+                            });
                         }
                     }
                     _ => (),
@@ -171,7 +195,7 @@ impl Mode {
                     self.select.saturate_cursor(self.entries.len());
                 }
             }
-            Response::Checkout => self.state = State::Idle,
+            Response::Checkout | Response::Merge => self.state = State::Idle,
         }
     }
 
@@ -236,3 +260,4 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
+
