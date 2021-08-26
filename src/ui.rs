@@ -100,14 +100,42 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
     }
 
     pub fn output(&mut self, output: &Output) {
+        let tab_bytes = [b' '; 4];
+        let mut utf8_buf = [0; 4];
+
+        let mut line_count = 0;
         for line in output.lines_from_scroll() {
+            let mut x = 0;
+            for c in line.chars() {
+                match c {
+                    '\t' => {
+                        self.stdout.write_all(&tab_bytes).unwrap();
+                        x += tab_bytes.len();
+                    }
+                    _ => {
+                        let bytes = c.encode_utf8(&mut utf8_buf).as_bytes();
+                        self.stdout.write_all(bytes).unwrap();
+                        x += 1;
+                    }
+                }
+
+                if x >= self.viewport_size.0 as _ {
+                    x -= self.viewport_size.0 as usize;
+                    line_count += 1;
+                }
+            }
+
             crossterm::queue!(
                 self.stdout,
-                style::Print(line),
                 terminal::Clear(terminal::ClearType::UntilNewLine),
                 cursor::MoveToNextLine(1),
             )
             .unwrap();
+
+            line_count += 1;
+            if line_count >= self.viewport_size.1 {
+                break;
+            }
         }
     }
 

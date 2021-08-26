@@ -1,4 +1,4 @@
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 use crate::backend::{
     Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
@@ -114,15 +114,10 @@ impl Backend for Git {
             Some(revision) => {
                 let parent = format!("{}^@", revision);
                 if entries.is_empty() {
-                    Process::spawn(
-                        "git",
-                        &["diff", "--color", &parent, revision],
-                    )?
-                    .wait()
+                    Process::spawn("git", &["diff", &parent, revision])?.wait()
                 } else {
                     let mut args = Vec::new();
                     args.push("diff");
-                    args.push("--color");
                     args.push(&parent);
                     args.push(revision);
                     args.push("--");
@@ -135,11 +130,10 @@ impl Backend for Git {
             }
             None => {
                 if entries.is_empty() {
-                    Process::spawn("git", &["diff", "--color"])?.wait()
+                    Process::spawn("git", &["diff", "-z"])?.wait()
                 } else {
                     let mut args = Vec::new();
                     args.push("diff");
-                    args.push("--color");
                     args.push("--");
                     for entry in entries {
                         args.push(&entry.name);
