@@ -62,11 +62,29 @@ impl SelectEntryDraw for LogEntry {
             total_chars += self.refs.chars().count() + 3;
         }
 
-        let available_width =
-            (drawer.viewport_size.0 as usize).saturating_sub(total_chars);
-        let message = match self.message.char_indices().nth(available_width) {
-            Some((i, _)) => &self.message[..i],
-            None => &self.message,
+        let (line_count, message) = if full {
+            let mut line_count = 0;
+            for line in self.message.lines() {
+                let mut x = 0;
+                for _ in line.chars() {
+                    if x >= drawer.viewport_size.0 as _ {
+                        x -= drawer.viewport_size.0 as usize;
+                        line_count += 1;
+                    }
+                }
+
+                line_count += 1;
+            }
+            (line_count, &self.message[..])
+        } else {
+            let available_width =
+                (drawer.viewport_size.0 as usize).saturating_sub(total_chars);
+            let message = match self.message.char_indices().nth(available_width)
+            {
+                Some((i, _)) => &self.message[..i],
+                None => &self.message,
+            };
+            (0, message)
         };
 
         let (refs_begin, refs_end) = match &self.refs[..] {
@@ -75,7 +93,7 @@ impl SelectEntryDraw for LogEntry {
         };
 
         drawer.write(&format_args!(
-            "{}{} {}{} {}{} {}{} {}{}{}{}{}{}",
+            "{}{} {}{} {}{} {}{} {}{}{}{}{}",
             color(Color::White, hovered),
             &self.graph,
             color(Color::Yellow, hovered),
@@ -89,10 +107,15 @@ impl SelectEntryDraw for LogEntry {
             &self.refs,
             refs_end,
             color(Color::White, hovered),
-            message,
         ));
 
-        1
+        if full {
+            drawer.next_line();
+        }
+
+        drawer.write(&message);
+
+        1 + line_count
     }
 }
 
@@ -102,6 +125,7 @@ pub struct Mode {
     entries: Vec<LogEntry>,
     output: Output,
     select: SelectMenu,
+    show_full_hovered_message: bool,
 }
 impl Mode {
     pub fn on_enter(&mut self, ctx: &ModeContext) {
@@ -111,6 +135,8 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
+        self.show_full_hovered_message = false;
+
         request(ctx, |_| Ok(()));
     }
 
@@ -126,6 +152,8 @@ impl Mode {
                     entry.hash.clone(),
                 ));
             }
+        } else if let Key::Tab = key {
+            self.show_full_hovered_message = !self.show_full_hovered_message;
         } else if let State::Idle = self.state {
             match key {
                 Key::Char('g') => {
@@ -221,8 +249,12 @@ impl Mode {
 
     pub fn draw(&self, drawer: &mut Drawer) {
         if self.output.text().is_empty() {
-            // TODO: toggle full entry
-            drawer.select_menu(&self.select, 0, false, self.entries.iter());
+            drawer.select_menu(
+                &self.select,
+                0,
+                self.show_full_hovered_message,
+                self.entries.iter(),
+            );
         } else {
             drawer.output(&self.output);
         }

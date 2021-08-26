@@ -49,6 +49,7 @@ pub struct Mode {
     entries: Vec<Entry>,
     output: Output,
     select: SelectMenu,
+    show_full_message: bool,
 }
 impl Mode {
     fn get_selected_entries(&self) -> Vec<RevisionEntry> {
@@ -72,6 +73,7 @@ impl Mode {
 
         self.output.set(String::new());
         self.select.saturate_cursor(0);
+        self.show_full_message = false;
 
         let ctx = ctx.clone();
         let revision = revision.to_string();
@@ -83,7 +85,8 @@ impl Mode {
                     entries: Vec::new(),
                 },
             };
-            info.entries.sort_unstable_by(|a, b| a.status.cmp(&b.status));
+            info.entries
+                .sort_unstable_by(|a, b| a.status.cmp(&b.status));
 
             ctx.event_sender
                 .send_response(ModeResponse::RevisionDetails(Response::Info(
@@ -102,8 +105,6 @@ impl Mode {
 
         match self.state {
             State::Idle => {
-                // TODO handle error and long messages
-
                 match self.select.on_key(
                     self.entries.len(),
                     available_height,
@@ -151,7 +152,13 @@ impl Mode {
                     _ => (),
                 }
             }
-            State::ViewDiff => self.output.on_key(available_height, key),
+            State::ViewDiff => {
+                if let Key::Tab = key {
+                    self.show_full_message = !self.show_full_message;
+                } else {
+                    self.output.on_key(available_height, key);
+                }
+            }
             _ => (),
         }
 
@@ -207,14 +214,27 @@ impl Mode {
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
-        drawer.output(&self.output);
+        let line_count = if self.show_full_message {
+            drawer.output(&self.output)
+        } else {
+            let first_line = self.output.text().lines().next().unwrap_or("");
+            let trimmed_line = match first_line
+                .char_indices()
+                .nth(drawer.viewport_size.0.saturating_sub(1) as _)
+            {
+                Some((i, c)) => &first_line[..i + c.len_utf8()],
+                None => first_line,
+            };
+            drawer.write(&trimmed_line);
+            1
+        };
 
         if let State::Idle = self.state {
             drawer.next_line();
             drawer.next_line();
             drawer.select_menu(
                 &self.select,
-                (self.output.line_count() + 1).min(u16::MAX as _) as _,
+                (line_count + 1).min(u16::MAX as _) as _,
                 false,
                 self.entries.iter(),
             );

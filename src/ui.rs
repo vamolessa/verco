@@ -99,7 +99,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         .unwrap();
     }
 
-    pub fn output(&mut self, output: &Output) {
+    pub fn output(&mut self, output: &Output) -> usize {
         let tab_bytes = [b' '; 4];
         let mut utf8_buf = [0; 4];
 
@@ -133,10 +133,12 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
             .unwrap();
 
             line_count += 1;
-            if line_count >= self.viewport_size.1 {
+            if line_count >= self.viewport_size.1 as _ {
                 break;
             }
         }
+
+        line_count
     }
 
     pub fn readline(&mut self, readline: &ReadLine) {

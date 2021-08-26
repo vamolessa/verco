@@ -322,7 +322,12 @@ impl Mode {
                     drawer.write(&self.output.text());
                     drawer.next_line();
                     drawer.next_line();
-                    drawer.select_menu(&self.select, 2, false, self.entries.iter());
+                    drawer.select_menu(
+                        &self.select,
+                        2,
+                        false,
+                        self.entries.iter(),
+                    );
 
                     if self.entries.is_empty() {
                         drawer.write(&format_args!(
@@ -333,7 +338,9 @@ impl Mode {
                 }
             }
             State::CommitMessageInput => drawer.readline(&self.readline),
-            State::ViewDiff => drawer.output(&self.output),
+            State::ViewDiff => {
+                drawer.output(&self.output);
+            }
         }
     }
 }
