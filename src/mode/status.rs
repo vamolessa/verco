@@ -45,7 +45,7 @@ struct Entry {
 impl SelectEntryDraw for Entry {
     fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
         let selected_text = if self.selected { '+' } else { ' ' };
-        drawer.write(&format_args!(
+        drawer.fmt(format_args!(
             "{} [{}] {}",
             selected_text, &self.status, &self.name,
         ));
@@ -319,7 +319,7 @@ impl Mode {
                 if self.output.line_count() > 1 {
                     drawer.output(&self.output);
                 } else {
-                    drawer.write(&self.output.text());
+                    drawer.str(self.output.text());
                     drawer.next_line();
                     drawer.next_line();
                     drawer.select_menu(
@@ -330,7 +330,7 @@ impl Mode {
                     );
 
                     if self.entries.is_empty() {
-                        drawer.write(&format_args!(
+                        drawer.fmt(format_args!(
                             "{}nothing to commit!",
                             Color::Yellow
                         ));

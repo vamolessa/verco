@@ -262,6 +262,7 @@ pub fn run(backend: Arc<dyn Backend>) {
 
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
+    let mut stdout_buf = Vec::new();
 
     loop {
         let mut draw_body = true;
@@ -285,13 +286,15 @@ pub fn run(backend: Arc<dyn Backend>) {
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
 
-        let mut drawer = Drawer::new(&mut stdout, viewport_size);
+        let mut drawer = Drawer::new(stdout_buf, viewport_size);
         application.draw_header(&mut drawer);
         if draw_body {
             application.draw_body(&mut drawer);
         }
+        stdout_buf = drawer.take_buf();
 
         use io::Write;
+        stdout.write_all(&stdout_buf).unwrap();
         stdout.flush().unwrap();
     }
 }

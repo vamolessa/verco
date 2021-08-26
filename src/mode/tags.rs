@@ -34,7 +34,7 @@ impl Default for State {
 
 impl SelectEntryDraw for TagEntry {
     fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
-        drawer.write(&self.name);
+        drawer.str(&self.name);
         1
     }
 }

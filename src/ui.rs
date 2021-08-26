@@ -1,7 +1,4 @@
-use std::{
-    fmt,
-    io::{StdoutLock, Write},
-};
+use std::fmt;
 
 use crossterm::{self, cursor, style, terminal};
 
@@ -30,25 +27,24 @@ pub trait SelectEntryDraw {
     fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool) -> usize;
 }
 
-pub struct Drawer<'stdout, 'lock> {
-    stdout: &'lock mut StdoutLock<'stdout>,
+pub struct Drawer {
+    buf: Vec<u8>,
     pub viewport_size: (u16, u16),
 }
 
-impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
-    pub fn new(
-        stdout: &'lock mut StdoutLock<'stdout>,
-        viewport_size: (u16, u16),
-    ) -> Self {
-        Self {
-            stdout,
-            viewport_size,
-        }
+impl Drawer {
+    pub fn new(mut buf: Vec<u8>, viewport_size: (u16, u16)) -> Self {
+        buf.clear();
+        Self { buf, viewport_size }
+    }
+
+    pub fn take_buf(self) -> Vec<u8> {
+        self.buf
     }
 
     pub fn clear_to_bottom(&mut self) {
         crossterm::queue!(
-            self.stdout,
+            self.buf,
             style::SetBackgroundColor(style::Color::Black),
             terminal::Clear(terminal::ClearType::FromCursorDown),
         )
@@ -66,7 +62,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         };
 
         crossterm::queue!(
-            self.stdout,
+            self.buf,
             cursor::MoveTo(0, 0),
             style::SetBackgroundColor(background_color),
             style::SetForegroundColor(foreground_color),
@@ -86,13 +82,18 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         .unwrap();
     }
 
-    pub fn write(&mut self, display: &dyn fmt::Display) {
-        write!(self.stdout, "{}", display).unwrap();
+    pub fn str(&mut self, line: &str) {
+        self.buf.extend_from_slice(line.as_bytes());
+    }
+
+    pub fn fmt(&mut self, args: fmt::Arguments) {
+        use std::io::Write;
+        self.buf.write_fmt(args).unwrap();
     }
 
     pub fn next_line(&mut self) {
         crossterm::queue!(
-            self.stdout,
+            self.buf,
             terminal::Clear(terminal::ClearType::UntilNewLine),
             cursor::MoveToNextLine(1),
         )
@@ -109,12 +110,12 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
             for c in line.chars() {
                 match c {
                     '\t' => {
-                        self.stdout.write_all(&tab_bytes).unwrap();
+                        self.buf.extend_from_slice(&tab_bytes);
                         x += tab_bytes.len();
                     }
                     _ => {
                         let bytes = c.encode_utf8(&mut utf8_buf).as_bytes();
-                        self.stdout.write_all(bytes).unwrap();
+                        self.buf.extend_from_slice(bytes);
                         x += 1;
                     }
                 }
@@ -126,7 +127,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
             }
 
             crossterm::queue!(
-                self.stdout,
+                self.buf,
                 terminal::Clear(terminal::ClearType::UntilNewLine),
                 cursor::MoveToNextLine(1),
             )
@@ -143,7 +144,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
 
     pub fn readline(&mut self, readline: &ReadLine) {
         crossterm::queue!(
-            self.stdout,
+            self.buf,
             style::SetBackgroundColor(style::Color::Black),
             style::SetForegroundColor(style::Color::White),
             style::Print(readline.input()),
@@ -167,7 +168,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
         let cursor_index = select.cursor();
 
         crossterm::queue!(
-            self.stdout,
+            self.buf,
             style::SetBackgroundColor(style::Color::Black),
             style::SetForegroundColor(style::Color::White),
         )
@@ -181,7 +182,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
             let hovered = i == cursor_index;
             if hovered {
                 crossterm::queue!(
-                    self.stdout,
+                    self.buf,
                     style::SetBackgroundColor(style::Color::DarkMagenta),
                 )
                 .unwrap();
@@ -191,7 +192,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
                 entry.draw(self, hovered, hovered && show_full_hovered_entry);
 
             crossterm::queue!(
-                self.stdout,
+                self.buf,
                 terminal::Clear(terminal::ClearType::UntilNewLine),
                 cursor::MoveToNextLine(1),
             )
@@ -199,7 +200,7 @@ impl<'stdout, 'lock> Drawer<'stdout, 'lock> {
 
             if hovered {
                 crossterm::queue!(
-                    self.stdout,
+                    self.buf,
                     style::SetBackgroundColor(style::Color::Black),
                 )
                 .unwrap();

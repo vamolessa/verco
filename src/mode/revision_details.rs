@@ -35,7 +35,7 @@ struct Entry {
 impl SelectEntryDraw for Entry {
     fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
         let selected_text = if self.selected { '+' } else { ' ' };
-        drawer.write(&format_args!(
+        drawer.fmt(format_args!(
             "{} [{}] {}",
             selected_text, &self.status, &self.name,
         ));
@@ -225,7 +225,7 @@ impl Mode {
                 Some((i, c)) => &first_line[..i + c.len_utf8()],
                 None => first_line,
             };
-            drawer.write(&trimmed_line);
+            drawer.str(trimmed_line);
             1
         };
 

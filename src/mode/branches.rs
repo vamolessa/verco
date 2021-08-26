@@ -41,7 +41,7 @@ impl SelectEntryDraw for BranchEntry {
         } else {
             ""
         };
-        drawer.write(&format_args!("{}{}", self.name, status));
+        drawer.fmt(format_args!("{}{}", self.name, status));
         1
     }
 }

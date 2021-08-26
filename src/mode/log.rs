@@ -92,7 +92,7 @@ impl SelectEntryDraw for LogEntry {
             _ => ("(", ") "),
         };
 
-        drawer.write(&format_args!(
+        drawer.fmt(format_args!(
             "{}{} {}{} {}{} {}{} {}{}{}{}{}",
             color(Color::White, hovered),
             &self.graph,
@@ -113,7 +113,7 @@ impl SelectEntryDraw for LogEntry {
             drawer.next_line();
         }
 
-        drawer.write(&message);
+        drawer.str(message);
 
         1 + line_count
     }
