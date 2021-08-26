@@ -126,12 +126,7 @@ impl Drawer {
                 }
             }
 
-            crossterm::queue!(
-                self.buf,
-                terminal::Clear(terminal::ClearType::UntilNewLine),
-                cursor::MoveToNextLine(1),
-            )
-            .unwrap();
+            self.next_line();
 
             line_count += 1;
             if line_count >= self.viewport_size.1 as _ {

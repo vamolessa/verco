@@ -124,6 +124,9 @@ impl Mode {
                 }
 
                 match key {
+                    Key::Tab => {
+                        self.show_full_message = !self.show_full_message;
+                    }
                     Key::Char('d') => {
                         if !self.entries.is_empty() {
                             self.state = State::ViewDiff;
@@ -152,13 +155,7 @@ impl Mode {
                     _ => (),
                 }
             }
-            State::ViewDiff => {
-                if let Key::Tab = key {
-                    self.show_full_message = !self.show_full_message;
-                } else {
-                    self.output.on_key(available_height, key);
-                }
-            }
+            State::ViewDiff => self.output.on_key(available_height, key),
             _ => (),
         }
 
@@ -214,7 +211,9 @@ impl Mode {
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
-        let line_count = if self.show_full_message {
+        let show_full_output =
+            !matches!(self.state, State::Idle) || self.show_full_message;
+        let line_count = if show_full_output {
             drawer.output(&self.output)
         } else {
             let first_line = self.output.text().lines().next().unwrap_or("");
@@ -226,11 +225,11 @@ impl Mode {
                 None => first_line,
             };
             drawer.str(trimmed_line);
+            drawer.next_line();
             1
         };
 
         if let State::Idle = self.state {
-            drawer.next_line();
             drawer.next_line();
             drawer.select_menu(
                 &self.select,
