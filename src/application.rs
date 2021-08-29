@@ -36,8 +36,8 @@ impl EventSender {
     }
 }
 
-fn console_events_loop(
-    platform_event_reader: PlatformEventReader,
+fn terminal_event_loop(
+    mut platform_event_reader: PlatformEventReader,
     sender: mpsc::SyncSender<Event>,
 ) {
     let mut keys = Vec::new();
@@ -186,7 +186,7 @@ pub fn run(
     application.enter_mode(&ctx, ModeKind::default());
 
     thread::spawn(move || {
-        console_events_loop(platform_event_reader, event_sender)
+        terminal_event_loop(platform_event_reader, event_sender)
     });
 
     let stdout = io::stdout();
