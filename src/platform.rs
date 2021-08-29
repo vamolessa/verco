@@ -405,7 +405,7 @@ impl PlatformEventReader {
                     }
                 }
                 Ok(TriggeredEvent { index: 1, .. }) => {
-                    *resize = Some(Self::get_terminal_size())
+                    *resize = Some(Platform::get_terminal_size())
                 }
                 Ok(_) => unreachable!(),
                 Err(()) => break,
@@ -599,7 +599,7 @@ impl PlatformEventReader {
         keys: &mut Vec<Key>,
         resize: &mut Option<(u16, u16)>,
     ) {
-        let input_handle = match Self::get_std_handle(STD_INPUT_HANDLE) {
+        let input_handle = match Platform::get_std_handle(STD_INPUT_HANDLE) {
             Some(handle) => handle,
             None => return,
         };
