@@ -1,12 +1,12 @@
 use std::thread;
 
 use crate::{
-    platform::Key,
     backend::{FileStatus, RevisionEntry, RevisionInfo},
     mode::{
         HeaderInfo, ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,
         SelectMenuAction,
     },
+    platform::Key,
     ui::{Drawer, SelectEntryDraw},
 };
 
@@ -240,4 +240,3 @@ impl Mode {
         }
     }
 }
-

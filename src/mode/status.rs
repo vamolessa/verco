@@ -1,12 +1,12 @@
 use std::thread;
 
 use crate::{
-    platform::Key,
     backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
         HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
         ReadLine, SelectMenu, SelectMenuAction,
     },
+    platform::Key,
     ui::{Color, Drawer, SelectEntryDraw},
 };
 
@@ -368,4 +368,3 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
-

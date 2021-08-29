@@ -1,12 +1,12 @@
 use std::thread;
 
 use crate::{
-    platform::Key,
     backend::{Backend, BackendResult, TagEntry},
     mode::{
         HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
         ReadLine, SelectMenu,
     },
+    platform::Key,
     ui::{Drawer, SelectEntryDraw},
 };
 
@@ -188,7 +188,12 @@ impl Mode {
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
-                    drawer.select_menu(&self.select, 0, false, self.entries.iter());
+                    drawer.select_menu(
+                        &self.select,
+                        0,
+                        false,
+                        self.entries.iter(),
+                    );
                 } else {
                     drawer.output(&self.output);
                 }
@@ -216,4 +221,3 @@ where
             .send_response(ModeResponse::Tags(Response::Refresh(result)));
     });
 }
-

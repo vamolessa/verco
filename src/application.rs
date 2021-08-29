@@ -227,4 +227,3 @@ pub fn run(
         stdout.flush().unwrap();
     }
 }
-

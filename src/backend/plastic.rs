@@ -62,7 +62,8 @@ impl Backend for Plastic {
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
         if entries.is_empty() {
-            let untracked = Process::spawn("cm", &["status", "--private"])?.wait()?;
+            let untracked =
+                Process::spawn("cm", &["status", "--private"])?.wait()?;
             // pass to stdin??
             Process::spawn("cm", &["add", "-"])?.wait()?;
             Process::spawn("cm", &["checkin", "--all"])?.wait()?;
@@ -446,4 +447,3 @@ fn parse_file_status(s: &str) -> FileStatus {
     }
     */
 }
-
