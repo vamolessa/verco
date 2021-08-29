@@ -114,6 +114,11 @@ impl Drawer {
         self.buf.push(b' ');
         self.buf.extend_from_slice(info.name.as_bytes());
         self.buf.push(b' ');
+
+        let size = crate::platform::Platform::terminal_size();
+        use std::io::Write;
+        write!(self.buf, " {:?} {:?}", self.viewport_size, size).unwrap();
+
         set_background_color(&mut self.buf, background_color);
         clear_until_new_line(&mut self.buf);
         move_cursor_to_next_line(&mut self.buf);
@@ -221,3 +226,4 @@ impl Drawer {
         }
     }
 }
+

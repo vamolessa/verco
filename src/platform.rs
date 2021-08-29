@@ -288,7 +288,7 @@ impl PlatformEventReader {
             flags: libc::EV_ADD,
             fflags: 0,
             data: 0,
-            udata: 0,
+            udata: 0 as _,
         };
         let resize_event = libc::kevent {
             ident: libc::SIGWINCH as _,
@@ -296,7 +296,7 @@ impl PlatformEventReader {
             flags: libc::EV_ADD,
             fflags: 0,
             data: 0,
-            udata: 1,
+            udata: 1 as _,
         };
 
         fn modify_kqueue(kqueue_fd: RawFd, event: &libc::kevent) -> bool {
@@ -405,7 +405,7 @@ impl PlatformEventReader {
                     }
                 }
                 Ok(TriggeredEvent { index: 1, .. }) => {
-                    *resize = Some(Platform::get_terminal_size())
+                    *resize = Some(Platform::terminal_size())
                 }
                 Ok(_) => unreachable!(),
                 Err(()) => break,
@@ -416,7 +416,20 @@ impl PlatformEventReader {
     // ========================================================= COMMON
 
     pub fn errno() -> libc::c_int {
-        unsafe { *libc::__errno_location() }
+        #[cfg(target_os = "linux")]
+        unsafe {
+            *libc::__errno_location()
+        }
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "dragonfly",
+        ))]
+        unsafe {
+            *libc::__error()
+        }
     }
 
     pub fn read(fd: RawFd, buf: &mut [u8]) -> Result<usize, ()> {
@@ -705,3 +718,4 @@ impl PlatformEventReader {
         }
     }
 }
+
