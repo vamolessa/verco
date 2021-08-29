@@ -8,7 +8,7 @@ use std::{
 use crate::{
     backend::Backend,
     mode::{self, ModeContext, ModeKind, ModeResponse},
-    platform::{Key, Platform},
+    platform::{Key, Platform, PlatformEventReader},
     ui::Drawer,
 };
 
@@ -36,14 +36,17 @@ impl EventSender {
     }
 }
 
-fn console_events_loop(sender: mpsc::SyncSender<Event>) {
+fn console_events_loop(
+    platform_event_reader: PlatformEventReader,
+    sender: mpsc::SyncSender<Event>,
+) {
     let mut keys = Vec::new();
 
     loop {
         keys.clear();
         let mut resize = None;
 
-        Platform::read_terminal_events(&mut keys, &mut resize);
+        platform_event_reader.read_terminal_events(&mut keys, &mut resize);
 
         for &key in &keys {
             if sender.send(Event::Key(key)).is_err() {
@@ -165,7 +168,10 @@ impl Application {
     }
 }
 
-pub fn run(backend: Arc<dyn Backend>) {
+pub fn run(
+    platform_event_reader: PlatformEventReader,
+    backend: Arc<dyn Backend>,
+) {
     let viewport_size = Platform::terminal_size();
 
     let (event_sender, event_receiver) = mpsc::sync_channel(1);
@@ -179,7 +185,9 @@ pub fn run(backend: Arc<dyn Backend>) {
     let mut application = Application::default();
     application.enter_mode(&ctx, ModeKind::default());
 
-    thread::spawn(|| console_events_loop(event_sender));
+    thread::spawn(move || {
+        console_events_loop(platform_event_reader, event_sender)
+    });
 
     let stdout = io::stdout();
     let mut stdout = stdout.lock();

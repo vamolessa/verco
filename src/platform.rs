@@ -58,49 +58,178 @@ impl Key {
     }
 }
 
-pub struct Platform;
-
 // ========================================================= UNIX
 
 #[cfg(unix)]
-pub struct PlatformInitGuard;
+pub struct Platform {
+    original: libc::termios,
+}
 
 #[cfg(unix)]
 impl Platform {
-    pub fn init() -> Option<PlatformInitGuard> {
-        todo!();
-        None
+    pub fn new() -> Option<(Self, PlatformEventReader)> {
+        let is_pipped = unsafe { libc::isatty(libc::STDIN_FILENO) == 0 };
+        if is_pipped {
+            return None;
+        }
+
+        let original = unsafe {
+            let mut original = std::mem::zeroed();
+            libc::tcgetattr(libc::STDIN_FILENO, &mut original);
+            let mut new = original.clone();
+            new.c_iflag &= !(libc::IGNBRK
+                | libc::BRKINT
+                | libc::PARMRK
+                | libc::ISTRIP
+                | libc::INLCR
+                | libc::IGNCR
+                | libc::ICRNL
+                | libc::IXON);
+            new.c_oflag &= !libc::OPOST;
+            new.c_cflag &= !(libc::CSIZE | libc::PARENB);
+            new.c_cflag |= libc::CS8;
+            new.c_lflag &=
+                !(libc::ECHO | libc::ICANON | libc::ISIG | libc::IEXTEN);
+            new.c_lflag |= libc::NOFLSH;
+            new.c_cc[libc::VMIN] = 0;
+            new.c_cc[libc::VTIME] = 0;
+            libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &new);
+            original
+        };
+        let backspace_code = original.c_cc[libc::VERASE];
+
+        Some((Self { original }, PlatformEventReader { backspace_code }))
     }
 
     pub fn terminal_size() -> (u16, u16) {
-        todo!();
-    }
+        let mut size: libc::winsize = unsafe { std::mem::zeroed() };
+        let result = unsafe {
+            libc::ioctl(
+                libc::STDOUT_FILENO,
+                libc::TIOCGWINSZ as _,
+                &mut size as *mut libc::winsize,
+            )
+        };
+        if result == -1 || size.ws_col == 0 {
+            panic!("could not get terminal size");
+        }
 
+        (size.ws_col as _, size.ws_row as _)
+    }
+}
+
+#[cfg(unix)]
+impl Drop for Platform {
+    fn drop(&mut self) {
+        unsafe {
+            libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &self.original)
+        };
+    }
+}
+
+#[cfg(unix)]
+pub struct PlatformEventReader {
+    backspace_code: u8,
+}
+
+#[cfg(unix)]
+impl PlatformEventReader {
+    #[cfg(target_os = "linux")]
     pub fn read_terminal_events(
+        &self,
         keys: &mut Vec<Key>,
         resize: &mut Option<(u16, u16)>,
     ) {
-        todo!();
+        //
     }
-}
-#[cfg(unix)]
-impl Drop for PlatformInitGuard {
-    fn drop(&mut self) {
-        todo!();
+
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "dragonfly",
+    ))]
+    pub fn read_terminal_events(
+        &self,
+        keys: &mut Vec<Key>,
+        resize: &mut Option<(u16, u16)>,
+    ) {
+        //
+    }
+
+    fn parse_terminal_keys(
+        mut buf: &[u8],
+        backspace_code: u8,
+        keys: &mut Vec<Key>,
+    ) {
+        loop {
+            let (key, rest) = match buf {
+                &[] => break,
+                &[b, ref rest @ ..] if b == backspace_code => {
+                    (Key::Backspace, rest)
+                }
+                &[0x1b, b'[', b'5', b'~', ref rest @ ..] => (Key::PageUp, rest),
+                &[0x1b, b'[', b'6', b'~', ref rest @ ..] => {
+                    (Key::PageDown, rest)
+                }
+                &[0x1b, b'[', b'A', ref rest @ ..] => (Key::Up, rest),
+                &[0x1b, b'[', b'B', ref rest @ ..] => (Key::Down, rest),
+                &[0x1b, b'[', b'C', ref rest @ ..] => (Key::Right, rest),
+                &[0x1b, b'[', b'D', ref rest @ ..] => (Key::Left, rest),
+                &[0x1b, b'[', b'1', b'~', ref rest @ ..]
+                | &[0x1b, b'[', b'7', b'~', ref rest @ ..]
+                | &[0x1b, b'[', b'H', ref rest @ ..]
+                | &[0x1b, b'O', b'H', ref rest @ ..] => (Key::Home, rest),
+                &[0x1b, b'[', b'4', b'~', ref rest @ ..]
+                | &[0x1b, b'[', b'8', b'~', ref rest @ ..]
+                | &[0x1b, b'[', b'F', ref rest @ ..]
+                | &[0x1b, b'O', b'F', ref rest @ ..] => (Key::End, rest),
+                &[0x1b, b'[', b'3', b'~', ref rest @ ..] => (Key::Delete, rest),
+                &[0x1b, ref rest @ ..] => (Key::Esc, rest),
+                &[0x8, ref rest @ ..] => (Key::Backspace, rest),
+                &[b'\r', ref rest @ ..] => (Key::Enter, rest),
+                &[b'\t', ref rest @ ..] => (Key::Tab, rest),
+                &[0x7f, ref rest @ ..] => (Key::Delete, rest),
+                &[b @ 0b0..=0b11111, ref rest @ ..] => {
+                    let byte = b | 0b01100000;
+                    (Key::Ctrl(byte as _), rest)
+                }
+                _ => match buf
+                    .iter()
+                    .position(|b| b.is_ascii())
+                    .unwrap_or(buf.len())
+                {
+                    0 => (Key::Char(buf[0] as _), &buf[1..]),
+                    len => {
+                        let (c, rest) = buf.split_at(len);
+                        match std::str::from_utf8(c) {
+                            Ok(s) => match s.chars().next() {
+                                Some(c) => (Key::Char(c), rest),
+                                None => (Key::None, rest),
+                            },
+                            Err(_) => (Key::None, rest),
+                        }
+                    }
+                },
+            };
+            buf = rest;
+            keys.push(key);
+        }
     }
 }
 
 // ========================================================= WINDOWS
 
 #[cfg(windows)]
-pub struct PlatformInitGuard {
+pub struct Platform {
     input_handle_original_mode: DWORD,
     output_handle_original_mode: DWORD,
 }
 
 #[cfg(windows)]
 impl Platform {
-    pub fn init() -> Option<PlatformInitGuard> {
+    pub fn new() -> Option<(Self, PlatformEventReader)> {
         let input_handle = Self::get_std_handle(STD_INPUT_HANDLE)?;
         let output_handle = Self::get_std_handle(STD_OUTPUT_HANDLE)?;
 
@@ -116,10 +245,13 @@ impl Platform {
             ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING,
         );
 
-        Some(PlatformInitGuard {
-            input_handle_original_mode,
-            output_handle_original_mode,
-        })
+        Some((
+            Self {
+                input_handle_original_mode,
+                output_handle_original_mode,
+            },
+            PlatformEventReader,
+        ))
     }
 
     pub fn terminal_size() -> (u16, u16) {
@@ -138,7 +270,55 @@ impl Platform {
         (console_info.dwSize.X as _, console_info.dwSize.Y as _)
     }
 
+    fn get_std_handle(which: DWORD) -> Option<HANDLE> {
+        let handle = unsafe { GetStdHandle(which) };
+        if handle != NULL && handle != INVALID_HANDLE_VALUE {
+            Some(handle)
+        } else {
+            None
+        }
+    }
+
+    fn set_console_mode(handle: HANDLE, mode: DWORD) {
+        let result = unsafe { SetConsoleMode(handle, mode) };
+        if result == FALSE {
+            panic!("could not set console mode");
+        }
+    }
+
+    fn swap_console_mode(handle: HANDLE, new_mode: DWORD) -> DWORD {
+        let mut original_mode = 0;
+        let result = unsafe { GetConsoleMode(handle, &mut original_mode) };
+        if result == FALSE {
+            panic!("could not get console mode");
+        }
+        Self::set_console_mode(handle, new_mode);
+        original_mode
+    }
+}
+
+#[cfg(windows)]
+impl Drop for Platform {
+    fn drop(&mut self) {
+        if let Some(handle) = Platform::get_std_handle(STD_INPUT_HANDLE) {
+            Platform::set_console_mode(handle, self.input_handle_original_mode);
+        }
+        if let Some(handle) = Platform::get_std_handle(STD_OUTPUT_HANDLE) {
+            Platform::set_console_mode(
+                handle,
+                self.output_handle_original_mode,
+            );
+        }
+    }
+}
+
+#[cfg(windows)]
+pub struct PlatformEventReader;
+
+#[cfg(windows)]
+impl PlatformEventReader {
     pub fn read_terminal_events(
+        &self,
         keys: &mut Vec<Key>,
         resize: &mut Option<(u16, u16)>,
     ) {
@@ -245,46 +425,6 @@ impl Platform {
                 }
                 _ => (),
             }
-        }
-    }
-
-    fn get_std_handle(which: DWORD) -> Option<HANDLE> {
-        let handle = unsafe { GetStdHandle(which) };
-        if handle != NULL && handle != INVALID_HANDLE_VALUE {
-            Some(handle)
-        } else {
-            None
-        }
-    }
-
-    fn set_console_mode(handle: HANDLE, mode: DWORD) {
-        let result = unsafe { SetConsoleMode(handle, mode) };
-        if result == FALSE {
-            panic!("could not set console mode");
-        }
-    }
-
-    fn swap_console_mode(handle: HANDLE, new_mode: DWORD) -> DWORD {
-        let mut original_mode = 0;
-        let result = unsafe { GetConsoleMode(handle, &mut original_mode) };
-        if result == FALSE {
-            panic!("could not get console mode");
-        }
-        Self::set_console_mode(handle, new_mode);
-        original_mode
-    }
-}
-#[cfg(windows)]
-impl Drop for PlatformInitGuard {
-    fn drop(&mut self) {
-        if let Some(handle) = Platform::get_std_handle(STD_INPUT_HANDLE) {
-            Platform::set_console_mode(handle, self.input_handle_original_mode);
-        }
-        if let Some(handle) = Platform::get_std_handle(STD_OUTPUT_HANDLE) {
-            Platform::set_console_mode(
-                handle,
-                self.output_handle_original_mode,
-            );
         }
     }
 }

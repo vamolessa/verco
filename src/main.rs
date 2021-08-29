@@ -44,8 +44,8 @@ fn main() {
         return;
     }
 
-    let _init = match platform::Platform::init() {
-        Some(init) => init,
+    let (_platform, platform_event_reader) = match platform::Platform::new() {
+        Some(platform) => platform,
         None => return,
     };
 
@@ -62,7 +62,7 @@ fn main() {
         stdout.flush().unwrap();
     }
 
-    application::run(backend);
+    application::run(platform_event_reader, backend);
 
     {
         let stdout = std::io::stdout();
