@@ -1,7 +1,7 @@
 use std::thread;
 
 use crate::{
-    application::Key,
+    platform::Key,
     backend::{Backend, BackendResult, TagEntry},
     mode::{
         HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,

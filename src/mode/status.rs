@@ -1,7 +1,7 @@
 use std::thread;
 
 use crate::{
-    application::Key,
+    platform::Key,
     backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
         HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
@@ -332,7 +332,7 @@ impl Mode {
                     if self.entries.is_empty() {
                         drawer.fmt(format_args!(
                             "{}nothing to commit!",
-                            Color::Yellow
+                            Color::DarkYellow
                         ));
                     }
                 }

@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use crate::{
-    application::{EventSender, Key},
-    backend::Backend,
-};
+use crate::{application::EventSender, backend::Backend, platform::Key};
 
 pub mod branches;
 pub mod log;

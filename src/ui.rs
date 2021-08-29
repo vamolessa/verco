@@ -1,25 +1,73 @@
 use std::fmt;
 
-use crossterm::{self, cursor, style, terminal};
-
 use crate::mode::{HeaderInfo, Output, ReadLine, SelectMenu};
 
+pub static ENTER_ALTERNATE_BUFFER_CODE: &[u8] = b"\x1b[?1049h";
+pub static EXIT_ALTERNATE_BUFFER_CODE: &[u8] = b"\x1b[?1049l";
+pub static HIDE_CURSOR_CODE: &[u8] = b"\x1b[?25l";
+pub static SHOW_CURSOR_CODE: &[u8] = b"\x1b[?25h";
+pub static RESET_STYLE_CODE: &[u8] = b"\x1b[0;49m";
+pub static BEGIN_TITLE_CODE: &[u8] = b"\x1b]0;";
+pub static END_TITLE_CODE: &[u8] = b"\x07";
+
+pub fn clear_until_new_line(buf: &mut Vec<u8>) {
+    buf.extend_from_slice(b"\x1b[0K");
+}
+
+pub fn clear_to_end(buf: &mut Vec<u8>) {
+    buf.extend_from_slice(b"\x1b[0J");
+}
+
+pub fn move_cursor_to_zero(buf: &mut Vec<u8>) {
+    buf.extend_from_slice(b"\x1b[0;0H");
+}
+
+pub fn move_cursor_to_next_line(buf: &mut Vec<u8>) {
+    buf.extend_from_slice(b"\x1b[1E");
+}
+
+pub fn set_background_color(buf: &mut Vec<u8>, color: Color) {
+    buf.extend_from_slice(b"\x1b[48;5;");
+    buf.extend_from_slice(color.code().as_bytes());
+    buf.push(b'm');
+}
+
+static BEGIN_FOREGROUND_COLOR_CODE: &str = "\x1b[38;5;";
+pub fn set_foreground_color(buf: &mut Vec<u8>, color: Color) {
+    buf.extend_from_slice(BEGIN_FOREGROUND_COLOR_CODE.as_bytes());
+    buf.extend_from_slice(color.code().as_bytes());
+    buf.push(b'm');
+}
+
+#[derive(Clone, Copy)]
 pub enum Color {
+    Black,
+    DarkRed,
+    DarkGreen,
+    DarkYellow,
+    DarkBlue,
+    DarkMagenta,
     White,
-    Red,
-    Green,
-    Blue,
-    Yellow,
+}
+impl Color {
+    fn code(&self) -> &str {
+        match self {
+            Self::Black => "0",
+            Self::DarkRed => "1",
+            Self::DarkGreen => "2",
+            Self::DarkYellow => "3",
+            Self::DarkBlue => "4",
+            Self::DarkMagenta => "5",
+            Self::White => "15",
+        }
+    }
 }
 impl fmt::Display for Color {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::White => f.write_str("\x1b[38;5;15m"),
-            Self::Red => f.write_str("\x1b[38;5;1m"),
-            Self::Green => f.write_str("\x1b[38;5;2m"),
-            Self::Blue => f.write_str("\x1b[38;5;4m"),
-            Self::Yellow => f.write_str("\x1b[38;5;3m"),
-        }
+        f.write_str(BEGIN_FOREGROUND_COLOR_CODE)?;
+        f.write_str(self.code())?;
+        f.write_str("m")?;
+        Ok(())
     }
 }
 
@@ -43,43 +91,33 @@ impl Drawer {
     }
 
     pub fn clear_to_bottom(&mut self) {
-        crossterm::queue!(
-            self.buf,
-            style::SetBackgroundColor(style::Color::Black),
-            terminal::Clear(terminal::ClearType::FromCursorDown),
-        )
-        .unwrap();
+        set_background_color(&mut self.buf, Color::Black);
+        clear_to_end(&mut self.buf);
     }
 
     pub fn header(&mut self, info: HeaderInfo, spinner_state: u8) {
-        let background_color = style::Color::DarkYellow;
-        let foreground_color = style::Color::Black;
+        let background_color = Color::DarkYellow;
+        let foreground_color = Color::Black;
 
-        let spinner = ['-', '\\', '|', '/'];
+        let spinner = [b'-', b'\\', b'|', b'/'];
         let spinner = match info.waiting_response {
             true => spinner[spinner_state as usize % spinner.len()],
-            false => ' ',
+            false => b' ',
         };
 
-        crossterm::queue!(
-            self.buf,
-            cursor::MoveTo(0, 0),
-            style::SetBackgroundColor(background_color),
-            style::SetForegroundColor(foreground_color),
-            style::Print(' '),
-            style::Print(spinner),
-            style::Print(' '),
-            style::SetBackgroundColor(foreground_color),
-            style::SetForegroundColor(background_color),
-            style::Print(' '),
-            style::Print(info.name),
-            style::Print(' '),
-            style::SetBackgroundColor(background_color),
-            terminal::Clear(terminal::ClearType::UntilNewLine),
-            cursor::MoveToNextLine(1),
-            style::ResetColor,
-        )
-        .unwrap();
+        move_cursor_to_zero(&mut self.buf);
+        set_background_color(&mut self.buf, background_color);
+        set_foreground_color(&mut self.buf, foreground_color);
+        self.buf.extend_from_slice(&[b' ', spinner, b' ']);
+        set_background_color(&mut self.buf, foreground_color);
+        set_foreground_color(&mut self.buf, background_color);
+        self.buf.push(b' ');
+        self.buf.extend_from_slice(info.name.as_bytes());
+        self.buf.push(b' ');
+        set_background_color(&mut self.buf, background_color);
+        clear_until_new_line(&mut self.buf);
+        move_cursor_to_next_line(&mut self.buf);
+        self.buf.extend_from_slice(RESET_STYLE_CODE);
     }
 
     pub fn str(&mut self, line: &str) {
@@ -92,12 +130,8 @@ impl Drawer {
     }
 
     pub fn next_line(&mut self) {
-        crossterm::queue!(
-            self.buf,
-            terminal::Clear(terminal::ClearType::UntilNewLine),
-            cursor::MoveToNextLine(1),
-        )
-        .unwrap();
+        clear_until_new_line(&mut self.buf);
+        move_cursor_to_next_line(&mut self.buf);
     }
 
     pub fn output(&mut self, output: &Output) -> usize {
@@ -138,16 +172,12 @@ impl Drawer {
     }
 
     pub fn readline(&mut self, readline: &ReadLine) {
-        crossterm::queue!(
-            self.buf,
-            style::SetBackgroundColor(style::Color::Black),
-            style::SetForegroundColor(style::Color::White),
-            style::Print(readline.input()),
-            style::SetBackgroundColor(style::Color::DarkRed),
-            style::Print(' '),
-            style::SetBackgroundColor(style::Color::Black),
-        )
-        .unwrap();
+        set_background_color(&mut self.buf, Color::Black);
+        set_foreground_color(&mut self.buf, Color::White);
+        self.buf.extend_from_slice(readline.input().as_bytes());
+        set_background_color(&mut self.buf, Color::DarkRed);
+        self.buf.push(b' ');
+        set_background_color(&mut self.buf, Color::Black);
     }
 
     pub fn select_menu<'entries, I, E>(
@@ -162,12 +192,8 @@ impl Drawer {
     {
         let cursor_index = select.cursor();
 
-        crossterm::queue!(
-            self.buf,
-            style::SetBackgroundColor(style::Color::Black),
-            style::SetForegroundColor(style::Color::White),
-        )
-        .unwrap();
+        set_background_color(&mut self.buf, Color::Black);
+        set_foreground_color(&mut self.buf, Color::White);
 
         let mut line_count = 0;
         let max_line_count =
@@ -176,29 +202,17 @@ impl Drawer {
         for (i, entry) in entries.enumerate().skip(select.scroll()) {
             let hovered = i == cursor_index;
             if hovered {
-                crossterm::queue!(
-                    self.buf,
-                    style::SetBackgroundColor(style::Color::DarkMagenta),
-                )
-                .unwrap();
+                set_background_color(&mut self.buf, Color::DarkMagenta);
             }
 
             line_count +=
                 entry.draw(self, hovered, hovered && show_full_hovered_entry);
 
-            crossterm::queue!(
-                self.buf,
-                terminal::Clear(terminal::ClearType::UntilNewLine),
-                cursor::MoveToNextLine(1),
-            )
-            .unwrap();
+            clear_until_new_line(&mut self.buf);
+            move_cursor_to_next_line(&mut self.buf);
 
             if hovered {
-                crossterm::queue!(
-                    self.buf,
-                    style::SetBackgroundColor(style::Color::Black),
-                )
-                .unwrap();
+                set_background_color(&mut self.buf, Color::Black);
             }
 
             if line_count >= max_line_count {

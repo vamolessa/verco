@@ -3,6 +3,7 @@ use std::{env, io::Write};
 mod application;
 mod backend;
 mod mode;
+mod platform;
 mod ui;
 
 fn main() {
@@ -30,7 +31,7 @@ fn main() {
         return;
     }
 
-    if !crossterm::tty::IsTty::is_tty(&std::io::stdin()) {
+    if platform::Platform::is_pipped() {
         eprintln!("not tty");
         return;
     }
@@ -51,16 +52,15 @@ fn main() {
     {
         let stdout = std::io::stdout();
         let mut stdout = stdout.lock();
-        crossterm::execute!(
-            &mut stdout,
-            crossterm::terminal::SetTitle(root.as_os_str().to_string_lossy()),
-            crossterm::terminal::EnterAlternateScreen,
-            crossterm::cursor::Hide,
-        )
-        .unwrap();
-        crossterm::terminal::enable_raw_mode().unwrap();
+        stdout.write_all(ui::BEGIN_TITLE_CODE).unwrap();
+        stdout.write_all(root.as_os_str().to_string_lossy().as_bytes()).unwrap();
+        stdout.write_all(ui::END_TITLE_CODE).unwrap();
+        stdout.write_all(ui::ENTER_ALTERNATE_BUFFER_CODE).unwrap();
+        stdout.write_all(ui::HIDE_CURSOR_CODE).unwrap();
         stdout.flush().unwrap();
     }
+
+    platform::Platform::init();
 
     ctrlc::set_handler(|| {}).unwrap();
     application::run(backend);
@@ -68,14 +68,10 @@ fn main() {
     {
         let stdout = std::io::stdout();
         let mut stdout = stdout.lock();
-        crossterm::execute!(
-            &mut stdout,
-            crossterm::style::ResetColor,
-            crossterm::cursor::Show,
-            crossterm::terminal::LeaveAlternateScreen,
-        )
-        .unwrap();
-        crossterm::terminal::disable_raw_mode().unwrap();
+        stdout.write_all(ui::RESET_STYLE_CODE).unwrap();
+        stdout.write_all(ui::SHOW_CURSOR_CODE).unwrap();
+        stdout.write_all(ui::EXIT_ALTERNATE_BUFFER_CODE).unwrap();
+        stdout.flush().unwrap();
     }
 }
 

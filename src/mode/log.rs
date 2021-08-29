@@ -1,7 +1,7 @@
 use std::thread;
 
 use crate::{
-    application::Key,
+    platform::Key,
     backend::{Backend, BackendResult, LogEntry},
     mode::{
         HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
@@ -96,13 +96,13 @@ impl SelectEntryDraw for LogEntry {
             "{}{} {}{} {}{} {}{} {}{}{}{}{}",
             color(Color::White, hovered),
             &self.graph,
-            color(Color::Yellow, hovered),
+            color(Color::DarkYellow, hovered),
             &self.hash,
-            color(Color::Blue, hovered),
+            color(Color::DarkBlue, hovered),
             &self.date,
-            color(Color::Green, hovered),
+            color(Color::DarkGreen, hovered),
             author,
-            color(Color::Red, hovered),
+            color(Color::DarkRed, hovered),
             refs_begin,
             &self.refs,
             refs_end,

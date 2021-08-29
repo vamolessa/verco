@@ -1,7 +1,7 @@
 use std::thread;
 
 use crate::{
-    application::Key,
+    platform::Key,
     backend::{FileStatus, RevisionEntry, RevisionInfo},
     mode::{
         HeaderInfo, ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,

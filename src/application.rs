@@ -5,86 +5,12 @@ use std::{
     time::Duration,
 };
 
-use crossterm::{event, terminal};
-
 use crate::{
     backend::Backend,
     mode::{self, ModeContext, ModeKind, ModeResponse},
+    platform::{Key, PlatformEvent, Platform},
     ui::Drawer,
 };
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Key {
-    None,
-    Backspace,
-    Enter,
-    Left,
-    Right,
-    Up,
-    Down,
-    Home,
-    End,
-    PageUp,
-    PageDown,
-    Tab,
-    BackTab,
-    Delete,
-    Insert,
-    Char(char),
-    Ctrl(char),
-    Esc,
-}
-impl Key {
-    pub fn from_key_event(ev: event::KeyEvent) -> Self {
-        match ev.code {
-            event::KeyCode::Backspace => Self::Backspace,
-            event::KeyCode::Enter => Self::Enter,
-            event::KeyCode::Left => Self::Left,
-            event::KeyCode::Right => Self::Right,
-            event::KeyCode::Up => Self::Up,
-            event::KeyCode::Down => Self::Down,
-            event::KeyCode::Home => Self::Home,
-            event::KeyCode::End => Self::End,
-            event::KeyCode::PageUp => Self::PageUp,
-            event::KeyCode::PageDown => Self::PageDown,
-            event::KeyCode::Tab => Self::Tab,
-            event::KeyCode::BackTab => Self::BackTab,
-            event::KeyCode::Delete => Self::Delete,
-            event::KeyCode::Insert => Self::Insert,
-            event::KeyCode::F(_) => Self::None,
-            event::KeyCode::Char(mut c) => {
-                if ev.modifiers & event::KeyModifiers::ALT
-                    != event::KeyModifiers::NONE
-                {
-                    return Self::None;
-                }
-
-                if ev.modifiers & event::KeyModifiers::SHIFT
-                    != event::KeyModifiers::NONE
-                {
-                    c = c.to_ascii_uppercase();
-                }
-                if ev.modifiers & event::KeyModifiers::CONTROL
-                    != event::KeyModifiers::NONE
-                {
-                    Self::Ctrl(c)
-                } else {
-                    Self::Char(c)
-                }
-            }
-            event::KeyCode::Null => Self::None,
-            event::KeyCode::Esc => Self::Esc,
-        }
-    }
-
-    pub fn is_submit(&self) -> bool {
-        matches!(self, Self::Enter | Self::Char('\n') | Self::Ctrl('m'))
-    }
-
-    pub fn is_cancel(&self) -> bool {
-        matches!(self, Self::Esc | Self::Ctrl('c'))
-    }
-}
 
 enum Event {
     Key(Key),
@@ -112,19 +38,15 @@ impl EventSender {
 
 fn console_events_loop(sender: mpsc::SyncSender<Event>) {
     loop {
-        let event = match event::read() {
-            Ok(event) => event,
-            Err(_) => break,
-        };
+        let event = Platform::next_terminal_event();
         match event {
-            event::Event::Key(key) => {
-                let event = Event::Key(Key::from_key_event(key));
+            PlatformEvent::Key(key) => {
+                let event = Event::Key(key);
                 if sender.send(event).is_err() {
                     break;
                 }
             }
-            event::Event::Mouse(_) => (),
-            event::Event::Resize(width, height) => {
+            PlatformEvent::Resize(width, height) => {
                 let event = Event::Resize(width, height);
                 if sender.send(event).is_err() {
                     break;
@@ -242,10 +164,7 @@ impl Application {
 }
 
 pub fn run(backend: Arc<dyn Backend>) {
-    let viewport_size = match terminal::size() {
-        Ok((width, height)) => (width, height),
-        Err(_) => return,
-    };
+    let viewport_size = Platform::terminal_size();
 
     let (event_sender, event_receiver) = mpsc::sync_channel(1);
 
