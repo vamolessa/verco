@@ -31,11 +31,6 @@ fn main() {
         return;
     }
 
-    if platform::Platform::is_pipped() {
-        eprintln!("not tty");
-        return;
-    }
-
     let (root, backend) = match backend::backend_from_current_repository() {
         Some((root, backend)) => (root, backend),
         None => {
@@ -49,20 +44,24 @@ fn main() {
         return;
     }
 
+    let _init = match platform::Platform::init() {
+        Some(init) => init,
+        None => return,
+    };
+
     {
         let stdout = std::io::stdout();
         let mut stdout = stdout.lock();
         stdout.write_all(ui::BEGIN_TITLE_CODE).unwrap();
-        stdout.write_all(root.as_os_str().to_string_lossy().as_bytes()).unwrap();
+        stdout
+            .write_all(root.as_os_str().to_string_lossy().as_bytes())
+            .unwrap();
         stdout.write_all(ui::END_TITLE_CODE).unwrap();
         stdout.write_all(ui::ENTER_ALTERNATE_BUFFER_CODE).unwrap();
         stdout.write_all(ui::HIDE_CURSOR_CODE).unwrap();
         stdout.flush().unwrap();
     }
 
-    platform::Platform::init();
-
-    ctrlc::set_handler(|| {}).unwrap();
     application::run(backend);
 
     {

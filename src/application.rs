@@ -8,7 +8,7 @@ use std::{
 use crate::{
     backend::Backend,
     mode::{self, ModeContext, ModeKind, ModeResponse},
-    platform::{Key, PlatformEvent, Platform},
+    platform::{Key, Platform},
     ui::Drawer,
 };
 
@@ -37,20 +37,22 @@ impl EventSender {
 }
 
 fn console_events_loop(sender: mpsc::SyncSender<Event>) {
+    let mut keys = Vec::new();
+
     loop {
-        let event = Platform::next_terminal_event();
-        match event {
-            PlatformEvent::Key(key) => {
-                let event = Event::Key(key);
-                if sender.send(event).is_err() {
-                    break;
-                }
+        keys.clear();
+        let mut resize = None;
+
+        Platform::read_terminal_events(&mut keys, &mut resize);
+
+        for &key in &keys {
+            if sender.send(Event::Key(key)).is_err() {
+                break;
             }
-            PlatformEvent::Resize(width, height) => {
-                let event = Event::Resize(width, height);
-                if sender.send(event).is_err() {
-                    break;
-                }
+        }
+        if let Some(resize) = resize {
+            if sender.send(Event::Resize(resize.0, resize.1)).is_err() {
+                break;
             }
         }
     }
