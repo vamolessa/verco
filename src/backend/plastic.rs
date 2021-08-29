@@ -55,20 +55,38 @@ impl Backend for Plastic {
         Ok(StatusInfo { header, entries })
     }
 
+    // TODO: stopped here
     fn commit(
         &self,
         message: &str,
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["add", "--all"])?.wait()?;
+            let untracked = Process::spawn("cm", &["status", "--private"])?.wait()?;
+            // pass to stdin??
+            Process::spawn("cm", &["add", "-"])?.wait()?;
+            Process::spawn("cm", &["checkin", "--all"])?.wait()?;
         } else {
+            let mut args = Vec::new();
+            args.push("add");
             for entry in entries {
-                Process::spawn("git", &["add", "--", &entry.name])?.wait()?;
+                if let FileStatus::Untracked = entry.status {
+                    args.push(&entry.name);
+                }
             }
+            if args.len() > 1 {
+                Process::spawn("cm", &args)?.wait()?;
+            }
+
+            args.clear();
+            args.push("checkin");
+            for entry in entries {
+                args.push(&entry.name);
+            }
+            Process::spawn("cm", &args)?.wait()?;
+            Process::spawn("cm", &["commit", "-m", message])?.wait()?;
         }
 
-        Process::spawn("git", &["commit", "-m", message])?.wait()?;
         Ok(())
     }
 

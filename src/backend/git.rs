@@ -48,9 +48,14 @@ impl Backend for Git {
         if entries.is_empty() {
             Process::spawn("git", &["add", "--all"])?.wait()?;
         } else {
+            let mut args = Vec::new();
+            args.push("add");
+            args.push("--");
             for entry in entries {
-                Process::spawn("git", &["add", "--", &entry.name])?.wait()?;
+                args.push(&entry.name);
             }
+
+            Process::spawn("git", &args)?.wait()?;
         }
 
         Process::spawn("git", &["commit", "-m", message])?.wait()?;
