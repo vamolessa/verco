@@ -354,4 +354,3 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
-

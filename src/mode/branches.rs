@@ -3,8 +3,8 @@ use std::thread;
 use crate::{
     backend::{Backend, BackendResult, BranchEntry},
     mode::{
-        ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
-        ReadLine, SelectMenu,
+        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine,
+        SelectMenu,
     },
     platform::Key,
     ui::{Drawer, SelectEntryDraw},
@@ -255,4 +255,3 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
-

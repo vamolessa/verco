@@ -153,10 +153,7 @@ impl Application {
         }
     }
 
-    pub fn draw_header(
-        &mut self,
-        drawer: &mut Drawer,
-    ) {
+    pub fn draw_header(&mut self, drawer: &mut Drawer) {
         let spinner = [b'-', b'\\', b'|', b'/'];
         self.spinner_state = (self.spinner_state + 1) % spinner.len() as u8;
         let spinner = match self.is_waiting_response() {
@@ -270,4 +267,3 @@ pub fn run(
         stdout.flush().unwrap();
     }
 }
-

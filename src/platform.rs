@@ -724,4 +724,3 @@ impl PlatformEventReader {
         }
     }
 }
-
