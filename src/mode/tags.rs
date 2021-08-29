@@ -3,8 +3,8 @@ use std::thread;
 use crate::{
     backend::{Backend, BackendResult, TagEntry},
     mode::{
-        HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
-        ReadLine, SelectMenu,
+        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine,
+        SelectMenu,
     },
     platform::Key,
     ui::{Drawer, SelectEntryDraw},
@@ -159,28 +159,20 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> HeaderInfo {
+    pub fn is_waiting_response(&self) -> bool {
         match self.state {
-            State::Idle => HeaderInfo {
-                name: "tags",
-                waiting_response: false,
-            },
-            State::Waiting(WaitOperation::Refresh) => HeaderInfo {
-                name: "tags",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::New) => HeaderInfo {
-                name: "new tag",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Delete) => HeaderInfo {
-                name: "delete tag",
-                waiting_response: true,
-            },
-            State::NewNameInput => HeaderInfo {
-                name: "new tag name",
-                waiting_response: false,
-            },
+            State::Idle | State::NewNameInput => false,
+            State::Waiting(_) => true,
+        }
+    }
+
+    pub fn header(&self) -> &str {
+        match self.state {
+            State::Idle => "tags",
+            State::Waiting(WaitOperation::Refresh) => "tags",
+            State::Waiting(WaitOperation::New) => "new tag",
+            State::Waiting(WaitOperation::Delete) => "delete tag",
+            State::NewNameInput => "new tag name",
         }
     }
 
@@ -221,3 +213,4 @@ where
             .send_response(ModeResponse::Tags(Response::Refresh(result)));
     });
 }
+

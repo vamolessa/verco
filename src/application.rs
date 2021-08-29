@@ -141,17 +141,37 @@ impl Application {
         }
     }
 
-    pub fn draw_header(&mut self, drawer: &mut Drawer) {
-        self.spinner_state = self.spinner_state.wrapping_add(1);
+    pub fn is_waiting_response(&self) -> bool {
+        match &self.current_mode {
+            ModeKind::Status => self.status_mode.is_waiting_response(),
+            ModeKind::Log => self.log_mode.is_waiting_response(),
+            ModeKind::RevisionDetails(_) => {
+                self.revision_details_mode.is_waiting_response()
+            }
+            ModeKind::Branches => self.branches_mode.is_waiting_response(),
+            ModeKind::Tags => self.tags_mode.is_waiting_response(),
+        }
+    }
 
-        let header_info = match &self.current_mode {
+    pub fn draw_header(
+        &mut self,
+        drawer: &mut Drawer,
+    ) {
+        let spinner = [b'-', b'\\', b'|', b'/'];
+        self.spinner_state = (self.spinner_state + 1) % spinner.len() as u8;
+        let spinner = match self.is_waiting_response() {
+            true => spinner[self.spinner_state as usize],
+            false => b' ',
+        };
+
+        let header = match &self.current_mode {
             ModeKind::Status => self.status_mode.header(),
             ModeKind::Log => self.log_mode.header(),
             ModeKind::RevisionDetails(_) => self.revision_details_mode.header(),
             ModeKind::Branches => self.branches_mode.header(),
             ModeKind::Tags => self.tags_mode.header(),
         };
-        drawer.header(header_info, self.spinner_state);
+        drawer.header(header, spinner);
     }
 
     pub fn draw_body(&self, drawer: &mut Drawer) {
@@ -172,14 +192,12 @@ pub fn run(
     platform_event_reader: PlatformEventReader,
     backend: Arc<dyn Backend>,
 ) {
-    let viewport_size = Platform::terminal_size();
-
     let (event_sender, event_receiver) = mpsc::sync_channel(1);
 
     let mut ctx = ModeContext {
         backend,
         event_sender: EventSender(event_sender.clone()),
-        viewport_size,
+        viewport_size: Platform::terminal_size(),
     };
 
     let mut application = Application::default();
@@ -193,11 +211,26 @@ pub fn run(
     let mut stdout = stdout.lock();
     let mut stdout_buf = Vec::new();
 
+    let mut counter = 0;
+
+    const TIMEOUT: Duration = Duration::from_millis(100);
+
     loop {
         let mut draw_body = true;
 
-        let timeout = Duration::from_millis(100);
-        match event_receiver.recv_timeout(timeout) {
+        let is_waiting_response = application.is_waiting_response();
+
+        let event = if is_waiting_response {
+            event_receiver.recv_timeout(TIMEOUT)
+        } else {
+            event_receiver
+                .recv()
+                .map_err(|_| mpsc::RecvTimeoutError::Disconnected)
+        };
+
+        let event_disc = std::mem::discriminant(&event);
+        let mut is_resize = false;
+        match event {
             Ok(Event::Key(key)) => {
                 if !application.on_key(&ctx, key) {
                     break;
@@ -205,18 +238,28 @@ pub fn run(
             }
             Ok(Event::Resize(width, height)) => {
                 ctx.viewport_size = (width, height);
+                is_resize = true;
             }
             Ok(Event::Response(response)) => application.on_response(response),
             Ok(Event::ModeChange(mode)) => application.enter_mode(&ctx, mode),
             Ok(Event::ModeRefresh(mode)) => {
                 application.refresh_mode(&ctx, mode)
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => draw_body = false,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                draw_body = false;
+                counter += 1;
+            }
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
 
-        let mut drawer = Drawer::new(stdout_buf, viewport_size);
+        let mut drawer = Drawer::new(stdout_buf, ctx.viewport_size);
         application.draw_header(&mut drawer);
+        drawer.fmt(format_args!(
+            "{:?} {} is_resize: {} ",
+            event_disc, counter, is_resize
+        ));
+        drawer.next_line();
+
         if draw_body {
             application.draw_body(&mut drawer);
         }
@@ -227,3 +270,4 @@ pub fn run(
         stdout.flush().unwrap();
     }
 }
+

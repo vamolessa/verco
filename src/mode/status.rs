@@ -3,8 +3,8 @@ use std::thread;
 use crate::{
     backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
-        HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
-        ReadLine, SelectMenu, SelectMenuAction,
+        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine,
+        SelectMenu, SelectMenuAction,
     },
     platform::Key,
     ui::{Color, Drawer, SelectEntryDraw},
@@ -274,42 +274,28 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> HeaderInfo {
-        let empty_output = self.output.text().is_empty();
-
+    pub fn is_waiting_response(&self) -> bool {
         match self.state {
-            State::Idle => HeaderInfo {
-                name: "status",
-                waiting_response: false,
-            },
-            State::Waiting(WaitOperation::Refresh) => HeaderInfo {
-                name: "status",
-                waiting_response: true,
-            },
-            State::CommitMessageInput => HeaderInfo {
-                name: "commit message",
-                waiting_response: false,
-            },
-            State::Waiting(WaitOperation::Commit) => HeaderInfo {
-                name: "commit",
-                waiting_response: empty_output,
-            },
-            State::Waiting(WaitOperation::Discard) => HeaderInfo {
-                name: "discard",
-                waiting_response: empty_output,
-            },
-            State::Waiting(WaitOperation::ResolveTakingLocal) => HeaderInfo {
-                name: "resolve taking local",
-                waiting_response: empty_output,
-            },
-            State::Waiting(WaitOperation::ResolveTakingOther) => HeaderInfo {
-                name: "resolve taking other",
-                waiting_response: empty_output,
-            },
-            State::ViewDiff => HeaderInfo {
-                name: "diff",
-                waiting_response: empty_output,
-            },
+            State::Idle | State::CommitMessageInput => false,
+            State::Waiting(_) => true,
+            State::ViewDiff => self.output.text().is_empty(),
+        }
+    }
+
+    pub fn header(&self) -> &str {
+        match self.state {
+            State::Idle => "status",
+            State::Waiting(WaitOperation::Refresh) => "status",
+            State::CommitMessageInput => "commit message",
+            State::Waiting(WaitOperation::Commit) => "commit",
+            State::Waiting(WaitOperation::Discard) => "discard",
+            State::Waiting(WaitOperation::ResolveTakingLocal) => {
+                "resolve taking local"
+            }
+            State::Waiting(WaitOperation::ResolveTakingOther) => {
+                "resolve taking other"
+            }
+            State::ViewDiff => "diff",
         }
     }
 
@@ -368,3 +354,4 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+

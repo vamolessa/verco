@@ -3,7 +3,7 @@ use std::thread;
 use crate::{
     backend::{Backend, BackendResult, BranchEntry},
     mode::{
-        HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
+        ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
         ReadLine, SelectMenu,
     },
     platform::Key,
@@ -200,32 +200,21 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> HeaderInfo {
+    pub fn is_waiting_response(&self) -> bool {
         match self.state {
-            State::Idle => HeaderInfo {
-                name: "branches",
-                waiting_response: false,
-            },
-            State::Waiting(WaitOperation::Refresh) => HeaderInfo {
-                name: "branches",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::New) => HeaderInfo {
-                name: "new branch",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Delete) => HeaderInfo {
-                name: "delete branch",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Merge) => HeaderInfo {
-                name: "merge branch",
-                waiting_response: true,
-            },
-            State::NewNameInput => HeaderInfo {
-                name: "new branch name",
-                waiting_response: false,
-            },
+            State::Idle | State::NewNameInput => false,
+            State::Waiting(_) => true,
+        }
+    }
+
+    pub fn header(&self) -> &str {
+        match self.state {
+            State::Idle => "branches",
+            State::Waiting(WaitOperation::Refresh) => "branches",
+            State::Waiting(WaitOperation::New) => "new branch",
+            State::Waiting(WaitOperation::Delete) => "delete branch",
+            State::Waiting(WaitOperation::Merge) => "merge branch",
+            State::NewNameInput => "new branch name",
         }
     }
 
@@ -266,3 +255,4 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
+

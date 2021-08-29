@@ -3,7 +3,7 @@ use std::thread;
 use crate::{
     backend::{FileStatus, RevisionEntry, RevisionInfo},
     mode::{
-        HeaderInfo, ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,
+        ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,
         SelectMenuAction,
     },
     platform::Key,
@@ -193,20 +193,19 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> HeaderInfo {
+    pub fn is_waiting_response(&self) -> bool {
         match self.state {
-            State::Idle => HeaderInfo {
-                name: "revision details",
-                waiting_response: false,
-            },
-            State::Waiting => HeaderInfo {
-                name: "revision details",
-                waiting_response: true,
-            },
-            State::ViewDiff => HeaderInfo {
-                name: "diff",
-                waiting_response: self.output.text().is_empty(),
-            },
+            State::Idle => false,
+            State::Waiting => true,
+            State::ViewDiff => self.output.text().is_empty(),
+        }
+    }
+
+    pub fn header(&self) -> &str {
+        match self.state {
+            State::Idle => "revision details",
+            State::Waiting => "revision details",
+            State::ViewDiff => "diff",
         }
     }
 
@@ -240,3 +239,4 @@ impl Mode {
         }
     }
 }
+

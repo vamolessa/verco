@@ -3,8 +3,7 @@ use std::thread;
 use crate::{
     backend::{Backend, BackendResult, LogEntry},
     mode::{
-        HeaderInfo, ModeContext, ModeKind, ModeResponse, ModeStatus, Output,
-        SelectMenu,
+        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, SelectMenu,
     },
     platform::Key,
     ui::{Color, Drawer, SelectEntryDraw},
@@ -34,7 +33,6 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for LogEntry {
-    // TODO: show full message
     fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool) -> usize {
         fn color(color: Color, hovered: bool) -> Color {
             if hovered {
@@ -214,36 +212,22 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> HeaderInfo {
+    pub fn is_waiting_response(&self) -> bool {
         match self.state {
-            State::Idle => HeaderInfo {
-                name: "log",
-                waiting_response: false,
-            },
-            State::Waiting(WaitOperation::Refresh) => HeaderInfo {
-                name: "log",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Checkout) => HeaderInfo {
-                name: "checkout",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Merge) => HeaderInfo {
-                name: "merge",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Fetch) => HeaderInfo {
-                name: "fetch",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Pull) => HeaderInfo {
-                name: "pull",
-                waiting_response: true,
-            },
-            State::Waiting(WaitOperation::Push) => HeaderInfo {
-                name: "push",
-                waiting_response: true,
-            },
+            State::Idle => false,
+            State::Waiting(_) => true,
+        }
+    }
+
+    pub fn header(&self) -> &str {
+        match self.state {
+            State::Idle => "log",
+            State::Waiting(WaitOperation::Refresh) => "log",
+            State::Waiting(WaitOperation::Checkout) => "checkout",
+            State::Waiting(WaitOperation::Merge) => "merge",
+            State::Waiting(WaitOperation::Fetch) => "fetch",
+            State::Waiting(WaitOperation::Pull) => "pull",
+            State::Waiting(WaitOperation::Push) => "push",
         }
     }
 
@@ -276,3 +260,4 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
+

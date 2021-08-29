@@ -40,11 +40,6 @@ pub struct ModeStatus {
     pub pending_input: bool,
 }
 
-pub struct HeaderInfo {
-    pub name: &'static str,
-    pub waiting_response: bool,
-}
-
 #[derive(Default)]
 pub struct Output {
     text: String,

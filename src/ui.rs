@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::mode::{HeaderInfo, Output, ReadLine, SelectMenu};
+use crate::mode::{Output, ReadLine, SelectMenu};
 
 pub static ENTER_ALTERNATE_BUFFER_CODE: &[u8] = b"\x1b[?1049h";
 pub static EXIT_ALTERNATE_BUFFER_CODE: &[u8] = b"\x1b[?1049l";
@@ -95,15 +95,9 @@ impl Drawer {
         clear_to_end(&mut self.buf);
     }
 
-    pub fn header(&mut self, info: HeaderInfo, spinner_state: u8) {
+    pub fn header(&mut self, header: &str, spinner: u8) {
         let background_color = Color::DarkYellow;
         let foreground_color = Color::Black;
-
-        let spinner = [b'-', b'\\', b'|', b'/'];
-        let spinner = match info.waiting_response {
-            true => spinner[spinner_state as usize % spinner.len()],
-            false => b' ',
-        };
 
         move_cursor_to_zero(&mut self.buf);
         set_background_color(&mut self.buf, background_color);
@@ -112,7 +106,7 @@ impl Drawer {
         set_background_color(&mut self.buf, foreground_color);
         set_foreground_color(&mut self.buf, background_color);
         self.buf.push(b' ');
-        self.buf.extend_from_slice(info.name.as_bytes());
+        self.buf.extend_from_slice(header.as_bytes());
         self.buf.push(b' ');
 
         let size = crate::platform::Platform::terminal_size();
@@ -226,3 +220,4 @@ impl Drawer {
         }
     }
 }
+

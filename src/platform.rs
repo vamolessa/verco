@@ -138,6 +138,7 @@ pub struct PlatformEventReader {
     resize_signal_fd: Option<RawFd>,
 }
 
+#[cfg(unix)]
 const MAX_TRIGGERED_EVENT_COUNT: usize = 32;
 
 #[cfg(unix)]
@@ -245,7 +246,7 @@ impl PlatformEventReader {
         for event_index in epoll_wait(self.queue_fd, &mut epoll_events) {
             match event_index {
                 0 => match Self::read(libc::STDIN_FILENO, &mut self.buf) {
-                    Ok(0) | Err(()) => continue,
+                    Ok(0) | Err(()) => panic!("could not read from stdin"),
                     Ok(len) => Self::parse_terminal_keys(
                         &self.buf[..len],
                         self.backspace_code,
@@ -253,13 +254,15 @@ impl PlatformEventReader {
                     ),
                 },
                 1 => {
+                    panic!("uee");
                     if let Some(fd) = self.resize_signal_fd {
                         let mut buf =
                             [0; std::mem::size_of::<libc::signalfd_siginfo>()];
-                        if Self::read(fd, &mut buf) != Ok(buf.len()) {
+                        if Self::read(fd, &mut self.buf) != Ok(buf.len()) {
                             panic!("could not read from signal fd");
                         }
                         *resize = Some(Platform::terminal_size());
+                        panic!("RESIZE! {:?}", resize);
                     }
                 }
                 _ => unreachable!(),
@@ -395,8 +398,8 @@ impl PlatformEventReader {
             match event {
                 Ok(TriggeredEvent { index: 0, data }) => {
                     self.buf.resize(data as _, 0);
-                    match read(libc::STDIN_FILENO, &mut buf) {
-                        Ok(0) | Err(()) => continue,
+                    match Self::read(libc::STDIN_FILENO, &mut self.buf) {
+                        Ok(0) | Err(()) => panic!("could not read from stdin"),
                         Ok(len) => Self::parse_terminal_keys(
                             &self.buf[..len],
                             self.backspace_code,
@@ -506,6 +509,9 @@ impl PlatformEventReader {
 impl Drop for PlatformEventReader {
     fn drop(&mut self) {
         unsafe { libc::close(self.queue_fd) };
+        if let Some(fd) = self.resize_signal_fd {
+            unsafe { libc::close(fd) };
+        }
     }
 }
 
@@ -718,3 +724,4 @@ impl PlatformEventReader {
         }
     }
 }
+
