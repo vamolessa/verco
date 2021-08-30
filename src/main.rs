@@ -6,58 +6,6 @@ mod mode;
 mod platform;
 mod ui;
 
-/*
-fn main2() {
-    fn block_sigwinch() {
-        unsafe {
-            let mut signals = std::mem::zeroed();
-            let result = libc::sigemptyset(&mut signals);
-            if result == -1 {
-                panic!("could not create signal fd");
-            }
-            let result = libc::sigaddset(&mut signals, libc::SIGWINCH);
-            if result == -1 {
-                panic!("could not create signal fd");
-            }
-            let result = libc::sigprocmask(
-                libc::SIG_BLOCK,
-                &signals,
-                std::ptr::null_mut(),
-            );
-            if result == -1 {
-                panic!("could not create signal fd");
-            }
-        }
-    }
-
-    block_sigwinch();
-    let resize_signal_fd = unsafe {
-        let mut signals = std::mem::zeroed();
-        let result = libc::sigprocmask(0, std::ptr::null_mut(), &mut signals);
-        let fd = libc::signalfd(-1, &signals, 0);
-        if fd == -1 {
-            panic!("could not create signal fd");
-        }
-        fd
-    };
-
-    let _ = std::thread::spawn(move || {
-        //block_sigwinch();
-
-        loop {
-            println!("{:?}", platform::Platform::terminal_size());
-            let mut buf = [0; std::mem::size_of::<libc::signalfd_siginfo>()];
-            if platform::PlatformEventReader::read(resize_signal_fd, &mut buf)
-                != Ok(buf.len())
-            {
-                panic!("could not read from signal fd");
-            }
-        }
-    })
-    .join();
-}
-*/
-
 fn main() {
     let mut args = env::args();
     args.next();
@@ -131,4 +79,3 @@ fn main() {
 
     drop(platform);
 }
-

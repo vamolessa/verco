@@ -1,2 +1,0 @@
-gv git --version
-hv hg --version

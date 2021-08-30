@@ -164,6 +164,8 @@ fn terminal_event_loop(
     mut event_reader: PlatformEventReader,
     sender: mpsc::SyncSender<Event>,
 ) {
+    event_reader.init();
+
     let mut keys = Vec::new();
     loop {
         keys.clear();
@@ -184,7 +186,10 @@ fn terminal_event_loop(
     }
 }
 
-pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>) {
+pub fn run(
+    platform_event_reader: PlatformEventReader,
+    backend: Arc<dyn Backend>,
+) {
     let (event_sender, event_receiver) = mpsc::sync_channel(1);
 
     let mut ctx = ModeContext {
@@ -204,16 +209,10 @@ pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>
     let mut stdout = stdout.lock();
     let mut stdout_buf = Vec::new();
 
-    let mut counter = 0;
-
     const TIMEOUT: Duration = Duration::from_millis(100);
 
     loop {
-        let mut draw_body = true;
-
-        let is_waiting_response = application.is_waiting_response();
-
-        let event = if is_waiting_response {
+        let event = if application.is_waiting_response() {
             event_receiver.recv_timeout(TIMEOUT)
         } else {
             event_receiver
@@ -221,8 +220,8 @@ pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>
                 .map_err(|_| mpsc::RecvTimeoutError::Disconnected)
         };
 
-        let event_disc = std::mem::discriminant(&event);
-        let mut is_resize = false;
+        let mut draw_body = true;
+
         match event {
             Ok(Event::Key(key)) => {
                 if !application.on_key(&ctx, key) {
@@ -231,28 +230,18 @@ pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>
             }
             Ok(Event::Resize(width, height)) => {
                 ctx.viewport_size = (width, height);
-                is_resize = true;
             }
             Ok(Event::Response(response)) => application.on_response(response),
             Ok(Event::ModeChange(mode)) => application.enter_mode(&ctx, mode),
             Ok(Event::ModeRefresh(mode)) => {
                 application.refresh_mode(&ctx, mode)
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                draw_body = false;
-                counter += 1;
-            }
+            Err(mpsc::RecvTimeoutError::Timeout) => draw_body = false,
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
 
         let mut drawer = Drawer::new(stdout_buf, ctx.viewport_size);
         application.draw_header(&mut drawer);
-        drawer.fmt(format_args!(
-            "{:?} {} is_resize: {} ",
-            event_disc, counter, is_resize
-        ));
-        drawer.next_line();
-
         if draw_body {
             application.draw_body(&mut drawer);
         }
@@ -263,4 +252,3 @@ pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>
         stdout.flush().unwrap();
     }
 }
-

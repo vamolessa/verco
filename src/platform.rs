@@ -143,295 +143,6 @@ const MAX_TRIGGERED_EVENT_COUNT: usize = 32;
 
 #[cfg(unix)]
 impl PlatformEventReader {
-    // ========================================================= LINUX
-
-    #[cfg(target_os = "linux")]
-    pub fn new(backspace_code: u8) -> Self {
-        let queue_fd = unsafe { libc::epoll_create1(0) };
-        if queue_fd == -1 {
-            panic!("could not create epoll");
-        }
-
-        let resize_signal_fd = unsafe {
-            let mut signals = std::mem::zeroed();
-            let result = libc::sigemptyset(&mut signals);
-            if result == -1 {
-                panic!("could not create signal fd");
-            }
-            let result = libc::sigaddset(&mut signals, libc::SIGWINCH);
-            if result == -1 {
-                panic!("could not create signal fd");
-            }
-            let result = libc::sigprocmask(
-                libc::SIG_BLOCK,
-                &signals,
-                std::ptr::null_mut(),
-            );
-            if result == -1 {
-                panic!("could not create signal fd");
-            }
-            let fd = libc::signalfd(-1, &signals, 0);
-            if fd == -1 {
-                panic!("could not create signal fd");
-            }
-            fd
-        };
-
-        fn epoll_add_fd(epoll_fd: RawFd, fd: RawFd, index: usize) {
-            let mut event = libc::epoll_event {
-                events: (libc::EPOLLIN
-                    | libc::EPOLLERR
-                    | libc::EPOLLRDHUP
-                    | libc::EPOLLHUP) as _,
-                u64: index as _,
-            };
-            let result = unsafe {
-                libc::epoll_ctl(epoll_fd, libc::EPOLL_CTL_ADD, fd, &mut event)
-            };
-            if result == -1 {
-                panic!("could not add event");
-            }
-        }
-
-        epoll_add_fd(queue_fd, libc::STDIN_FILENO, 0);
-        epoll_add_fd(queue_fd, resize_signal_fd, 1);
-
-        let mut buf = Vec::with_capacity(1024);
-        let capacity = buf.capacity();
-        buf.resize(capacity, 0);
-
-        let resize_signal_fd = Some(resize_signal_fd);
-
-        Self {
-            backspace_code,
-            buf,
-            queue_fd,
-            resize_signal_fd,
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    pub fn read_terminal_events(
-        &mut self,
-        keys: &mut Vec<Key>,
-        resize: &mut Option<(u16, u16)>,
-    ) {
-        fn epoll_wait<'a>(
-            epoll_fd: RawFd,
-            events: &'a mut [libc::epoll_event],
-        ) -> impl 'a + ExactSizeIterator<Item = usize> {
-            let timeout = -1;
-            let mut len = unsafe {
-                libc::epoll_wait(
-                    epoll_fd,
-                    events.as_mut_ptr(),
-                    events.len() as _,
-                    timeout,
-                )
-            };
-            if len == -1 {
-                if PlatformEventReader::errno() == libc::EINTR {
-                    len = 0;
-                } else {
-                    panic!("could not wait for events");
-                }
-            }
-
-            events[..len as usize].iter().map(|e| e.u64 as _)
-        }
-
-        const DEFAULT_EVENT: libc::epoll_event =
-            libc::epoll_event { events: 0, u64: 0 };
-        let mut epoll_events = [DEFAULT_EVENT; MAX_TRIGGERED_EVENT_COUNT];
-
-        for event_index in epoll_wait(self.queue_fd, &mut epoll_events) {
-            match event_index {
-                0 => match Self::read(libc::STDIN_FILENO, &mut self.buf) {
-                    Ok(0) | Err(()) => panic!("could not read from stdin"),
-                    Ok(len) => Self::parse_terminal_keys(
-                        &self.buf[..len],
-                        self.backspace_code,
-                        keys,
-                    ),
-                },
-                1 => {
-                    if let Some(fd) = self.resize_signal_fd {
-                        let mut buf =
-                            [0; std::mem::size_of::<libc::signalfd_siginfo>()];
-                        if Self::read(fd, &mut buf) != Ok(buf.len()) {
-                            panic!("could not read from signal fd");
-                        }
-                        *resize = Some(Platform::terminal_size());
-                    }
-                }
-                _ => unreachable!(),
-            }
-        }
-    }
-
-    // ========================================================= BSD
-
-    #[cfg(any(
-        target_os = "macos",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "dragonfly",
-    ))]
-    pub fn new(backspace_code: u8) -> Self {
-        let queue_fd = unsafe { libc::kqueue() };
-        if queue_fd == -1 {
-            panic!("could not create kqueue");
-        }
-
-        let stdin_event = libc::kevent {
-            ident: libc::STDIN_FILENO as _,
-            filter: libc::EVFILT_READ,
-            flags: libc::EV_ADD,
-            fflags: 0,
-            data: 0,
-            udata: 0 as _,
-        };
-        let resize_event = libc::kevent {
-            ident: libc::SIGWINCH as _,
-            filter: libc::EVFILT_SIGNAL,
-            flags: libc::EV_ADD,
-            fflags: 0,
-            data: 0,
-            udata: 1 as _,
-        };
-
-        fn modify_kqueue(kqueue_fd: RawFd, event: &libc::kevent) {
-            let result = unsafe {
-                libc::kevent(
-                    kqueue_fd,
-                    event as _,
-                    1,
-                    std::ptr::null_mut(),
-                    0,
-                    std::ptr::null(),
-                )
-            };
-            if result != 0 {
-                panic!("could not add event to kqueue");
-            }
-        }
-
-        modify_kqueue(queue_fd, &stdin_event);
-        modify_kqueue(queue_fd, &resize_event);
-
-        Self {
-            backspace_code,
-            buf: Vec::with_capacity(1024),
-            queue_fd,
-            resize_signal_fd: None,
-        }
-    }
-
-    #[cfg(any(
-        target_os = "macos",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "dragonfly",
-    ))]
-    pub fn read_terminal_events(
-        &mut self,
-        keys: &mut Vec<Key>,
-        resize: &mut Option<(u16, u16)>,
-    ) {
-        struct TriggeredEvent {
-            pub index: usize,
-            pub data: isize,
-        }
-
-        pub fn kqueue_wait<'a>(
-            kqueue_fd: RawFd,
-            events: &'a mut [libc::kevent],
-        ) -> impl 'a + ExactSizeIterator<Item = Result<TriggeredEvent, ()>>
-        {
-            let timeout = std::ptr::null();
-            let mut len = unsafe {
-                libc::kevent(
-                    kqueue_fd,
-                    [].as_ptr(),
-                    0,
-                    events.as_mut_ptr(),
-                    events.len() as _,
-                    timeout,
-                )
-            };
-            if len == -1 {
-                if PlatformEventReader::errno() == libc::EINTR {
-                    len = 0;
-                } else {
-                    panic!("could not wait for events");
-                }
-            }
-
-            events[..len as usize].iter().map(|e| {
-                if e.flags & libc::EV_ERROR != 0 {
-                    Err(())
-                } else {
-                    Ok(TriggeredEvent {
-                        index: e.udata as _,
-                        data: e.data as _,
-                    })
-                }
-            })
-        }
-
-        const DEFAULT_KEVENT: libc::kevent = libc::kevent {
-            ident: 0,
-            filter: 0,
-            flags: 0,
-            fflags: 0,
-            data: 0,
-            udata: std::ptr::null_mut(),
-        };
-        let mut kqueue_events = [DEFAULT_KEVENT; MAX_TRIGGERED_EVENT_COUNT];
-
-        for event in kqueue_wait(self.queue_fd, &mut kqueue_events) {
-            match event {
-                Ok(TriggeredEvent { index: 0, data }) => {
-                    self.buf.resize(data as _, 0);
-                    match Self::read(libc::STDIN_FILENO, &mut self.buf) {
-                        Ok(0) | Err(()) => panic!("could not read from stdin"),
-                        Ok(len) => Self::parse_terminal_keys(
-                            &self.buf[..len],
-                            self.backspace_code,
-                            keys,
-                        ),
-                    }
-                }
-                Ok(TriggeredEvent { index: 1, .. }) => {
-                    *resize = Some(Platform::terminal_size())
-                }
-                Ok(_) => unreachable!(),
-                Err(()) => break,
-            }
-        }
-    }
-
-    // ========================================================= COMMON
-
-    pub fn errno() -> libc::c_int {
-        #[cfg(target_os = "linux")]
-        unsafe {
-            *libc::__errno_location()
-        }
-        #[cfg(any(
-            target_os = "macos",
-            target_os = "freebsd",
-            target_os = "netbsd",
-            target_os = "openbsd",
-            target_os = "dragonfly",
-        ))]
-        unsafe {
-            *libc::__error()
-        }
-    }
-
     pub fn read(fd: RawFd, buf: &mut [u8]) -> Result<usize, ()> {
         let len =
             unsafe { libc::read(fd, buf.as_mut_ptr() as _, buf.len() as _) };
@@ -508,6 +219,284 @@ impl Drop for PlatformEventReader {
         unsafe { libc::close(self.queue_fd) };
         if let Some(fd) = self.resize_signal_fd {
             unsafe { libc::close(fd) };
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl PlatformEventReader {
+    pub fn errno() -> libc::c_int {
+        unsafe { *libc::__errno_location() }
+    }
+
+    fn epoll_add_fd(epoll_fd: RawFd, fd: RawFd, index: usize) {
+        let mut event = libc::epoll_event {
+            events: (libc::EPOLLIN
+                | libc::EPOLLERR
+                | libc::EPOLLRDHUP
+                | libc::EPOLLHUP) as _,
+            u64: index as _,
+        };
+        let result = unsafe {
+            libc::epoll_ctl(epoll_fd, libc::EPOLL_CTL_ADD, fd, &mut event)
+        };
+        if result == -1 {
+            panic!("could not add event");
+        }
+    }
+
+    fn new(backspace_code: u8) -> Self {
+        let queue_fd = unsafe { libc::epoll_create1(0) };
+        if queue_fd == -1 {
+            panic!("could not create epoll");
+        }
+
+        let resize_signal_fd = unsafe {
+            let mut signals = std::mem::zeroed();
+            let result = libc::sigemptyset(&mut signals);
+            if result == -1 {
+                panic!("could not create signal fd");
+            }
+            let result = libc::sigaddset(&mut signals, libc::SIGWINCH);
+            if result == -1 {
+                panic!("could not create signal fd");
+            }
+            let result = libc::sigprocmask(
+                libc::SIG_BLOCK,
+                &signals,
+                std::ptr::null_mut(),
+            );
+            if result == -1 {
+                panic!("could not create signal fd");
+            }
+            let fd = libc::signalfd(-1, &signals, 0);
+            if fd == -1 {
+                panic!("could not create signal fd");
+            }
+            fd
+        };
+
+        Self::epoll_add_fd(queue_fd, libc::STDIN_FILENO, 0);
+
+        let mut buf = Vec::with_capacity(1024);
+        let capacity = buf.capacity();
+        buf.resize(capacity, 0);
+
+        let resize_signal_fd = Some(resize_signal_fd);
+
+        Self {
+            backspace_code,
+            buf,
+            queue_fd,
+            resize_signal_fd,
+        }
+    }
+
+    pub fn init(&mut self) {
+        if let Some(fd) = self.resize_signal_fd {
+            Self::epoll_add_fd(self.queue_fd, fd, 1);
+        }
+    }
+
+    pub fn read_terminal_events(
+        &mut self,
+        keys: &mut Vec<Key>,
+        resize: &mut Option<(u16, u16)>,
+    ) {
+        fn epoll_wait<'a>(
+            epoll_fd: RawFd,
+            events: &'a mut [libc::epoll_event],
+        ) -> impl 'a + ExactSizeIterator<Item = usize> {
+            let timeout = -1;
+            let mut len = unsafe {
+                libc::epoll_wait(
+                    epoll_fd,
+                    events.as_mut_ptr(),
+                    events.len() as _,
+                    timeout,
+                )
+            };
+            if len == -1 {
+                if PlatformEventReader::errno() == libc::EINTR {
+                    len = 0;
+                } else {
+                    panic!("could not wait for events");
+                }
+            }
+
+            events[..len as usize].iter().map(|e| e.u64 as _)
+        }
+
+        const DEFAULT_EVENT: libc::epoll_event =
+            libc::epoll_event { events: 0, u64: 0 };
+        let mut epoll_events = [DEFAULT_EVENT; MAX_TRIGGERED_EVENT_COUNT];
+
+        for event_index in epoll_wait(self.queue_fd, &mut epoll_events) {
+            match event_index {
+                0 => match Self::read(libc::STDIN_FILENO, &mut self.buf) {
+                    Ok(0) | Err(()) => panic!("could not read from stdin"),
+                    Ok(len) => Self::parse_terminal_keys(
+                        &self.buf[..len],
+                        self.backspace_code,
+                        keys,
+                    ),
+                },
+                1 => {
+                    if let Some(fd) = self.resize_signal_fd {
+                        let mut buf =
+                            [0; std::mem::size_of::<libc::signalfd_siginfo>()];
+                        if Self::read(fd, &mut buf) != Ok(buf.len()) {
+                            panic!("could not read from signal fd");
+                        }
+                        *resize = Some(Platform::terminal_size());
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly",
+))]
+impl PlatformEventReader {
+    pub fn errno() -> libc::c_int {
+        unsafe { *libc::__error() }
+    }
+
+    fn modify_kqueue(kqueue_fd: RawFd, event: &libc::kevent) {
+        let result = unsafe {
+            libc::kevent(
+                kqueue_fd,
+                event as _,
+                1,
+                std::ptr::null_mut(),
+                0,
+                std::ptr::null(),
+            )
+        };
+        if result != 0 {
+            panic!("could not add event to kqueue");
+        }
+    }
+
+    fn new(backspace_code: u8) -> Self {
+        let queue_fd = unsafe { libc::kqueue() };
+        if queue_fd == -1 {
+            panic!("could not create kqueue");
+        }
+
+        let stdin_event = libc::kevent {
+            ident: libc::STDIN_FILENO as _,
+            filter: libc::EVFILT_READ,
+            flags: libc::EV_ADD,
+            fflags: 0,
+            data: 0,
+            udata: 0 as _,
+        };
+
+        Self::modify_kqueue(queue_fd, &stdin_event);
+
+        Self {
+            backspace_code,
+            buf: Vec::with_capacity(1024),
+            queue_fd,
+            resize_signal_fd: None,
+        }
+    }
+
+    pub fn init(&mut self) {
+        let resize_event = libc::kevent {
+            ident: libc::SIGWINCH as _,
+            filter: libc::EVFILT_SIGNAL,
+            flags: libc::EV_ADD,
+            fflags: 0,
+            data: 0,
+            udata: 1 as _,
+        };
+        Self::modify_kqueue(self.queue_fd, &resize_event);
+    }
+
+    pub fn read_terminal_events(
+        &mut self,
+        keys: &mut Vec<Key>,
+        resize: &mut Option<(u16, u16)>,
+    ) {
+        struct TriggeredEvent {
+            pub index: usize,
+            pub data: isize,
+        }
+
+        pub fn kqueue_wait<'a>(
+            kqueue_fd: RawFd,
+            events: &'a mut [libc::kevent],
+        ) -> impl 'a + ExactSizeIterator<Item = Result<TriggeredEvent, ()>>
+        {
+            let timeout = std::ptr::null();
+            let mut len = unsafe {
+                libc::kevent(
+                    kqueue_fd,
+                    [].as_ptr(),
+                    0,
+                    events.as_mut_ptr(),
+                    events.len() as _,
+                    timeout,
+                )
+            };
+            if len == -1 {
+                if PlatformEventReader::errno() == libc::EINTR {
+                    len = 0;
+                } else {
+                    panic!("could not wait for events");
+                }
+            }
+
+            events[..len as usize].iter().map(|e| {
+                if e.flags & libc::EV_ERROR != 0 {
+                    Err(())
+                } else {
+                    Ok(TriggeredEvent {
+                        index: e.udata as _,
+                        data: e.data as _,
+                    })
+                }
+            })
+        }
+
+        const DEFAULT_KEVENT: libc::kevent = libc::kevent {
+            ident: 0,
+            filter: 0,
+            flags: 0,
+            fflags: 0,
+            data: 0,
+            udata: std::ptr::null_mut(),
+        };
+        let mut kqueue_events = [DEFAULT_KEVENT; MAX_TRIGGERED_EVENT_COUNT];
+
+        for event in kqueue_wait(self.queue_fd, &mut kqueue_events) {
+            match event {
+                Ok(TriggeredEvent { index: 0, data }) => {
+                    self.buf.resize(data as _, 0);
+                    match Self::read(libc::STDIN_FILENO, &mut self.buf) {
+                        Ok(0) | Err(()) => panic!("could not read from stdin"),
+                        Ok(len) => Self::parse_terminal_keys(
+                            &self.buf[..len],
+                            self.backspace_code,
+                            keys,
+                        ),
+                    }
+                }
+                Ok(TriggeredEvent { index: 1, .. }) => {
+                    *resize = Some(Platform::terminal_size())
+                }
+                Ok(_) => unreachable!(),
+                Err(()) => break,
+            }
         }
     }
 }
@@ -610,6 +599,8 @@ pub struct PlatformEventReader;
 
 #[cfg(windows)]
 impl PlatformEventReader {
+    pub fn init(&mut self) {}
+
     pub fn read_terminal_events(
         &mut self,
         keys: &mut Vec<Key>,
