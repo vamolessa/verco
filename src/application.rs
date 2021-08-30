@@ -36,31 +36,6 @@ impl EventSender {
     }
 }
 
-fn terminal_event_loop(
-    mut platform_event_reader: PlatformEventReader,
-    sender: mpsc::SyncSender<Event>,
-) {
-    let mut keys = Vec::new();
-
-    loop {
-        keys.clear();
-        let mut resize = None;
-
-        platform_event_reader.read_terminal_events(&mut keys, &mut resize);
-
-        for &key in &keys {
-            if sender.send(Event::Key(key)).is_err() {
-                break;
-            }
-        }
-        if let Some(resize) = resize {
-            if sender.send(Event::Resize(resize.0, resize.1)).is_err() {
-                break;
-            }
-        }
-    }
-}
-
 #[derive(Default)]
 struct Application {
     current_mode: ModeKind,
@@ -185,10 +160,31 @@ impl Application {
     }
 }
 
-pub fn run(
-    platform_event_reader: PlatformEventReader,
-    backend: Arc<dyn Backend>,
+fn terminal_event_loop(
+    mut event_reader: PlatformEventReader,
+    sender: mpsc::SyncSender<Event>,
 ) {
+    let mut keys = Vec::new();
+    loop {
+        keys.clear();
+        let mut resize = None;
+
+        event_reader.read_terminal_events(&mut keys, &mut resize);
+
+        for &key in &keys {
+            if sender.send(Event::Key(key)).is_err() {
+                break;
+            }
+        }
+        if let Some(resize) = resize {
+            if sender.send(Event::Resize(resize.0, resize.1)).is_err() {
+                break;
+            }
+        }
+    }
+}
+
+pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>) {
     let (event_sender, event_receiver) = mpsc::sync_channel(1);
 
     let mut ctx = ModeContext {
@@ -197,12 +193,12 @@ pub fn run(
         viewport_size: Platform::terminal_size(),
     };
 
+    let _ = thread::spawn(move || {
+        terminal_event_loop(platform_event_reader, event_sender);
+    });
+
     let mut application = Application::default();
     application.enter_mode(&ctx, ModeKind::default());
-
-    thread::spawn(move || {
-        terminal_event_loop(platform_event_reader, event_sender)
-    });
 
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
@@ -267,3 +263,4 @@ pub fn run(
         stdout.flush().unwrap();
     }
 }
+

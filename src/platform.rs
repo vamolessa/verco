@@ -196,10 +196,11 @@ impl PlatformEventReader {
         epoll_add_fd(queue_fd, libc::STDIN_FILENO, 0);
         epoll_add_fd(queue_fd, resize_signal_fd, 1);
 
-        let resize_signal_fd = Some(resize_signal_fd);
         let mut buf = Vec::with_capacity(1024);
         let capacity = buf.capacity();
         buf.resize(capacity, 0);
+
+        let resize_signal_fd = Some(resize_signal_fd);
 
         Self {
             backspace_code,
@@ -254,15 +255,13 @@ impl PlatformEventReader {
                     ),
                 },
                 1 => {
-                    panic!("uee");
                     if let Some(fd) = self.resize_signal_fd {
                         let mut buf =
                             [0; std::mem::size_of::<libc::signalfd_siginfo>()];
-                        if Self::read(fd, &mut self.buf) != Ok(buf.len()) {
+                        if Self::read(fd, &mut buf) != Ok(buf.len()) {
                             panic!("could not read from signal fd");
                         }
                         *resize = Some(Platform::terminal_size());
-                        panic!("RESIZE! {:?}", resize);
                     }
                 }
                 _ => unreachable!(),
@@ -302,7 +301,7 @@ impl PlatformEventReader {
             udata: 1 as _,
         };
 
-        fn modify_kqueue(kqueue_fd: RawFd, event: &libc::kevent) -> bool {
+        fn modify_kqueue(kqueue_fd: RawFd, event: &libc::kevent) {
             let result = unsafe {
                 libc::kevent(
                     kqueue_fd,
@@ -313,15 +312,13 @@ impl PlatformEventReader {
                     std::ptr::null(),
                 )
             };
-            result == 0
+            if result != 0 {
+                panic!("could not add event to kqueue");
+            }
         }
 
-        if !modify_kqueue(queue_fd, &stdin_event) {
-            panic!("could not add event");
-        }
-        if !modify_kqueue(queue_fd, &resize_event) {
-            panic!("could not add event");
-        }
+        modify_kqueue(queue_fd, &stdin_event);
+        modify_kqueue(queue_fd, &resize_event);
 
         Self {
             backspace_code,
