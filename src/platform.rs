@@ -709,4 +709,3 @@ impl PlatformEventReader {
         }
     }
 }
-
