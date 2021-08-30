@@ -198,13 +198,20 @@ impl PlatformEventReader {
                         match std::str::from_utf8(c) {
                             Ok(s) => match s.chars().next() {
                                 Some(c) => (Key::Char(c), rest),
-                                None => (Key::None, rest),
+                                None => {
+                                    buf = rest;
+                                    continue;
+                                }
                             },
-                            Err(_) => (Key::None, rest),
+                            Err(_) => {
+                                buf = rest;
+                                continue;
+                            }
                         }
                     }
                 },
             };
+
             buf = rest;
             keys.push(key);
         }
