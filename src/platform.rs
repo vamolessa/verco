@@ -32,7 +32,6 @@ use winapi::{
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
-    None,
     Backspace,
     Enter,
     Left,
@@ -44,9 +43,7 @@ pub enum Key {
     PageUp,
     PageDown,
     Tab,
-    BackTab,
     Delete,
-    Insert,
     Char(char),
     Ctrl(char),
     Esc,
@@ -712,3 +709,4 @@ impl PlatformEventReader {
         }
     }
 }
+
