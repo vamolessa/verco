@@ -157,7 +157,7 @@ impl Drawer {
             self.next_line();
 
             line_count += 1;
-            if line_count >= self.viewport_size.1 as _ {
+            if line_count + 1 >= self.viewport_size.1 as _ {
                 break;
             }
         }
@@ -191,7 +191,7 @@ impl Drawer {
 
         let mut line_count = 0;
         let max_line_count =
-            self.viewport_size.1.saturating_sub(1 + header_height) as usize;
+            self.viewport_size.1.saturating_sub(2 + header_height) as usize;
 
         for (i, entry) in entries.enumerate().skip(select.scroll()) {
             let hovered = i == cursor_index;

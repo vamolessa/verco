@@ -101,7 +101,7 @@ impl Mode {
         revision: &str,
         key: Key,
     ) -> ModeStatus {
-        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
 
         match self.state {
             State::Idle => {
@@ -215,15 +215,15 @@ impl Mode {
         let line_count = if show_full_output {
             drawer.output(&self.output)
         } else {
-            let first_line = self.output.text().lines().next().unwrap_or("");
-            let trimmed_line = match first_line
+            let output = self.output.text().lines().next().unwrap_or("");
+            let output = match output
                 .char_indices()
                 .nth(drawer.viewport_size.0.saturating_sub(1) as _)
             {
-                Some((i, c)) => &first_line[..i + c.len_utf8()],
-                None => first_line,
+                Some((i, c)) => &output[..i + c.len_utf8()],
+                None => output,
             };
-            drawer.str(trimmed_line);
+            drawer.str(output);
             drawer.next_line();
             1
         };

@@ -103,7 +103,7 @@ impl Mode {
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let pending_input = matches!(self.state, State::CommitMessageInput);
-        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
 
         match self.state {
             State::Idle | State::Waiting(_) => {
@@ -305,7 +305,16 @@ impl Mode {
                 if self.output.line_count() > 1 {
                     drawer.output(&self.output);
                 } else {
-                    drawer.str(self.output.text());
+                    let output = self.output.text();
+                    let output = match output
+                        .char_indices()
+                        .nth(drawer.viewport_size.0.saturating_sub(1) as _)
+                    {
+                        Some((i, c)) => &output[..i + c.len_utf8()],
+                        None => output,
+                    };
+
+                    drawer.str(output);
                     drawer.next_line();
                     drawer.next_line();
                     drawer.select_menu(
@@ -354,3 +363,4 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+

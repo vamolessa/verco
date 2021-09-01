@@ -139,7 +139,7 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
-        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
         self.select
             .on_key(self.entries.len(), available_height, key);
 
@@ -253,7 +253,7 @@ where
     thread::spawn(move || {
         use std::ops::Deref;
 
-        let available_height = ctx.viewport_size.1.saturating_sub(1) as _;
+        let available_height = ctx.viewport_size.1.saturating_sub(2) as _;
         let result = f(ctx.backend.deref())
             .and_then(|_| ctx.backend.log(0, available_height));
         ctx.event_sender

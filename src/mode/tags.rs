@@ -62,7 +62,7 @@ impl Mode {
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let pending_input = matches!(self.state, State::NewNameInput);
-        let available_height = ctx.viewport_size.1.saturating_sub(1) as usize;
+        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
 
         match self.state {
             State::Idle | State::Waiting(_) => {
