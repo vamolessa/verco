@@ -249,6 +249,15 @@ impl Backend for Plastic {
     }
 
     fn log(&self, skip: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
+        let current_changeset = Process::spawn(
+            "cm",
+            &[
+                "status",
+                "--header",
+                "--machinereadable",
+                "--fieldseparator=\x1f",
+            ],
+        )?;
         let output = Process::spawn(
             "cm",
             &[
@@ -257,15 +266,21 @@ impl Backend for Plastic {
                 "--nototal",
                 "--format={changesetid}\x1f{date}\x1f{owner}\x1f{branch}\x1f{comment}\x1e",
             ],
-        )?
-        .wait()?;
+        )?;
+
+        let current_changeset = current_changeset.wait()?;
+        let current_changeset =
+            current_changeset.split('\x1f').nth(1).unwrap_or("");
+        let output = output.wait()?;
 
         let mut entries = Vec::new();
         for record in output.split('\x1e').rev().skip(skip + 1).take(len) {
             let mut splits = record.splitn(5, '\x1f');
 
-            let graph = String::new();
             let hash = splits.next().unwrap_or("").trim().into();
+            let graph = if hash == current_changeset { "*" } else { " " };
+            let graph = graph.into();
+
             let date = splits.next().unwrap_or("").into();
             let author = splits.next().unwrap_or("").into();
             let refs = splits.next().unwrap_or("").into();
