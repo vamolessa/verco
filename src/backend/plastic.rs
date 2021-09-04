@@ -43,9 +43,9 @@ impl Backend for Plastic {
 
         for line in output.lines() {
             let mut splits = line.split(';');
-            let status = splits.next().unwrap_or("").trim();
+            let status = splits.next().unwrap_or("");
             let status = parse_file_status(status);
-            let name = splits.next().unwrap_or("").trim().into();
+            let name = splits.next().unwrap_or("").into();
             splits.next();
             let _mergeinfo = splits.next().unwrap_or("").trim();
 
@@ -55,17 +55,36 @@ impl Backend for Plastic {
         Ok(StatusInfo { header, entries })
     }
 
-    // TODO: stopped here
     fn commit(
         &self,
         message: &str,
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
         if entries.is_empty() {
-            let untracked =
-                Process::spawn("cm", &["status", "--private"])?.wait()?;
-            // pass to stdin??
-            Process::spawn("cm", &["add", "-"])?.wait()?;
+            let untracked = Process::spawn(
+                "cm",
+                &[
+                    "status",
+                    "--short",
+                    "--nomergesinfo",
+                    "--private",
+                    "--machinereadable",
+                    "--fieldseparator=;",
+                ],
+            )?
+            .wait()?;
+
+            let mut args = Vec::new();
+            args.push("add");
+            for line in untracked.lines() {
+                if let Some(name) = line.split(';').nth(1) {
+                    args.push(name);
+                }
+            }
+            if args.len() > 1 {
+                Process::spawn("cm", &args)?.wait()?;
+            }
+
             Process::spawn("cm", &["checkin", "--all"])?.wait()?;
         } else {
             let mut args = Vec::new();
@@ -429,6 +448,7 @@ impl Backend for Plastic {
 fn parse_file_status(s: &str) -> FileStatus {
     match s {
         "CH" => FileStatus::Modified,
+        "CO" => FileStatus::CheckedOut,
         "LD" => FileStatus::Deleted,
         "PR" => FileStatus::Untracked,
         _ => FileStatus::Other(s.into()),
@@ -447,3 +467,4 @@ fn parse_file_status(s: &str) -> FileStatus {
     }
     */
 }
+
