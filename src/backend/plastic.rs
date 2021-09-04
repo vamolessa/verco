@@ -156,30 +156,48 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    // TODO: implement diff somehow
     fn diff(
         &self,
         revision: Option<&str>,
         entries: &[RevisionEntry],
     ) -> BackendResult<String> {
+        let entry = match entries {
+            [] => None,
+            [entry] => Some(entry),
+            _ => return Err("can not diff more than one file at a time".into()),
+        };
+
         match revision {
-            Some(revision) => {
-                if entries.is_empty() {
-                    //
-                } else {
-                    //
+            Some(revision) => match entry {
+                None => {
+                    let head =
+                        Process::spawn("cm", &["status", "--head"])?.wait()?;
+                    let suffix = match head.find('@') {
+                        Some(i) => &head[i..],
+                        None => return Err("could not parse head".into()),
+                    };
+                    let changeset_arg =
+                        format!("--showchangeset=cs:{}{}", revision, suffix);
+                    Process::spawn("plastic", &[&changeset_arg])?.wait()?;
                 }
-            }
-            None => {
-                if entries.is_empty() {
-                    //
-                } else {
-                    //
+                Some(entry) => {
+                    Process::spawn("cm", &["diff", revision, &entry.name])?
+                        .wait()?;
                 }
-            }
+            },
+            None => match entry {
+                None => {
+                    return Err(
+                        "diff is not implemented for pending changes".into()
+                    );
+                }
+                Some(entry) => {
+                    Process::spawn("cm", &["diff", &entry.name])?.wait()?;
+                }
+            },
         }
 
-        Err("diff is not yet implemented".into())
+        Ok("".into())
     }
 
     // TODO
@@ -188,7 +206,11 @@ impl Backend for Plastic {
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["checkout", ".", "--ours"])?.wait()?;
+            Process::spawn(
+                "cm",
+                &["merge", "--merge", "--keepdestination" /*revision*/],
+            )?
+            .wait()?;
         } else {
             if !entries
                 .iter()
@@ -221,7 +243,11 @@ impl Backend for Plastic {
         entries: &[RevisionEntry],
     ) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["checkout", ".", "--theirs"])?.wait()?;
+            Process::spawn(
+                "cm",
+                &["merge", "--merge", "--keepsource" /*revision*/],
+            )?
+            .wait()?;
         } else {
             if !entries
                 .iter()
@@ -304,10 +330,17 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    // TODO
     fn merge(&self, revision: &str) -> BackendResult<()> {
-        Process::spawn("git", &["merge", revision])?.wait()?;
-        Ok(())
+        let result = Process::spawn("cm", &["merge", "--merge", revision])
+            .and_then(Process::wait)
+            .map(|_| ());
+
+        // TODO: will this be required?
+        if result.is_err() {
+            //
+        }
+
+        result
     }
 
     fn fetch(&self) -> BackendResult<()> {
