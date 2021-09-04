@@ -420,20 +420,6 @@ fn parse_file_status(s: &str) -> FileStatus {
         "CO" => FileStatus::Added,
         "LD" => FileStatus::Deleted,
         "PR" => FileStatus::Untracked,
-        _ => FileStatus::Other(s.into()),
+        _ => panic!("unknown file status '{}'", s),
     }
-
-    /*
-    match s {
-        "M" => FileStatus::Modified,
-        "A" => FileStatus::Added,
-        "D" => FileStatus::Deleted,
-        "R" => FileStatus::Renamed,
-        "?" => FileStatus::Untracked,
-        "C" => FileStatus::Copied,
-        "U" => FileStatus::Unmerged,
-        _ => FileStatus::Unmodified,
-    }
-    */
 }
-

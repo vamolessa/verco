@@ -89,6 +89,9 @@ impl Backend for Git {
             }
             let rm = Process::spawn("git", &args)?;
 
+            clean.wait()?;
+            rm.wait()?;
+
             args.clear();
             args.push("checkout");
             args.push("--");
@@ -100,11 +103,7 @@ impl Backend for Git {
                     args.push(&entry.name);
                 }
             }
-            let checkout = Process::spawn("git", &args)?;
-
-            clean.wait()?;
-            rm.wait()?;
-            checkout.wait()?;
+            Process::spawn("git", &args)?.wait()?;
         }
 
         Ok(())
@@ -401,6 +400,6 @@ fn parse_file_status(s: &str) -> FileStatus {
         "??" => FileStatus::Untracked,
         "C" => FileStatus::Copied,
         "U" => FileStatus::Unmerged,
-        _ => FileStatus::Other(s.into()),
+        _ => panic!("unknown file status '{}'", s),
     }
 }

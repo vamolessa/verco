@@ -190,7 +190,9 @@ impl Mode {
                     drawer.output(&self.output);
                 }
             }
-            State::NewNameInput => drawer.readline(&self.readline, "type in the tag name..."),
+            State::NewNameInput => {
+                drawer.readline(&self.readline, "type in the tag name...")
+            }
         }
     }
 }

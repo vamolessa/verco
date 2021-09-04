@@ -1,9 +1,10 @@
 use std::{
-    fmt,
     path::PathBuf,
     process::{Child, Command, Stdio},
     sync::Arc,
 };
+
+use crate::ui::{Drawer, SelectEntryDraw};
 
 pub mod git;
 pub mod hg;
@@ -23,24 +24,24 @@ pub enum FileStatus {
     Missing,
     Ignored,
     Clean,
-    Other(String),
 }
-impl fmt::Display for FileStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl FileStatus {
+    pub const fn max_len() -> usize {
+        9
+    }
+
+    pub fn as_str(&self) -> &str {
         match self {
-            Self::Modified => f.write_str("modified"),
-            Self::Added => f.write_str("added"),
-            Self::Deleted => f.write_str("deleted"),
-            Self::Renamed => f.write_str("renamed"),
-            Self::Untracked => f.write_str("untracked"),
-            Self::Copied => f.write_str("copied"),
-            Self::Unmerged => f.write_str("unmerged"),
-            Self::Missing => f.write_str("missing"),
-            Self::Ignored => f.write_str("ignored"),
-            Self::Clean => f.write_str("clean"),
-            Self::Other(status) => {
-                f.write_fmt(format_args!("other {}", status))
-            }
+            Self::Modified => "modified",
+            Self::Added => "added",
+            Self::Deleted => "deleted",
+            Self::Renamed => "renamed",
+            Self::Untracked => "untracked",
+            Self::Copied => "copied",
+            Self::Unmerged => "unmerged",
+            Self::Missing => "missing",
+            Self::Ignored => "ignored",
+            Self::Clean => "clean",
         }
     }
 }
@@ -77,6 +78,54 @@ pub struct BranchEntry {
 
 pub struct TagEntry {
     pub name: String,
+}
+
+#[derive(Clone)]
+pub struct SelectableRevisionEntry {
+    pub selected: bool,
+    pub name: String,
+    pub status: FileStatus,
+}
+impl From<RevisionEntry> for SelectableRevisionEntry {
+    fn from(other: RevisionEntry) -> Self {
+        Self {
+            selected: false,
+            name: other.name,
+            status: other.status,
+        }
+    }
+}
+impl SelectEntryDraw for SelectableRevisionEntry {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
+        const NAME_TOO_LONG_PREFIX: &str = "...";
+
+        let name_available_width = (drawer.viewport_size.0 as usize)
+            .saturating_sub(
+                2 + 1
+                    + FileStatus::max_len()
+                    + 1
+                    + 1
+                    + NAME_TOO_LONG_PREFIX.len(),
+            );
+
+        let (name_prefix, trimmed_name) =
+            match self.name.char_indices().nth_back(name_available_width) {
+                Some((i, _)) => (NAME_TOO_LONG_PREFIX, &self.name[i..]),
+                None => ("", &self.name[..]),
+            };
+
+        let selected_text = if self.selected { '+' } else { ' ' };
+        drawer.fmt(format_args!(
+            "{} [{:width$}] {}{}",
+            selected_text,
+            self.status.as_str(),
+            name_prefix,
+            trimmed_name,
+            width = FileStatus::max_len(),
+        ));
+
+        1
+    }
 }
 
 pub trait Backend: 'static + Send + Sync {

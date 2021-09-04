@@ -1,13 +1,16 @@
 use std::thread;
 
 use crate::{
-    backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
+    backend::{
+        Backend, BackendResult, RevisionEntry, SelectableRevisionEntry,
+        StatusInfo,
+    },
     mode::{
         ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine,
         SelectMenu, SelectMenuAction,
     },
     platform::Key,
-    ui::{Color, Drawer, SelectEntryDraw},
+    ui::{Color, Drawer},
 };
 
 pub enum Response {
@@ -36,28 +39,10 @@ impl Default for State {
     }
 }
 
-#[derive(Clone)]
-struct Entry {
-    pub selected: bool,
-    pub name: String,
-    pub status: FileStatus,
-}
-impl SelectEntryDraw for Entry {
-    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
-        // TODO: trim
-        let selected_text = if self.selected { '+' } else { ' ' };
-        drawer.fmt(format_args!(
-            "{} [{}] {}",
-            selected_text, &self.status, &self.name,
-        ));
-        1
-    }
-}
-
 #[derive(Default)]
 pub struct Mode {
     state: State,
-    entries: Vec<Entry>,
+    entries: Vec<SelectableRevisionEntry>,
     output: Output,
     select: SelectMenu,
     readline: ReadLine,
@@ -252,15 +237,8 @@ impl Mode {
                     self.output.set(info.header);
                 }
 
-                self.entries = info
-                    .entries
-                    .into_iter()
-                    .map(|e| Entry {
-                        selected: false,
-                        name: e.name,
-                        status: e.status,
-                    })
-                    .collect();
+                self.entries =
+                    info.entries.into_iter().map(Into::into).collect();
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Commit => self.state = State::Idle,
@@ -333,7 +311,9 @@ impl Mode {
                     }
                 }
             }
-            State::CommitMessageInput => drawer.readline(&self.readline, "type in the commit message..."),
+            State::CommitMessageInput => {
+                drawer.readline(&self.readline, "type in the commit message...")
+            }
             State::ViewDiff => {
                 drawer.output(&self.output);
             }
@@ -364,4 +344,3 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
-

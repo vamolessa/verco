@@ -404,6 +404,6 @@ fn parse_file_status(s: &str) -> FileStatus {
         "!" => FileStatus::Missing,
         "I" => FileStatus::Ignored,
         "C" => FileStatus::Clean,
-        _ => FileStatus::Copied,
+        _ => panic!("unknown file status '{}'", s),
     }
 }

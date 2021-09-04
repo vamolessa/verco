@@ -1,13 +1,13 @@
 use std::thread;
 
 use crate::{
-    backend::{FileStatus, RevisionEntry, RevisionInfo},
+    backend::{RevisionEntry, RevisionInfo, SelectableRevisionEntry},
     mode::{
         ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,
         SelectMenuAction,
     },
     platform::Key,
-    ui::{Drawer, SelectEntryDraw},
+    ui::Drawer,
 };
 
 pub enum Response {
@@ -26,28 +26,10 @@ impl Default for State {
     }
 }
 
-#[derive(Clone)]
-struct Entry {
-    pub selected: bool,
-    pub name: String,
-    pub status: FileStatus,
-}
-impl SelectEntryDraw for Entry {
-    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
-        // TODO: trim
-        let selected_text = if self.selected { '+' } else { ' ' };
-        drawer.fmt(format_args!(
-            "{} [{}] {}",
-            selected_text, &self.status, &self.name,
-        ));
-        1
-    }
-}
-
 #[derive(Default)]
 pub struct Mode {
     state: State,
-    entries: Vec<Entry>,
+    entries: Vec<SelectableRevisionEntry>,
     output: Output,
     select: SelectMenu,
     show_full_message: bool,
@@ -175,15 +157,8 @@ impl Mode {
                     self.output.set(info.message);
                 }
 
-                self.entries = info
-                    .entries
-                    .into_iter()
-                    .map(|e| Entry {
-                        selected: false,
-                        name: e.name,
-                        status: e.status,
-                    })
-                    .collect();
+                self.entries =
+                    info.entries.into_iter().map(Into::into).collect();
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Diff(output) => {
