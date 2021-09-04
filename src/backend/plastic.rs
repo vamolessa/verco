@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::backend::{
     Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
@@ -111,53 +114,49 @@ impl Backend for Plastic {
     }
 
     fn discard(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
+        fn delete_file(name: &str) -> BackendResult<()> {
+            fs::remove_file(name).map_err(|e| e.to_string())
+        }
+
         if entries.is_empty() {
-            Process::spawn("git", &["reset", "--hard"])?.wait()?;
-            Process::spawn("git", &["clean", "-d", "--force"])?.wait()?;
+            Process::spawn("cm", &["undo", ".", "-r"])?.wait()?;
+            let untracked = Process::spawn(
+                "cm",
+                &[
+                    "status",
+                    "--short",
+                    "--nomergesinfo",
+                    "--private",
+                    "--machinereadable",
+                    "--fieldseparator=;",
+                ],
+            )?
+            .wait()?;
+
+            for line in untracked.lines() {
+                if let Some(name) = line.split(';').nth(1) {
+                    delete_file(name)?;
+                }
+            }
         } else {
             let mut args = Vec::new();
-            args.push("clean");
-            args.push("--force");
-            args.push("--");
-            for entry in entries {
-                if let FileStatus::Untracked = entry.status {
-                    args.push(&entry.name);
-                }
-            }
-            let clean = Process::spawn("git", &args)?;
-
             args.clear();
-            args.push("rm");
-            args.push("--force");
-            args.push("--");
+            args.push("undo");
             for entry in entries {
-                if let FileStatus::Added = entry.status {
-                    args.push(&entry.name);
+                match entry.status {
+                    FileStatus::Untracked => delete_file(&entry.name)?,
+                    _ => args.push(&entry.name),
                 }
             }
-            let rm = Process::spawn("git", &args)?;
-
-            args.clear();
-            args.push("checkout");
-            args.push("--");
-            for entry in entries {
-                if !matches!(
-                    entry.status,
-                    FileStatus::Untracked | FileStatus::Added,
-                ) {
-                    args.push(&entry.name);
-                }
+            if args.len() > 1 {
+                Process::spawn("cm", &args)?.wait()?;
             }
-            let checkout = Process::spawn("git", &args)?;
-
-            clean.wait()?;
-            rm.wait()?;
-            checkout.wait()?;
         }
 
         Ok(())
     }
 
+    // TODO: stopped here
     fn diff(
         &self,
         revision: Option<&str>,
@@ -448,7 +447,7 @@ impl Backend for Plastic {
 fn parse_file_status(s: &str) -> FileStatus {
     match s {
         "CH" => FileStatus::Modified,
-        "CO" => FileStatus::CheckedOut,
+        "CO" => FileStatus::Added,
         "LD" => FileStatus::Deleted,
         "PR" => FileStatus::Untracked,
         _ => FileStatus::Other(s.into()),

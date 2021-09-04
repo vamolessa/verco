@@ -15,7 +15,6 @@ pub type BackendResult<T> = std::result::Result<T, String>;
 pub enum FileStatus {
     Modified,
     Added,
-    CheckedOut,
     Deleted,
     Renamed,
     Untracked,
@@ -31,7 +30,6 @@ impl fmt::Display for FileStatus {
         match self {
             Self::Modified => f.write_str("modified"),
             Self::Added => f.write_str("added"),
-            Self::CheckedOut => f.write_str("checked-out"),
             Self::Deleted => f.write_str("deleted"),
             Self::Renamed => f.write_str("renamed"),
             Self::Untracked => f.write_str("untracked"),
