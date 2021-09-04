@@ -217,8 +217,8 @@ impl Backend for Hg {
         Ok(())
     }
 
-    fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
-        let start = start.to_string();
+    fn log(&self, skip: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
+        let skip = skip.to_string();
         let len = len.to_string();
         let template = "--format=format:%x00%h%x00%as%x00%aN%x00%D%x00%s";
         let output = Process::spawn(
@@ -230,7 +230,7 @@ impl Backend for Hg {
                 "--oneline",
                 "--graph",
                 "--skip",
-                &start,
+                &skip,
                 "--max-count",
                 &len,
                 template,

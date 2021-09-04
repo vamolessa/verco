@@ -77,7 +77,13 @@ impl SelectEntryDraw for LogEntry {
         } else {
             let available_width =
                 (drawer.viewport_size.0 as usize).saturating_sub(total_chars);
-            let message = match self.message.char_indices().nth(available_width)
+            let message = match self
+                .message
+                .lines()
+                .next()
+                .unwrap_or("")
+                .char_indices()
+                .nth(available_width)
             {
                 Some((i, _)) => &self.message[..i],
                 None => &self.message,
@@ -111,7 +117,14 @@ impl SelectEntryDraw for LogEntry {
             drawer.next_line();
         }
 
-        drawer.str(message);
+        let mut lines = message.lines();
+        if let Some(line) = lines.next() {
+            drawer.str(line);
+        }
+        for line in lines {
+            drawer.next_line();
+            drawer.str(line);
+        }
 
         1 + line_count
     }
@@ -260,3 +273,4 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
+

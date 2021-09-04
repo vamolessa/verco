@@ -35,7 +35,7 @@ impl Backend for Plastic {
                 "--short",
                 "--nomergesinfo",
                 "--machinereadable",
-                "--fieldseparator=;",
+                "--fieldseparator=\x1f",
             ],
         )?;
 
@@ -45,7 +45,7 @@ impl Backend for Plastic {
         let mut entries = Vec::new();
 
         for line in output.lines() {
-            let mut splits = line.split(';');
+            let mut splits = line.split('\x1f');
             let status = splits.next().unwrap_or("");
             let status = parse_file_status(status);
             let name = splits.next().unwrap_or("").into();
@@ -72,7 +72,7 @@ impl Backend for Plastic {
                     "--nomergesinfo",
                     "--private",
                     "--machinereadable",
-                    "--fieldseparator=;",
+                    "--fieldseparator=\x1f",
                 ],
             )?
             .wait()?;
@@ -80,7 +80,7 @@ impl Backend for Plastic {
             let mut args = Vec::new();
             args.push("add");
             for line in untracked.lines() {
-                if let Some(name) = line.split(';').nth(1) {
+                if let Some(name) = line.split('\x1f').nth(1) {
                     args.push(name);
                 }
             }
@@ -128,13 +128,13 @@ impl Backend for Plastic {
                     "--nomergesinfo",
                     "--private",
                     "--machinereadable",
-                    "--fieldseparator=;",
+                    "--fieldseparator=\x1f",
                 ],
             )?
             .wait()?;
 
             for line in untracked.lines() {
-                if let Some(name) = line.split(';').nth(1) {
+                if let Some(name) = line.split('\x1f').nth(1) {
                     delete_file(name)?;
                 }
             }
@@ -248,34 +248,24 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    // TODO
-    fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
-        let start = start.to_string();
-        let len = len.to_string();
-        let template = "--format=format:%x00%h%x00%as%x00%aN%x00%D%x00%s";
+    fn log(&self, skip: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
         let output = Process::spawn(
-            "git",
+            "cm",
             &[
-                "log",
-                "--all",
-                "--decorate",
-                "--oneline",
-                "--graph",
-                "--skip",
-                &start,
-                "--max-count",
-                &len,
-                template,
+                "find",
+                "changeset",
+                "--nototal",
+                "--format={changesetid}\x1f{date}\x1f{owner}\x1f{branch}\x1f{comment}\x1e",
             ],
         )?
         .wait()?;
 
         let mut entries = Vec::new();
-        for line in output.lines() {
-            let mut splits = line.splitn(6, '\0');
+        for record in output.split('\x1e').rev().skip(skip + 1).take(len) {
+            let mut splits = record.splitn(5, '\x1f');
 
-            let graph = splits.next().unwrap_or("").into();
-            let hash = splits.next().unwrap_or("").into();
+            let graph = String::new();
+            let hash = splits.next().unwrap_or("").trim().into();
             let date = splits.next().unwrap_or("").into();
             let author = splits.next().unwrap_or("").into();
             let refs = splits.next().unwrap_or("").into();
@@ -294,9 +284,8 @@ impl Backend for Plastic {
         Ok(entries)
     }
 
-    // TODO
     fn checkout(&self, revision: &str) -> BackendResult<()> {
-        Process::spawn("git", &["checkout", revision])?.wait()?;
+        Process::spawn("cm", &["switch", revision])?.wait()?;
         Ok(())
     }
 
