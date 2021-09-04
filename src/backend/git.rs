@@ -286,7 +286,7 @@ impl Backend for Git {
     fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo> {
         let message =
             Process::spawn("git", &["show", "-s", "--format=%B", revision])?;
-        let output = Process::spawn(
+        let changes = Process::spawn(
             "git",
             &[
                 "diff-tree",
@@ -300,8 +300,8 @@ impl Backend for Git {
 
         let message = message.wait()?.trim().into();
 
-        let output = output.wait()?;
-        let mut splits = output.split('\0').map(str::trim);
+        let changes = changes.wait()?;
+        let mut splits = changes.split('\0').map(str::trim);
 
         let mut entries = Vec::new();
         loop {

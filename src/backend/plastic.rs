@@ -323,31 +323,29 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    // TODO
     fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo> {
-        let message = Process::spawn("git", &["show", "-s", "--format=%B"])?;
         let output = Process::spawn(
-            "git",
+            "cm",
             &[
-                "diff-tree",
-                "--no-commit-id",
-                "--name-status",
-                "-r",
-                "-z",
+                "log",
                 revision,
+                "--csformat={comment}\x1f{items}",
+                "--itemformat={shortstatus}\x1f{path}\x1f",
             ],
-        )?;
+        )?
+        .wait()?;
 
-        let message = message.wait()?.trim().into();
-
-        let output = output.wait()?;
-        let mut splits = output.split('\0').map(str::trim);
+        let mut splits = output.split('\x1f');
+        let message = splits.next().unwrap_or("").into();
 
         let mut entries = Vec::new();
         loop {
             let status = match splits.next() {
-                Some(status) => parse_file_status(status),
-                None => break,
+                Some("A") => FileStatus::Added,
+                Some("D") => FileStatus::Deleted,
+                Some("M") => FileStatus::Renamed,
+                Some("C") => FileStatus::Modified,
+                _ => break,
             };
             let name = match splits.next() {
                 Some(name) => name.into(),

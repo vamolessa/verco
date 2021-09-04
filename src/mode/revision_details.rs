@@ -34,6 +34,7 @@ struct Entry {
 }
 impl SelectEntryDraw for Entry {
     fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
+        // TODO: trim
         let selected_text = if self.selected { '+' } else { ' ' };
         drawer.fmt(format_args!(
             "{} [{}] {}",
