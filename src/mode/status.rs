@@ -332,7 +332,7 @@ impl Mode {
                     }
                 }
             }
-            State::CommitMessageInput => drawer.readline(&self.readline),
+            State::CommitMessageInput => drawer.readline(&self.readline, "type in the commit message..."),
             State::ViewDiff => {
                 drawer.output(&self.output);
             }

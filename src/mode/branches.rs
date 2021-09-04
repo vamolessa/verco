@@ -232,7 +232,7 @@ impl Mode {
                     drawer.output(&self.output);
                 }
             }
-            State::NewNameInput => drawer.readline(&self.readline),
+            State::NewNameInput => drawer.readline(&self.readline, "type in the branch name..."),
         }
     }
 }

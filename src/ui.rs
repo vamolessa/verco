@@ -47,6 +47,7 @@ pub enum Color {
     DarkYellow,
     DarkBlue,
     DarkMagenta,
+    DarkGray,
     White,
 }
 impl Color {
@@ -58,6 +59,7 @@ impl Color {
             Self::DarkYellow => "3",
             Self::DarkBlue => "4",
             Self::DarkMagenta => "5",
+            Self::DarkGray => "8",
             Self::White => "15",
         }
     }
@@ -165,13 +167,21 @@ impl Drawer {
         line_count
     }
 
-    pub fn readline(&mut self, readline: &ReadLine) {
+    pub fn readline(&mut self, readline: &ReadLine, placeholder: &str) {
+        let input = readline.input();
+
         set_background_color(&mut self.buf, Color::Black);
         set_foreground_color(&mut self.buf, Color::White);
-        self.buf.extend_from_slice(readline.input().as_bytes());
+        self.buf.extend_from_slice(input.as_bytes());
+
         set_background_color(&mut self.buf, Color::DarkRed);
         self.buf.push(b' ');
         set_background_color(&mut self.buf, Color::Black);
+
+        if input.is_empty() {
+            set_foreground_color(&mut self.buf, Color::DarkGray);
+            self.buf.extend_from_slice(placeholder.as_bytes());
+        }
     }
 
     pub fn select_menu<'entries, I, E>(
@@ -215,3 +225,4 @@ impl Drawer {
         }
     }
 }
+
