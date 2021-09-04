@@ -156,7 +156,7 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    // TODO: stopped here
+    // TODO: implement diff somehow
     fn diff(
         &self,
         revision: Option<&str>,
@@ -164,44 +164,25 @@ impl Backend for Plastic {
     ) -> BackendResult<String> {
         match revision {
             Some(revision) => {
-                let parent = format!("{}^@", revision);
                 if entries.is_empty() {
-                    Process::spawn(
-                        "git",
-                        &["diff", "--color", &parent, revision],
-                    )?
-                    .wait()
+                    //
                 } else {
-                    let mut args = Vec::new();
-                    args.push("diff");
-                    args.push("--color");
-                    args.push(&parent);
-                    args.push(revision);
-                    args.push("--");
-                    for entry in entries {
-                        args.push(&entry.name);
-                    }
-
-                    Process::spawn("git", &args)?.wait()
+                    //
                 }
             }
             None => {
                 if entries.is_empty() {
-                    Process::spawn("git", &["diff", "--color"])?.wait()
+                    //
                 } else {
-                    let mut args = Vec::new();
-                    args.push("diff");
-                    args.push("--color");
-                    args.push("--");
-                    for entry in entries {
-                        args.push(&entry.name);
-                    }
-                    Process::spawn("git", &args)?.wait()
+                    //
                 }
             }
         }
+
+        Err("diff is not yet implemented".into())
     }
 
+    // TODO
     fn resolve_taking_ours(
         &self,
         entries: &[RevisionEntry],
@@ -234,6 +215,7 @@ impl Backend for Plastic {
         Ok(())
     }
 
+    // TODO
     fn resolve_taking_theirs(
         &self,
         entries: &[RevisionEntry],
@@ -266,6 +248,7 @@ impl Backend for Plastic {
         Ok(())
     }
 
+    // TODO
     fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
         let start = start.to_string();
         let len = len.to_string();
@@ -311,31 +294,32 @@ impl Backend for Plastic {
         Ok(entries)
     }
 
+    // TODO
     fn checkout(&self, revision: &str) -> BackendResult<()> {
         Process::spawn("git", &["checkout", revision])?.wait()?;
         Ok(())
     }
 
+    // TODO
     fn merge(&self, revision: &str) -> BackendResult<()> {
         Process::spawn("git", &["merge", revision])?.wait()?;
         Ok(())
     }
 
     fn fetch(&self) -> BackendResult<()> {
-        Process::spawn("git", &["fetch", "--all"])?.wait()?;
         Ok(())
     }
 
     fn pull(&self) -> BackendResult<()> {
-        Process::spawn("git", &["pull", "--all"])?.wait()?;
+        Process::spawn("cm", &["update"])?.wait()?;
         Ok(())
     }
 
     fn push(&self) -> BackendResult<()> {
-        Process::spawn("git", &["push"])?.wait()?;
         Ok(())
     }
 
+    // TODO
     fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo> {
         let message = Process::spawn("git", &["show", "-s", "--format=%B"])?;
         let output = Process::spawn(
@@ -373,73 +357,57 @@ impl Backend for Plastic {
     }
 
     fn branches(&self) -> BackendResult<Vec<BranchEntry>> {
+        let current_branch = Process::spawn("cm", &["status", "--header"])?;
         let entries = Process::spawn(
-            "git",
-            &[
-                "branch",
-                "--list",
-                "--all",
-                "--format=%(refname:short)%00%(HEAD)",
-            ],
-        )?
-        .wait()?
-        .lines()
-        .map(|l| {
-            let mut splits = l.splitn(2, '\0');
-            let name = splits.next().unwrap_or("").into();
-            let checked_out = splits.next().unwrap_or("") == "*";
-            BranchEntry { name, checked_out }
-        })
-        .collect();
+            "cm",
+            &["find", "branch", "--nototal", "--format={name}"],
+        )?;
+
+        let current_branch = current_branch.wait()?;
+        let current_branch = current_branch.split('@').next().unwrap_or("");
+
+        let entries = entries
+            .wait()?
+            .lines()
+            .map(|name| {
+                let name = name.into();
+                let checked_out = name == current_branch;
+                BranchEntry { name, checked_out }
+            })
+            .collect();
+
         Ok(entries)
     }
 
     fn new_branch(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["branch", name])?.wait()?;
-        Process::spawn("git", &["checkout", name])?.wait()?;
-        Process::spawn(
-            "git",
-            &["push", "--set-upstream", remote.trim(), name],
-        )?
-        .wait()?;
+        Process::spawn("cm", &["branch", "create", name])?.wait()?;
         Ok(())
     }
 
     fn delete_branch(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["branch", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
-            .wait()?;
+        Process::spawn("cm", &["branch", "delete", name])?.wait()?;
         Ok(())
     }
 
     fn tags(&self) -> BackendResult<Vec<TagEntry>> {
         let entries = Process::spawn(
-            "git",
-            &["tag", "--list", "--format=%(refname:short)"],
+            "cm",
+            &["find", "label", "--nototal", "--format={name}"],
         )?
         .wait()?
         .lines()
-        .map(|l| TagEntry {
-            name: l.trim().into(),
-        })
+        .map(|l| TagEntry { name: l.into() })
         .collect();
         Ok(entries)
     }
 
     fn new_tag(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["tag", "--force", name])?.wait()?;
-        Process::spawn("git", &["push", remote.trim(), name])?.wait()?;
+        Process::spawn("cm", &["label", "create", name])?.wait()?;
         Ok(())
     }
 
     fn delete_tag(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["tag", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
-            .wait()?;
+        Process::spawn("cm", &["label", "delete", name])?.wait()?;
         Ok(())
     }
 }
