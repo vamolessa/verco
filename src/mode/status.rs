@@ -313,9 +313,14 @@ impl Mode {
                     );
 
                     if self.entries.is_empty() {
+                        let empty_message = match self.state {
+                            State::Idle => "nothing to commit!",
+                            _ => "working...",
+                        };
                         drawer.fmt(format_args!(
-                            "{}nothing to commit!",
-                            Color::DarkYellow
+                            "{}{}",
+                            Color::DarkYellow,
+                            empty_message
                         ));
                     }
                 }
@@ -353,3 +358,4 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+
