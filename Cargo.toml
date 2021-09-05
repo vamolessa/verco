@@ -14,7 +14,7 @@ documentation = "https://github.com/vamolessa/verco"
 homepage = "https://vamolessa.github.com/verco"
 repository = "https://github.com/vamolessa/verco"
 readme = "README.md"
-keywords = ["version-control", "tool", "git", "hg", "mercurial", "plastic", "scm", "cli"]
+keywords = ["version-control", "git", "hg", "mercurial", "plastic"]
 categories = ["command-line-utilities"]
 
 [[bin]]
