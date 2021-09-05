@@ -19,6 +19,8 @@ fn main() {
                     let version = env!("CARGO_PKG_VERSION");
                     println!("{} v{}", name, version);
                     println!();
+                    println!("{}", env!("CARGO_PKG_DESCRIPTION"));
+                    println!();
                     println!("\t-h --help\tprint this help message and exit");
                     println!("\t-v --version\tprint version number and exit");
                 }

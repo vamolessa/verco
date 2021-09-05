@@ -1,12 +1,12 @@
 [package]
 name = "verco"
-version = "6.0.1"
+version = "6.1.0"
 authors = ["Matheus Lessa"]
 edition = "2018"
 exclude = [
     "images/*",
 ]
-description = "A simple Git/Hg version control client based on keyboard shortcuts"
+description = "A simple Git/Mercurial/PlasticSCM tui client based on keyboard shortcuts"
 license = "GPL-3.0"
 resolver = "2"
 
@@ -14,7 +14,7 @@ documentation = "https://github.com/vamolessa/verco"
 homepage = "https://vamolessa.github.com/verco"
 repository = "https://github.com/vamolessa/verco"
 readme = "README.md"
-keywords = ["version-control", "tool", "git", "hg", "cli"]
+keywords = ["version-control", "tool", "git", "hg", "mercurial", "plastic", "scm", "cli"]
 categories = ["command-line-utilities"]
 
 [[bin]]
