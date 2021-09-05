@@ -7,7 +7,7 @@ use crate::{
         SelectMenu,
     },
     platform::Key,
-    ui::{Drawer, SelectEntryDraw},
+    ui::{Drawer, SelectEntryDraw, RESERVED_LINES_COUNT},
 };
 
 pub enum Response {
@@ -62,7 +62,8 @@ impl Mode {
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let pending_input = matches!(self.state, State::NewNameInput);
-        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
+        let available_height =
+            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
         match self.state {
             State::Idle | State::Waiting(_) => {
@@ -166,14 +167,18 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> &str {
-        match self.state {
-            State::Idle => "tags",
-            State::Waiting(WaitOperation::Refresh) => "tags",
+    pub fn header(&self) -> (&str, &str, &str) {
+        let name = match self.state {
+            State::Idle | State::Waiting(WaitOperation::Refresh) => "tags",
             State::Waiting(WaitOperation::New) => "new tag",
             State::Waiting(WaitOperation::Delete) => "delete tag",
             State::NewNameInput => "new tag name",
-        }
+        };
+        let (left_help, right_help) = match self.state {
+            State::Idle | State::Waiting(_) => ("[g]checkout [n]new [D]delete", "[arrows]move"),
+            State::NewNameInput => ("", "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all"),
+        };
+        (name, left_help, right_help)
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {

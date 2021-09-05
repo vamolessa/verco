@@ -136,14 +136,14 @@ impl Application {
             false => b' ',
         };
 
-        let header = match &self.current_mode {
+        let (mode_name, left_help, right_help) = match &self.current_mode {
             ModeKind::Status => self.status_mode.header(),
             ModeKind::Log => self.log_mode.header(),
             ModeKind::RevisionDetails(_) => self.revision_details_mode.header(),
             ModeKind::Branches => self.branches_mode.header(),
             ModeKind::Tags => self.tags_mode.header(),
         };
-        drawer.header(header, spinner);
+        drawer.header(mode_name, left_help, right_help, spinner);
     }
 
     pub fn draw_body(&self, drawer: &mut Drawer) {

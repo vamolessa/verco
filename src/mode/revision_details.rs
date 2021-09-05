@@ -7,7 +7,7 @@ use crate::{
         SelectMenuAction,
     },
     platform::Key,
-    ui::Drawer,
+    ui::{Drawer, RESERVED_LINES_COUNT},
 };
 
 pub enum Response {
@@ -84,7 +84,8 @@ impl Mode {
         revision: &str,
         key: Key,
     ) -> ModeStatus {
-        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
+        let available_height =
+            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
         match self.state {
             State::Idle => {
@@ -177,11 +178,14 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> &str {
+    pub fn header(&self) -> (&str, &str, &str) {
         match self.state {
-            State::Idle => "revision details",
-            State::Waiting => "revision details",
-            State::ViewDiff => "diff",
+            State::Idle | State::Waiting => (
+                "revision details",
+                "[d]diff",
+                "[arrows]move [space]toggle [a]toggle all",
+            ),
+            State::ViewDiff => ("diff", "", "[arrows]move"),
         }
     }
 

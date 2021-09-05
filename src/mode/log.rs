@@ -6,7 +6,7 @@ use crate::{
         ModeContext, ModeKind, ModeResponse, ModeStatus, Output, SelectMenu,
     },
     platform::Key,
-    ui::{Color, Drawer, SelectEntryDraw},
+    ui::{Color, Drawer, SelectEntryDraw, RESERVED_LINES_COUNT},
 };
 
 pub enum Response {
@@ -152,7 +152,8 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
-        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
+        let available_height =
+            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
         self.select
             .on_key(self.entries.len(), available_height, key);
 
@@ -232,16 +233,18 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> &str {
-        match self.state {
-            State::Idle => "log",
-            State::Waiting(WaitOperation::Refresh) => "log",
+    pub fn header(&self) -> (&str, &str, &str) {
+        let name = match self.state {
+            State::Idle | State::Waiting(WaitOperation::Refresh) => "log",
             State::Waiting(WaitOperation::Checkout) => "checkout",
             State::Waiting(WaitOperation::Merge) => "merge",
             State::Waiting(WaitOperation::Fetch) => "fetch",
             State::Waiting(WaitOperation::Pull) => "pull",
             State::Waiting(WaitOperation::Push) => "push",
-        }
+        };
+        let left_help = "[g]checkout [d]details [f]fetch [p]pull [P]push";
+        let right_help = "[arrows]move";
+        (name, left_help, right_help)
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
@@ -266,7 +269,8 @@ where
     thread::spawn(move || {
         use std::ops::Deref;
 
-        let available_height = ctx.viewport_size.1.saturating_sub(2) as _;
+        let available_height =
+            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
         let result = f(ctx.backend.deref())
             .and_then(|_| ctx.backend.log(0, available_height));
         ctx.event_sender

@@ -2,6 +2,9 @@ use std::fmt;
 
 use crate::mode::{Output, ReadLine, SelectMenu};
 
+pub const HEADER_LINE_COUNT: usize = 2;
+pub const RESERVED_LINES_COUNT: usize = HEADER_LINE_COUNT + 1;
+
 pub static ENTER_ALTERNATE_BUFFER_CODE: &[u8] = b"\x1b[?1049h";
 pub static EXIT_ALTERNATE_BUFFER_CODE: &[u8] = b"\x1b[?1049l";
 pub static HIDE_CURSOR_CODE: &[u8] = b"\x1b[?25l";
@@ -97,23 +100,98 @@ impl Drawer {
         clear_to_end(&mut self.buf);
     }
 
-    pub fn header(&mut self, header: &str, spinner: u8) {
-        let background_color = Color::DarkYellow;
-        let foreground_color = Color::Black;
+    pub fn header(
+        &mut self,
+        current_mode_name: &str,
+        left_help: &str,
+        right_help: &str,
+        spinner: u8,
+    ) {
+        const ALL_MODES: &[(&str, u8)] = &[
+            ("status", b's'),
+            ("log", b'l'),
+            ("branches", b'b'),
+            ("tags", b't'),
+        ];
+        fn mode_tabs_len(tabs: &[(&str, u8)]) -> usize {
+            let mut len = 0;
+            for (name, _) in tabs {
+                len += "[x]".len() + name.len() + 1;
+            }
+            len
+        }
+
+        let background_color = Color::Black;
+        let foreground_color = Color::DarkYellow;
 
         move_cursor_to_zero(&mut self.buf);
+
         set_background_color(&mut self.buf, background_color);
         set_foreground_color(&mut self.buf, foreground_color);
-        self.buf.extend_from_slice(&[b' ', spinner, b' ']);
+        self.buf.push(b' ');
+        self.buf.push(spinner);
+        self.buf.push(b' ');
+
         set_background_color(&mut self.buf, foreground_color);
         set_foreground_color(&mut self.buf, background_color);
         self.buf.push(b' ');
-        self.buf.extend_from_slice(header.as_bytes());
+        self.buf.extend_from_slice(current_mode_name.as_bytes());
         self.buf.push(b' ');
+
         set_background_color(&mut self.buf, background_color);
+        set_foreground_color(&mut self.buf, foreground_color);
+
+        let (modes_before, modes_after) =
+            match ALL_MODES.iter().position(|&(m, _)| m == current_mode_name) {
+                Some(i) => (&ALL_MODES[..i], &ALL_MODES[i + 1..]),
+                None => (ALL_MODES, &[][..]),
+            };
+        let modes_before_len = mode_tabs_len(modes_before);
+        let modes_after_len = mode_tabs_len(modes_after);
+        let current_mode_len = 3 + 1 + current_mode_name.len() + 1;
+
+        let spacer_len = (self.viewport_size.0 as usize).saturating_sub(
+            modes_before_len + modes_after_len + current_mode_len,
+        );
+        self.buf.extend(std::iter::repeat(b' ').take(spacer_len));
+
+        for &(mode_name, shortcut) in modes_before.iter().chain(modes_after) {
+            self.buf.push(b'[');
+            self.buf.push(shortcut);
+            self.buf.push(b']');
+            self.buf.extend_from_slice(mode_name.as_bytes());
+            self.buf.push(b' ');
+        }
+
         clear_until_new_line(&mut self.buf);
         move_cursor_to_next_line(&mut self.buf);
-        self.buf.extend_from_slice(RESET_STYLE_CODE);
+
+        set_background_color(&mut self.buf, foreground_color);
+        set_foreground_color(&mut self.buf, background_color);
+
+        let mut left_help = left_help.as_bytes();
+        let mut right_help = right_help.as_bytes();
+
+        let available_width = self.viewport_size.0.saturating_sub(1) as usize;
+        if left_help.len() > available_width {
+            left_help = &left_help[..available_width];
+            right_help = &[];
+        } else if left_help.len() + right_help.len() > available_width {
+            let overflow_len =
+                left_help.len() + right_help.len() - available_width;
+            right_help = &right_help[..right_help.len() - overflow_len];
+        }
+
+        let spacer_len =
+            1 + available_width - left_help.len() - right_help.len();
+        self.buf.extend_from_slice(left_help);
+        self.buf.extend(std::iter::repeat(b' ').take(spacer_len));
+        self.buf.extend_from_slice(right_help);
+
+        move_cursor_to_next_line(&mut self.buf);
+
+        set_background_color(&mut self.buf, Color::Black);
+        set_foreground_color(&mut self.buf, Color::White);
     }
 
     pub fn str(&mut self, line: &str) {

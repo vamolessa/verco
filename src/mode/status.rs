@@ -10,7 +10,7 @@ use crate::{
         SelectMenu, SelectMenuAction,
     },
     platform::Key,
-    ui::{Color, Drawer},
+    ui::{Color, Drawer, RESERVED_LINES_COUNT},
 };
 
 pub enum Response {
@@ -89,7 +89,8 @@ impl Mode {
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let pending_input = matches!(self.state, State::CommitMessageInput);
-        let available_height = ctx.viewport_size.1.saturating_sub(2) as usize;
+        let available_height =
+            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
         match self.state {
             State::Idle | State::Waiting(_) => {
@@ -261,10 +262,9 @@ impl Mode {
         }
     }
 
-    pub fn header(&self) -> &str {
-        match self.state {
-            State::Idle => "status",
-            State::Waiting(WaitOperation::Refresh) => "status",
+    pub fn header(&self) -> (&str, &str, &str) {
+        let name = match self.state {
+            State::Idle | State::Waiting(WaitOperation::Refresh) => "status",
             State::CommitMessageInput => "commit message",
             State::Waiting(WaitOperation::Commit) => "commit",
             State::Waiting(WaitOperation::Discard) => "discard",
@@ -275,7 +275,16 @@ impl Mode {
                 "resolve taking other"
             }
             State::ViewDiff => "diff",
-        }
+        };
+        let (left_help, right_help) = match self.state {
+            State::Idle | State::Waiting(_) => (
+                "[c]commit [R]revert [d]diff [L]take local [O]take other",
+                "[arrows]move [space]toggle [a]toggle all"
+            ),
+            State::CommitMessageInput => ("", "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all"),
+            State::ViewDiff => ("", "[arrows]move"),
+        };
+        (name, left_help, right_help)
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {

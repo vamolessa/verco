@@ -116,7 +116,7 @@ impl SelectEntryDraw for SelectableRevisionEntry {
 
         let selected_text = if self.selected { '+' } else { ' ' };
         drawer.fmt(format_args!(
-            "{} [{:width$}] {}{}",
+            "{} [{:>width$}] {}{}",
             selected_text,
             self.status.as_str(),
             name_prefix,
