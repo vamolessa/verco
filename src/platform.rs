@@ -18,14 +18,13 @@ use winapi::{
             ENABLE_VIRTUAL_TERMINAL_PROCESSING, ENABLE_WINDOW_INPUT,
         },
         wincontypes::{
-            KEY_EVENT, LEFT_ALT_PRESSED, LEFT_CTRL_PRESSED, RIGHT_ALT_PRESSED,
-            RIGHT_CTRL_PRESSED, WINDOW_BUFFER_SIZE_EVENT,
+            KEY_EVENT, LEFT_ALT_PRESSED, LEFT_CTRL_PRESSED, RIGHT_ALT_PRESSED, RIGHT_CTRL_PRESSED,
+            WINDOW_BUFFER_SIZE_EVENT,
         },
         winnt::HANDLE,
         winuser::{
-            VK_BACK, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_F1, VK_F24,
-            VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SPACE,
-            VK_TAB, VK_UP,
+            VK_BACK, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_F1, VK_F24, VK_HOME, VK_LEFT,
+            VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SPACE, VK_TAB, VK_UP,
         },
     },
 };
@@ -88,8 +87,7 @@ impl Platform {
             new.c_oflag &= !libc::OPOST;
             new.c_cflag &= !(libc::CSIZE | libc::PARENB);
             new.c_cflag |= libc::CS8;
-            new.c_lflag &=
-                !(libc::ECHO | libc::ICANON | libc::ISIG | libc::IEXTEN);
+            new.c_lflag &= !(libc::ECHO | libc::ICANON | libc::ISIG | libc::IEXTEN);
             new.c_lflag |= libc::NOFLSH;
             new.c_cc[libc::VMIN] = 0;
             new.c_cc[libc::VTIME] = 0;
@@ -121,9 +119,7 @@ impl Platform {
 #[cfg(unix)]
 impl Drop for Platform {
     fn drop(&mut self) {
-        unsafe {
-            libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &self.original)
-        };
+        unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &self.original) };
     }
 }
 
@@ -141,8 +137,7 @@ const MAX_TRIGGERED_EVENT_COUNT: usize = 32;
 #[cfg(unix)]
 impl PlatformEventReader {
     pub fn read(fd: RawFd, buf: &mut [u8]) -> Result<usize, ()> {
-        let len =
-            unsafe { libc::read(fd, buf.as_mut_ptr() as _, buf.len() as _) };
+        let len = unsafe { libc::read(fd, buf.as_mut_ptr() as _, buf.len() as _) };
         if len >= 0 {
             Ok(len as _)
         } else {
@@ -150,21 +145,13 @@ impl PlatformEventReader {
         }
     }
 
-    fn parse_terminal_keys(
-        mut buf: &[u8],
-        backspace_code: u8,
-        keys: &mut Vec<Key>,
-    ) {
+    fn parse_terminal_keys(mut buf: &[u8], backspace_code: u8, keys: &mut Vec<Key>) {
         loop {
             let (key, rest) = match buf {
                 &[] => break,
-                &[b, ref rest @ ..] if b == backspace_code => {
-                    (Key::Backspace, rest)
-                }
+                &[b, ref rest @ ..] if b == backspace_code => (Key::Backspace, rest),
                 &[0x1b, b'[', b'5', b'~', ref rest @ ..] => (Key::PageUp, rest),
-                &[0x1b, b'[', b'6', b'~', ref rest @ ..] => {
-                    (Key::PageDown, rest)
-                }
+                &[0x1b, b'[', b'6', b'~', ref rest @ ..] => (Key::PageDown, rest),
                 &[0x1b, b'[', b'A', ref rest @ ..] => (Key::Up, rest),
                 &[0x1b, b'[', b'B', ref rest @ ..] => (Key::Down, rest),
                 &[0x1b, b'[', b'C', ref rest @ ..] => (Key::Right, rest),
@@ -187,11 +174,7 @@ impl PlatformEventReader {
                     let byte = b | 0b01100000;
                     (Key::Ctrl(byte as _), rest)
                 }
-                _ => match buf
-                    .iter()
-                    .position(|b| b.is_ascii())
-                    .unwrap_or(buf.len())
-                {
+                _ => match buf.iter().position(|b| b.is_ascii()).unwrap_or(buf.len()) {
                     0 => (Key::Char(buf[0] as _), &buf[1..]),
                     len => {
                         let (c, rest) = buf.split_at(len);
@@ -235,15 +218,10 @@ impl PlatformEventReader {
 
     fn epoll_add_fd(epoll_fd: RawFd, fd: RawFd, index: usize) {
         let mut event = libc::epoll_event {
-            events: (libc::EPOLLIN
-                | libc::EPOLLERR
-                | libc::EPOLLRDHUP
-                | libc::EPOLLHUP) as _,
+            events: (libc::EPOLLIN | libc::EPOLLERR | libc::EPOLLRDHUP | libc::EPOLLHUP) as _,
             u64: index as _,
         };
-        let result = unsafe {
-            libc::epoll_ctl(epoll_fd, libc::EPOLL_CTL_ADD, fd, &mut event)
-        };
+        let result = unsafe { libc::epoll_ctl(epoll_fd, libc::EPOLL_CTL_ADD, fd, &mut event) };
         if result == -1 {
             panic!("could not add event");
         }
@@ -265,11 +243,7 @@ impl PlatformEventReader {
             if result == -1 {
                 panic!("could not create signal fd");
             }
-            let result = libc::sigprocmask(
-                libc::SIG_BLOCK,
-                &signals,
-                std::ptr::null_mut(),
-            );
+            let result = libc::sigprocmask(libc::SIG_BLOCK, &signals, std::ptr::null_mut());
             if result == -1 {
                 panic!("could not create signal fd");
             }
@@ -302,23 +276,14 @@ impl PlatformEventReader {
         }
     }
 
-    pub fn read_terminal_events(
-        &mut self,
-        keys: &mut Vec<Key>,
-        resize: &mut Option<(u16, u16)>,
-    ) {
+    pub fn read_terminal_events(&mut self, keys: &mut Vec<Key>, resize: &mut Option<(u16, u16)>) {
         fn epoll_wait<'a>(
             epoll_fd: RawFd,
             events: &'a mut [libc::epoll_event],
         ) -> impl 'a + ExactSizeIterator<Item = usize> {
             let timeout = -1;
             let mut len = unsafe {
-                libc::epoll_wait(
-                    epoll_fd,
-                    events.as_mut_ptr(),
-                    events.len() as _,
-                    timeout,
-                )
+                libc::epoll_wait(epoll_fd, events.as_mut_ptr(), events.len() as _, timeout)
             };
             if len == -1 {
                 if PlatformEventReader::errno() == libc::EINTR {
@@ -331,24 +296,20 @@ impl PlatformEventReader {
             events[..len as usize].iter().map(|e| e.u64 as _)
         }
 
-        const DEFAULT_EVENT: libc::epoll_event =
-            libc::epoll_event { events: 0, u64: 0 };
+        const DEFAULT_EVENT: libc::epoll_event = libc::epoll_event { events: 0, u64: 0 };
         let mut epoll_events = [DEFAULT_EVENT; MAX_TRIGGERED_EVENT_COUNT];
 
         for event_index in epoll_wait(self.queue_fd, &mut epoll_events) {
             match event_index {
                 0 => match Self::read(libc::STDIN_FILENO, &mut self.buf) {
                     Ok(0) | Err(()) => panic!("could not read from stdin"),
-                    Ok(len) => Self::parse_terminal_keys(
-                        &self.buf[..len],
-                        self.backspace_code,
-                        keys,
-                    ),
+                    Ok(len) => {
+                        Self::parse_terminal_keys(&self.buf[..len], self.backspace_code, keys)
+                    }
                 },
                 1 => {
                     if let Some(fd) = self.resize_signal_fd {
-                        let mut buf =
-                            [0; std::mem::size_of::<libc::signalfd_siginfo>()];
+                        let mut buf = [0; std::mem::size_of::<libc::signalfd_siginfo>()];
                         if Self::read(fd, &mut buf) != Ok(buf.len()) {
                             panic!("could not read from signal fd");
                         }
@@ -426,11 +387,7 @@ impl PlatformEventReader {
         Self::modify_kqueue(self.queue_fd, &resize_event);
     }
 
-    pub fn read_terminal_events(
-        &mut self,
-        keys: &mut Vec<Key>,
-        resize: &mut Option<(u16, u16)>,
-    ) {
+    pub fn read_terminal_events(&mut self, keys: &mut Vec<Key>, resize: &mut Option<(u16, u16)>) {
         struct TriggeredEvent {
             pub index: usize,
             pub data: isize,
@@ -439,8 +396,7 @@ impl PlatformEventReader {
         pub fn kqueue_wait<'a>(
             kqueue_fd: RawFd,
             events: &'a mut [libc::kevent],
-        ) -> impl 'a + ExactSizeIterator<Item = Result<TriggeredEvent, ()>>
-        {
+        ) -> impl 'a + ExactSizeIterator<Item = Result<TriggeredEvent, ()>> {
             let timeout = std::ptr::null();
             let mut len = unsafe {
                 libc::kevent(
@@ -488,16 +444,12 @@ impl PlatformEventReader {
                     self.buf.resize(data as _, 0);
                     match Self::read(libc::STDIN_FILENO, &mut self.buf) {
                         Ok(0) | Err(()) => panic!("could not read from stdin"),
-                        Ok(len) => Self::parse_terminal_keys(
-                            &self.buf[..len],
-                            self.backspace_code,
-                            keys,
-                        ),
+                        Ok(len) => {
+                            Self::parse_terminal_keys(&self.buf[..len], self.backspace_code, keys)
+                        }
                     }
                 }
-                Ok(TriggeredEvent { index: 1, .. }) => {
-                    *resize = Some(Platform::terminal_size())
-                }
+                Ok(TriggeredEvent { index: 1, .. }) => *resize = Some(Platform::terminal_size()),
                 Ok(_) => unreachable!(),
                 Err(()) => break,
             }
@@ -524,8 +476,7 @@ impl Platform {
             return None;
         }
 
-        let input_handle_original_mode =
-            Self::swap_console_mode(input_handle, ENABLE_WINDOW_INPUT);
+        let input_handle_original_mode = Self::swap_console_mode(input_handle, ENABLE_WINDOW_INPUT);
         let output_handle_original_mode = Self::swap_console_mode(
             output_handle,
             ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING,
@@ -547,9 +498,7 @@ impl Platform {
         };
 
         let mut console_info = unsafe { std::mem::zeroed() };
-        let result = unsafe {
-            GetConsoleScreenBufferInfo(output_handle, &mut console_info)
-        };
+        let result = unsafe { GetConsoleScreenBufferInfo(output_handle, &mut console_info) };
         if result == FALSE {
             panic!("could not get console size");
         }
@@ -590,10 +539,7 @@ impl Drop for Platform {
             Platform::set_console_mode(handle, self.input_handle_original_mode);
         }
         if let Some(handle) = Platform::get_std_handle(STD_OUTPUT_HANDLE) {
-            Platform::set_console_mode(
-                handle,
-                self.output_handle_original_mode,
-            );
+            Platform::set_console_mode(handle, self.output_handle_original_mode);
         }
     }
 }
@@ -605,11 +551,7 @@ pub struct PlatformEventReader;
 impl PlatformEventReader {
     pub fn init(&mut self) {}
 
-    pub fn read_terminal_events(
-        &mut self,
-        keys: &mut Vec<Key>,
-        resize: &mut Option<(u16, u16)>,
-    ) {
+    pub fn read_terminal_events(&mut self, keys: &mut Vec<Key>, resize: &mut Option<(u16, u16)>) {
         let input_handle = match Platform::get_std_handle(STD_INPUT_HANDLE) {
             Some(handle) => handle,
             None => return,
@@ -660,43 +602,29 @@ impl PlatformEventReader {
                         VK_F1..=VK_F24 => continue,
                         VK_ESCAPE => Key::Esc,
                         VK_SPACE => {
-                            match std::char::decode_utf16(std::iter::once(
-                                unicode_char,
-                            ))
-                            .next()
-                            {
+                            match std::char::decode_utf16(std::iter::once(unicode_char)).next() {
                                 Some(Ok(c)) => Key::Char(c),
                                 _ => continue,
                             }
                         }
                         CHAR_A..=CHAR_Z => {
-                            const ALT_PRESSED_MASK: DWORD =
-                                LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED;
-                            const CTRL_PRESSED_MASK: DWORD =
-                                LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED;
+                            const ALT_PRESSED_MASK: DWORD = LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED;
+                            const CTRL_PRESSED_MASK: DWORD = LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED;
 
                             if control_key_state & ALT_PRESSED_MASK != 0 {
                                 continue;
-                            } else if control_key_state & CTRL_PRESSED_MASK != 0
-                            {
+                            } else if control_key_state & CTRL_PRESSED_MASK != 0 {
                                 let c = (keycode - CHAR_A) as u8 + b'a';
                                 Key::Ctrl(c.to_ascii_lowercase() as _)
                             } else {
-                                match std::char::decode_utf16(std::iter::once(
-                                    unicode_char,
-                                ))
-                                .next()
+                                match std::char::decode_utf16(std::iter::once(unicode_char)).next()
                                 {
                                     Some(Ok(c)) => Key::Char(c),
                                     _ => continue,
                                 }
                             }
                         }
-                        _ => match std::char::decode_utf16(std::iter::once(
-                            unicode_char,
-                        ))
-                        .next()
-                        {
+                        _ => match std::char::decode_utf16(std::iter::once(unicode_char)).next() {
                             Some(Ok(c)) if c.is_ascii_graphic() => Key::Char(c),
                             _ => continue,
                         },
@@ -707,8 +635,7 @@ impl PlatformEventReader {
                     }
                 }
                 WINDOW_BUFFER_SIZE_EVENT => {
-                    let size =
-                        unsafe { event.Event.WindowBufferSizeEvent().dwSize };
+                    let size = unsafe { event.Event.WindowBufferSizeEvent().dwSize };
                     *resize = Some((size.X as _, size.Y as _));
                 }
                 _ => (),

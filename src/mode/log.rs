@@ -2,9 +2,7 @@ use std::thread;
 
 use crate::{
     backend::{Backend, BackendResult, LogEntry},
-    mode::{
-        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, SelectMenu,
-    },
+    mode::{ModeContext, ModeKind, ModeResponse, ModeStatus, Output, SelectMenu},
     platform::Key,
     ui::{Color, Drawer, SelectEntryDraw, RESERVED_LINES_COUNT},
 };
@@ -75,8 +73,7 @@ impl SelectEntryDraw for LogEntry {
             }
             (line_count, &self.message[..])
         } else {
-            let available_width =
-                (drawer.viewport_size.0 as usize).saturating_sub(total_chars);
+            let available_width = (drawer.viewport_size.0 as usize).saturating_sub(total_chars);
             let message = match self
                 .message
                 .lines()
@@ -152,17 +149,15 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
-        let available_height =
-            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+        let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
         self.select
             .on_key(self.entries.len(), available_height, key);
 
         if let Key::Char('d') = key {
             let index = self.select.cursor();
             if let Some(entry) = self.entries.get(index) {
-                ctx.event_sender.send_mode_change(ModeKind::RevisionDetails(
-                    entry.hash.clone(),
-                ));
+                ctx.event_sender
+                    .send_mode_change(ModeKind::RevisionDetails(entry.hash.clone()));
             }
         } else if let Key::Tab = key {
             self.show_full_hovered_message = !self.show_full_hovered_message;
@@ -269,10 +264,8 @@ where
     thread::spawn(move || {
         use std::ops::Deref;
 
-        let available_height =
-            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
-        let result = f(ctx.backend.deref())
-            .and_then(|_| ctx.backend.log(0, available_height));
+        let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+        let result = f(ctx.backend.deref()).and_then(|_| ctx.backend.log(0, available_height));
         ctx.event_sender
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });

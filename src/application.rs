@@ -63,9 +63,7 @@ impl Application {
     }
 
     pub fn refresh_mode(&mut self, ctx: &ModeContext, mode: ModeKind) {
-        if std::mem::discriminant(&self.current_mode)
-            == std::mem::discriminant(&mode)
-        {
+        if std::mem::discriminant(&self.current_mode) == std::mem::discriminant(&mode) {
             self.enter_mode(ctx, mode);
         }
     }
@@ -120,9 +118,7 @@ impl Application {
         match &self.current_mode {
             ModeKind::Status => self.status_mode.is_waiting_response(),
             ModeKind::Log => self.log_mode.is_waiting_response(),
-            ModeKind::RevisionDetails(_) => {
-                self.revision_details_mode.is_waiting_response()
-            }
+            ModeKind::RevisionDetails(_) => self.revision_details_mode.is_waiting_response(),
             ModeKind::Branches => self.branches_mode.is_waiting_response(),
             ModeKind::Tags => self.tags_mode.is_waiting_response(),
         }
@@ -160,10 +156,7 @@ impl Application {
     }
 }
 
-fn terminal_event_loop(
-    mut event_reader: PlatformEventReader,
-    sender: mpsc::SyncSender<Event>,
-) {
+fn terminal_event_loop(mut event_reader: PlatformEventReader, sender: mpsc::SyncSender<Event>) {
     event_reader.init();
 
     let mut keys = Vec::new();
@@ -186,10 +179,7 @@ fn terminal_event_loop(
     }
 }
 
-pub fn run(
-    platform_event_reader: PlatformEventReader,
-    backend: Arc<dyn Backend>,
-) {
+pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>) {
     let (event_sender, event_receiver) = mpsc::sync_channel(1);
 
     let mut ctx = ModeContext {
@@ -233,9 +223,7 @@ pub fn run(
             }
             Ok(Event::Response(response)) => application.on_response(response),
             Ok(Event::ModeChange(mode)) => application.enter_mode(&ctx, mode),
-            Ok(Event::ModeRefresh(mode)) => {
-                application.refresh_mode(&ctx, mode)
-            }
+            Ok(Event::ModeRefresh(mode)) => application.refresh_mode(&ctx, mode),
             Err(mpsc::RecvTimeoutError::Timeout) => draw_body = false,
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }

@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::backend::{
-    Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
-    RevisionEntry, RevisionInfo, StatusInfo, TagEntry,
+    Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process, RevisionEntry,
+    RevisionInfo, StatusInfo, TagEntry,
 };
 
 pub struct Hg;
@@ -20,39 +20,29 @@ impl Backend for Hg {
         let header = Process::spawn("hg", &["summary"])?;
         let output = Process::spawn("hg", &["status"])?;
 
-        let header = header.wait()?;
+        let header = header.wait()?.lines().next().unwrap_or("").into();
         let output = output.wait()?;
 
-        let entries = output
-            .lines()
-            .map(str::trim)
-            .filter(|e| e.len() > 1)
-            .map(|e| {
-                let (status, filename) = e.split_at(1);
-                RevisionEntry {
-                    name: filename.trim().into(),
-                    status: parse_file_status(status.trim()),
-                }
-            })
-            .collect();
+        let mut entries = Vec::new();
+        for line in output.lines() {
+            let mut splits = line.splitn(2, ' ');
+            let status = parse_file_status(splits.next().unwrap_or("").trim());
+            let name = splits.next().unwrap_or("").into();
+
+            entries.push(RevisionEntry { name, status });
+        }
 
         Ok(StatusInfo { header, entries })
     }
 
-    fn commit(
-        &self,
-        message: &str,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn commit(&self, message: &str, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("hg", &["commit", "--addremove", "-m", message])?
-                .wait()?;
+            Process::spawn("hg", &["commit", "--addremove", "-m", message])?.wait()?;
         } else {
             let mut args = Vec::new();
             args.push("remove");
             for entry in entries {
-                if let FileStatus::Missing | FileStatus::Deleted = entry.status
-                {
+                if let FileStatus::Missing | FileStatus::Deleted = entry.status {
                     args.push(&entry.name);
                 }
             }
@@ -70,7 +60,7 @@ impl Backend for Hg {
             remove.wait()?;
             add.wait()?;
 
-            Process::spawn("git", &["commit", "-m", message])?.wait()?;
+            Process::spawn("hg", &["commit", "-m", message])?.wait()?;
         }
 
         Ok(())
@@ -107,58 +97,43 @@ impl Backend for Hg {
         Ok(())
     }
 
-    // TODO: stopped here
-    fn diff(
-        &self,
-        revision: Option<&str>,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<String> {
+    fn diff(&self, revision: Option<&str>, entries: &[RevisionEntry]) -> BackendResult<String> {
         match revision {
             Some(revision) => {
-                let parent = format!("{}^@", revision);
                 if entries.is_empty() {
-                    Process::spawn(
-                        "git",
-                        &["diff", "--color", &parent, revision],
-                    )?
-                    .wait()
+                    Process::spawn("hg", &["diff", "--change", revision])?.wait()
                 } else {
                     let mut args = Vec::new();
                     args.push("diff");
-                    args.push("--color");
-                    args.push(&parent);
+                    args.push("--change");
                     args.push(revision);
                     args.push("--");
                     for entry in entries {
                         args.push(&entry.name);
                     }
 
-                    Process::spawn("git", &args)?.wait()
+                    Process::spawn("hg", &args)?.wait()
                 }
             }
             None => {
                 if entries.is_empty() {
-                    Process::spawn("git", &["diff", "--color"])?.wait()
+                    Process::spawn("hg", &["diff"])?.wait()
                 } else {
                     let mut args = Vec::new();
                     args.push("diff");
-                    args.push("--color");
                     args.push("--");
                     for entry in entries {
                         args.push(&entry.name);
                     }
-                    Process::spawn("git", &args)?.wait()
+                    Process::spawn("hg", &args)?.wait()
                 }
             }
         }
     }
 
-    fn resolve_taking_ours(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn resolve_taking_ours(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["checkout", ".", "--ours"])?.wait()?;
+            Process::spawn("hg", &["resolve", "--all", "--tool", "internal:local"])?.wait()?;
         } else {
             if !entries
                 .iter()
@@ -168,9 +143,9 @@ impl Backend for Hg {
             }
 
             let mut args = Vec::new();
-            args.push("checkout");
-            args.push(".");
-            args.push("--ours");
+            args.push("resolve");
+            args.push("--tool");
+            args.push("internal:local");
             args.push("--");
 
             for entry in entries {
@@ -179,18 +154,15 @@ impl Backend for Hg {
                 }
             }
 
-            Process::spawn("git", &args)?.wait()?;
+            Process::spawn("hg", &args)?.wait()?;
         }
 
         Ok(())
     }
 
-    fn resolve_taking_theirs(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn resolve_taking_theirs(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["checkout", ".", "--theirs"])?.wait()?;
+            Process::spawn("hg", &["resolve", "--all", "--tool", "internal:other"])?.wait()?;
         } else {
             if !entries
                 .iter()
@@ -200,9 +172,9 @@ impl Backend for Hg {
             }
 
             let mut args = Vec::new();
-            args.push("checkout");
-            args.push(".");
-            args.push("--theirs");
+            args.push("resolve");
+            args.push("--tool");
+            args.push("internal:other");
             args.push("--");
 
             for entry in entries {
@@ -211,36 +183,33 @@ impl Backend for Hg {
                 }
             }
 
-            Process::spawn("git", &args)?.wait()?;
+            Process::spawn("hg", &args)?.wait()?;
         }
 
         Ok(())
     }
 
     fn log(&self, skip: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
-        let skip = skip.to_string();
-        let len = len.to_string();
-        let template = "--format=format:%x00%h%x00%as%x00%aN%x00%D%x00%s";
+        let limit = (skip + len).to_string();
+        let template = "\x1f{node|short}\x1f{date|shortdate}\x1f{author|person}\x1f{ifeq(phase,'secret','(secret) ','')}{ifeq(phase,'draft','(draft) ','')}{if(topics,'[{topics}] ')}{tags % '{tag} '}{branch}\x1f{desc}";
         let output = Process::spawn(
-            "git",
+            "hg",
             &[
                 "log",
-                "--all",
-                "--decorate",
-                "--oneline",
+                "--config",
+                "experimental.graphshorten=True",
                 "--graph",
-                "--skip",
-                &skip,
-                "--max-count",
-                &len,
+                "--template",
                 template,
+                "--limit",
+                &limit,
             ],
         )?
         .wait()?;
 
         let mut entries = Vec::new();
-        for line in output.lines() {
-            let mut splits = line.splitn(6, '\0');
+        for line in output.lines().skip(skip) {
+            let mut splits = line.splitn(6, '\x1f');
 
             let graph = splits.next().unwrap_or("").into();
             let hash = splits.next().unwrap_or("").into();
@@ -263,59 +232,41 @@ impl Backend for Hg {
     }
 
     fn checkout(&self, revision: &str) -> BackendResult<()> {
-        Process::spawn("git", &["checkout", revision])?.wait()?;
+        Process::spawn("hg", &["update", revision])?.wait()?;
         Ok(())
     }
 
     fn merge(&self, revision: &str) -> BackendResult<()> {
-        Process::spawn("git", &["merge", revision])?.wait()?;
+        Process::spawn("hg", &["merge", revision])?.wait()?;
         Ok(())
     }
 
     fn fetch(&self) -> BackendResult<()> {
-        Process::spawn("git", &["fetch", "--all"])?.wait()?;
-        Ok(())
+        self.pull()
     }
 
     fn pull(&self) -> BackendResult<()> {
-        Process::spawn("git", &["pull", "--all"])?.wait()?;
+        Process::spawn("hg", &["pull"])?.wait()?;
         Ok(())
     }
 
     fn push(&self) -> BackendResult<()> {
-        Process::spawn("git", &["push"])?.wait()?;
+        Process::spawn("hg", &["push", "--new-branch"])?.wait()?;
         Ok(())
     }
 
     fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo> {
-        let message = Process::spawn("git", &["show", "-s", "--format=%B"])?;
-        let output = Process::spawn(
-            "git",
-            &[
-                "diff-tree",
-                "--no-commit-id",
-                "--name-status",
-                "-r",
-                "-z",
-                revision,
-            ],
-        )?;
+        let message = Process::spawn("hg", &["log", "--rev", revision, "--template", "{desc}"])?;
+        let output = Process::spawn("hg", &["status", "--change", revision])?;
 
         let message = message.wait()?.trim().into();
-
         let output = output.wait()?;
-        let mut splits = output.split('\0').map(str::trim);
 
         let mut entries = Vec::new();
-        loop {
-            let status = match splits.next() {
-                Some(status) => parse_file_status(status),
-                None => break,
-            };
-            let name = match splits.next() {
-                Some(name) => name.into(),
-                None => break,
-            };
+        for line in output.lines() {
+            let mut splits = line.splitn(2, ' ');
+            let status = parse_file_status(splits.next().unwrap_or("").trim());
+            let name = splits.next().unwrap_or("").into();
 
             entries.push(RevisionEntry { name, status });
         }
@@ -324,73 +275,48 @@ impl Backend for Hg {
     }
 
     fn branches(&self) -> BackendResult<Vec<BranchEntry>> {
-        let entries = Process::spawn(
-            "git",
-            &[
-                "branch",
-                "--list",
-                "--all",
-                "--format=%(refname:short)%00%(HEAD)",
-            ],
-        )?
-        .wait()?
-        .lines()
-        .map(|l| {
-            let mut splits = l.splitn(2, '\0');
-            let name = splits.next().unwrap_or("").into();
-            let checked_out = splits.next().unwrap_or("") == "*";
-            BranchEntry { name, checked_out }
-        })
-        .collect();
+        let entries = Process::spawn("hg", &["branches", "--template", "{branch}\x1f#\\n"])?
+            .wait()?
+            .lines()
+            .map(|l| {
+                let mut splits = l.splitn(2, '\x1f');
+                let name = splits.next().unwrap_or("").into();
+                let checked_out = splits.next().unwrap_or("") == "*";
+                BranchEntry { name, checked_out }
+            })
+            .collect();
         Ok(entries)
     }
 
     fn new_branch(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["branch", name])?.wait()?;
-        Process::spawn("git", &["checkout", name])?.wait()?;
-        Process::spawn(
-            "git",
-            &["push", "--set-upstream", remote.trim(), name],
-        )?
-        .wait()?;
+        Process::spawn("hg", &["branch", name])?.wait()?;
         Ok(())
     }
 
     fn delete_branch(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["branch", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
-            .wait()?;
+        let changeset = Process::spawn("hg", &["identify", "--num"])?.wait()?;
+        self.checkout(name)?;
+        Process::spawn("hg", &["commit", "-m", "close branch", "--close-branch"])?.wait()?;
+        self.checkout(&changeset)?;
         Ok(())
     }
 
     fn tags(&self) -> BackendResult<Vec<TagEntry>> {
-        let entries = Process::spawn(
-            "git",
-            &["tag", "--list", "--format=%(refname:short)"],
-        )?
-        .wait()?
-        .lines()
-        .map(|l| TagEntry {
-            name: l.trim().into(),
-        })
-        .collect();
+        let entries = Process::spawn("hg", &["tags", "--template", "{tag}\\n"])?
+            .wait()?
+            .lines()
+            .map(|l| TagEntry { name: l.into() })
+            .collect();
         Ok(entries)
     }
 
     fn new_tag(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["tag", "--force", name])?.wait()?;
-        Process::spawn("git", &["push", remote.trim(), name])?.wait()?;
+        Process::spawn("hg", &["tag", "--force", name])?.wait()?;
         Ok(())
     }
 
     fn delete_tag(&self, name: &str) -> BackendResult<()> {
-        let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["tag", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
-            .wait()?;
+        Process::spawn("hg", &["tag", "--remove", name])?.wait()?;
         Ok(())
     }
 }

@@ -150,9 +150,8 @@ impl Drawer {
         let modes_after_len = mode_tabs_len(modes_after);
         let current_mode_len = 3 + 1 + current_mode_name.len() + 1;
 
-        let spacer_len = (self.viewport_size.0 as usize).saturating_sub(
-            modes_before_len + modes_after_len + current_mode_len,
-        );
+        let spacer_len = (self.viewport_size.0 as usize)
+            .saturating_sub(modes_before_len + modes_after_len + current_mode_len);
         self.buf.extend(std::iter::repeat(b' ').take(spacer_len));
 
         for &(mode_name, shortcut) in modes_before.iter().chain(modes_after) {
@@ -177,13 +176,11 @@ impl Drawer {
             left_help = &left_help[..available_width];
             right_help = &[];
         } else if left_help.len() + right_help.len() > available_width {
-            let overflow_len =
-                left_help.len() + right_help.len() - available_width;
+            let overflow_len = left_help.len() + right_help.len() - available_width;
             right_help = &right_help[..right_help.len() - overflow_len];
         }
 
-        let spacer_len =
-            1 + available_width - left_help.len() - right_help.len();
+        let spacer_len = 1 + available_width - left_help.len() - right_help.len();
         self.buf.extend_from_slice(left_help);
         self.buf.extend(std::iter::repeat(b' ').take(spacer_len));
         self.buf.extend_from_slice(right_help);
@@ -278,8 +275,7 @@ impl Drawer {
         set_foreground_color(&mut self.buf, Color::White);
 
         let mut line_count = 0;
-        let max_line_count =
-            self.viewport_size.1.saturating_sub(2 + header_height) as usize;
+        let max_line_count = self.viewport_size.1.saturating_sub(2 + header_height) as usize;
 
         for (i, entry) in entries.enumerate().skip(select.scroll()) {
             let hovered = i == cursor_index;
@@ -287,8 +283,7 @@ impl Drawer {
                 set_background_color(&mut self.buf, Color::DarkMagenta);
             }
 
-            line_count +=
-                entry.draw(self, hovered, hovered && show_full_hovered_entry);
+            line_count += entry.draw(self, hovered, hovered && show_full_hovered_entry);
 
             clear_until_new_line(&mut self.buf);
             move_cursor_to_next_line(&mut self.buf);

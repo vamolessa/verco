@@ -2,10 +2,7 @@ use std::thread;
 
 use crate::{
     backend::{Backend, BackendResult, BranchEntry},
-    mode::{
-        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine,
-        SelectMenu,
-    },
+    mode::{ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine, SelectMenu},
     platform::Key,
     ui::{Drawer, SelectEntryDraw, RESERVED_LINES_COUNT},
 };
@@ -69,17 +66,13 @@ impl Mode {
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let pending_input = matches!(self.state, State::NewNameInput);
-        let available_height =
-            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+        let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text().is_empty() {
-                    self.select.on_key(
-                        self.entries.len(),
-                        available_height,
-                        key,
-                    );
+                    self.select
+                        .on_key(self.entries.len(), available_height, key);
                 } else {
                     self.output.on_key(available_height, key);
                 }
@@ -91,23 +84,17 @@ impl Mode {
                             let name = entry.name.clone();
                             let ctx = ctx.clone();
                             thread::spawn(move || {
-                                ctx.event_sender
-                                    .send_mode_change(ModeKind::Log);
+                                ctx.event_sender.send_mode_change(ModeKind::Log);
                                 match ctx.backend.checkout(&name) {
                                     Ok(()) => {
-                                        ctx.event_sender.send_response(
-                                            ModeResponse::Branches(
-                                                Response::Checkout,
-                                            ),
-                                        );
-                                        ctx.event_sender
-                                            .send_mode_refresh(ModeKind::Log);
+                                        ctx.event_sender.send_response(ModeResponse::Branches(
+                                            Response::Checkout,
+                                        ));
+                                        ctx.event_sender.send_mode_refresh(ModeKind::Log);
                                     }
-                                    Err(error) => ctx
-                                        .event_sender
-                                        .send_response(ModeResponse::Branches(
-                                            Response::Refresh(Err(error)),
-                                        )),
+                                    Err(error) => ctx.event_sender.send_response(
+                                        ModeResponse::Branches(Response::Refresh(Err(error))),
+                                    ),
                                 }
                             });
                         }
@@ -136,23 +123,16 @@ impl Mode {
                             let name = entry.name.clone();
                             let ctx = ctx.clone();
                             thread::spawn(move || {
-                                ctx.event_sender
-                                    .send_mode_change(ModeKind::Log);
+                                ctx.event_sender.send_mode_change(ModeKind::Log);
                                 match ctx.backend.merge(&name) {
                                     Ok(()) => {
-                                        ctx.event_sender.send_response(
-                                            ModeResponse::Branches(
-                                                Response::Merge,
-                                            ),
-                                        );
                                         ctx.event_sender
-                                            .send_mode_refresh(ModeKind::Log);
+                                            .send_response(ModeResponse::Branches(Response::Merge));
+                                        ctx.event_sender.send_mode_refresh(ModeKind::Log);
                                     }
-                                    Err(error) => ctx
-                                        .event_sender
-                                        .send_response(ModeResponse::Branches(
-                                            Response::Refresh(Err(error)),
-                                        )),
+                                    Err(error) => ctx.event_sender.send_response(
+                                        ModeResponse::Branches(Response::Refresh(Err(error))),
+                                    ),
                                 }
                             });
                         }
@@ -190,8 +170,7 @@ impl Mode {
                     }
                 }
 
-                if let Some(i) = self.entries.iter().position(|e| e.checked_out)
-                {
+                if let Some(i) = self.entries.iter().position(|e| e.checked_out) {
                     self.select.set_cursor(i);
                 } else {
                     self.select.saturate_cursor(self.entries.len());
@@ -217,8 +196,13 @@ impl Mode {
             State::NewNameInput => "new branch name",
         };
         let (left_help, right_help) = match self.state {
-            State::Idle | State::Waiting(_) => ("[g]checkout [n]new [D]delete [m]merge", "[arrows]move"),
-            State::NewNameInput => ("", "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all"),
+            State::Idle | State::Waiting(_) => {
+                ("[g]checkout [n]new [D]delete [m]merge", "[arrows]move")
+            }
+            State::NewNameInput => (
+                "",
+                "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all",
+            ),
         };
         (name, left_help, right_help)
     }
@@ -227,19 +211,12 @@ impl Mode {
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
-                    drawer.select_menu(
-                        &self.select,
-                        0,
-                        false,
-                        self.entries.iter(),
-                    );
+                    drawer.select_menu(&self.select, 0, false, self.entries.iter());
                 } else {
                     drawer.output(&self.output);
                 }
             }
-            State::NewNameInput => {
-                drawer.readline(&self.readline, "type in the branch name...")
-            }
+            State::NewNameInput => drawer.readline(&self.readline, "type in the branch name..."),
         }
     }
 }
@@ -252,8 +229,7 @@ where
     thread::spawn(move || {
         use std::ops::Deref;
 
-        let mut result =
-            f(ctx.backend.deref()).and_then(|_| ctx.backend.branches());
+        let mut result = f(ctx.backend.deref()).and_then(|_| ctx.backend.branches());
         if let Ok(entries) = &mut result {
             entries.sort_unstable_by(|a, b| a.name.cmp(&b.name));
         }

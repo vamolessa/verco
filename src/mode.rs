@@ -61,9 +61,7 @@ impl Output {
         self.line_count
     }
 
-    pub fn lines_from_scroll<'a>(
-        &'a self,
-    ) -> impl 'a + Iterator<Item = &'a str> {
+    pub fn lines_from_scroll<'a>(&'a self) -> impl 'a + Iterator<Item = &'a str> {
         self.text.lines().skip(self.scroll)
     }
 
@@ -72,15 +70,11 @@ impl Output {
 
         self.scroll = match key {
             Key::Down | Key::Ctrl('n') | Key::Char('j') => self.scroll + 1,
-            Key::Up | Key::Ctrl('p') | Key::Char('k') => {
-                self.scroll.saturating_sub(1)
-            }
+            Key::Up | Key::Ctrl('p') | Key::Char('k') => self.scroll.saturating_sub(1),
             Key::Ctrl('h') | Key::Home => 0,
             Key::Ctrl('e') | Key::End => usize::MAX,
             Key::Ctrl('d') | Key::PageDown => self.scroll + half_height,
-            Key::Ctrl('u') | Key::PageUp => {
-                self.scroll.saturating_sub(half_height)
-            }
+            Key::Ctrl('u') | Key::PageUp => self.scroll.saturating_sub(half_height),
             _ => self.scroll,
         };
 
@@ -112,10 +106,7 @@ impl ReadLine {
                     c.is_alphanumeric() || c == '_'
                 }
 
-                fn rfind_boundary(
-                    mut chars: std::str::Chars,
-                    f: fn(&char) -> bool,
-                ) -> usize {
+                fn rfind_boundary(mut chars: std::str::Chars, f: fn(&char) -> bool) -> usize {
                     match chars.rfind(f) {
                         Some(c) => chars.as_str().len() + c.len_utf8(),
                         None => 0,
@@ -127,21 +118,15 @@ impl ReadLine {
                     let len = if is_word(c) {
                         rfind_boundary(chars, |&c| !is_word(c))
                     } else if c.is_ascii_whitespace() {
-                        rfind_boundary(chars, |&c| {
-                            is_word(c) || !c.is_ascii_whitespace()
-                        })
+                        rfind_boundary(chars, |&c| is_word(c) || !c.is_ascii_whitespace())
                     } else {
-                        rfind_boundary(chars, |&c| {
-                            is_word(c) || c.is_ascii_whitespace()
-                        })
+                        rfind_boundary(chars, |&c| is_word(c) || c.is_ascii_whitespace())
                     };
                     self.input.truncate(len);
                 }
             }
             Key::Backspace | Key::Ctrl('h') => {
-                if let Some((last_char_index, _)) =
-                    self.input.char_indices().next_back()
-                {
+                if let Some((last_char_index, _)) = self.input.char_indices().next_back() {
                     self.input.truncate(last_char_index);
                 }
             }
@@ -195,15 +180,11 @@ impl SelectMenu {
 
         self.cursor = match key {
             Key::Down | Key::Ctrl('n') | Key::Char('j') => self.cursor + 1,
-            Key::Up | Key::Ctrl('p') | Key::Char('k') => {
-                self.cursor.saturating_sub(1)
-            }
+            Key::Up | Key::Ctrl('p') | Key::Char('k') => self.cursor.saturating_sub(1),
             Key::Ctrl('h') | Key::Home => 0,
             Key::Ctrl('e') | Key::End => usize::MAX,
             Key::Ctrl('d') | Key::PageDown => self.cursor + half_height,
-            Key::Ctrl('u') | Key::PageUp => {
-                self.cursor.saturating_sub(half_height)
-            }
+            Key::Ctrl('u') | Key::PageUp => self.cursor.saturating_sub(half_height),
             _ => self.cursor,
         };
 
@@ -216,9 +197,7 @@ impl SelectMenu {
         }
 
         match key {
-            Key::Char(' ') if self.cursor < entries_len => {
-                SelectMenuAction::Toggle(self.cursor)
-            }
+            Key::Char(' ') if self.cursor < entries_len => SelectMenuAction::Toggle(self.cursor),
             Key::Char('a') => SelectMenuAction::ToggleAll,
             _ => SelectMenuAction::None,
         }

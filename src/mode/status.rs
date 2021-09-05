@@ -1,13 +1,10 @@
 use std::thread;
 
 use crate::{
-    backend::{
-        Backend, BackendResult, RevisionEntry, SelectableRevisionEntry,
-        StatusInfo,
-    },
+    backend::{Backend, BackendResult, RevisionEntry, SelectableRevisionEntry, StatusInfo},
     mode::{
-        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine,
-        SelectMenu, SelectMenuAction,
+        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine, SelectMenu,
+        SelectMenuAction,
     },
     platform::Key,
     ui::{Color, Drawer, RESERVED_LINES_COUNT},
@@ -89,26 +86,23 @@ impl Mode {
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let pending_input = matches!(self.state, State::CommitMessageInput);
-        let available_height =
-            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+        let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.line_count() > 1 {
                     self.output.on_key(available_height, key);
                 } else {
-                    match self.select.on_key(
-                        self.entries.len(),
-                        available_height,
-                        key,
-                    ) {
+                    match self
+                        .select
+                        .on_key(self.entries.len(), available_height, key)
+                    {
                         SelectMenuAction::None => (),
                         SelectMenuAction::Toggle(i) => {
                             self.entries[i].selected = !self.entries[i].selected
                         }
                         SelectMenuAction::ToggleAll => {
-                            let all_selected =
-                                self.entries.iter().all(|e| e.selected);
+                            let all_selected = self.entries.iter().all(|e| e.selected);
                             for entry in &mut self.entries {
                                 entry.selected = !all_selected;
                             }
@@ -125,9 +119,7 @@ impl Mode {
                         }
                     }
                     Key::Char('R') => {
-                        if matches!(self.state, State::Idle)
-                            && !self.entries.is_empty()
-                        {
+                        if matches!(self.state, State::Idle) && !self.entries.is_empty() {
                             self.state = State::Waiting(WaitOperation::Discard);
                             let entries = self.get_selected_entries();
                             self.remove_selected_entries();
@@ -136,31 +128,19 @@ impl Mode {
                         }
                     }
                     Key::Char('O') => {
-                        if matches!(self.state, State::Idle)
-                            && !self.entries.is_empty()
-                        {
-                            self.state = State::Waiting(
-                                WaitOperation::ResolveTakingLocal,
-                            );
+                        if matches!(self.state, State::Idle) && !self.entries.is_empty() {
+                            self.state = State::Waiting(WaitOperation::ResolveTakingLocal);
                             let entries = self.get_selected_entries();
 
-                            request(ctx, move |b| {
-                                b.resolve_taking_ours(&entries)
-                            });
+                            request(ctx, move |b| b.resolve_taking_ours(&entries));
                         }
                     }
                     Key::Char('T') => {
-                        if matches!(self.state, State::Idle)
-                            && !self.entries.is_empty()
-                        {
-                            self.state = State::Waiting(
-                                WaitOperation::ResolveTakingOther,
-                            );
+                        if matches!(self.state, State::Idle) && !self.entries.is_empty() {
+                            self.state = State::Waiting(WaitOperation::ResolveTakingOther);
                             let entries = self.get_selected_entries();
 
-                            request(ctx, move |b| {
-                                b.resolve_taking_theirs(&entries)
-                            });
+                            request(ctx, move |b| b.resolve_taking_theirs(&entries));
                         }
                     }
                     Key::Char('d') => {
@@ -172,16 +152,12 @@ impl Mode {
 
                             let ctx = ctx.clone();
                             thread::spawn(move || {
-                                let output =
-                                    match ctx.backend.diff(None, &entries) {
-                                        Ok(output) => output,
-                                        Err(error) => error,
-                                    };
-                                ctx.event_sender.send_response(
-                                    ModeResponse::Status(Response::Diff(
-                                        output,
-                                    )),
-                                );
+                                let output = match ctx.backend.diff(None, &entries) {
+                                    Ok(output) => output,
+                                    Err(error) => error,
+                                };
+                                ctx.event_sender
+                                    .send_response(ModeResponse::Status(Response::Diff(output)));
                             });
                         }
                     }
@@ -202,20 +178,16 @@ impl Mode {
                         ctx.event_sender.send_mode_change(ModeKind::Log);
                         match ctx.backend.commit(&message, &entries) {
                             Ok(()) => {
-                                ctx.event_sender.send_response(
-                                    ModeResponse::Status(Response::Commit),
-                                );
                                 ctx.event_sender
-                                    .send_mode_refresh(ModeKind::Log);
+                                    .send_response(ModeResponse::Status(Response::Commit));
+                                ctx.event_sender.send_mode_refresh(ModeKind::Log);
                             }
-                            Err(error) => ctx.event_sender.send_response(
-                                ModeResponse::Status(Response::Refresh(
-                                    StatusInfo {
-                                        header: error,
-                                        entries: Vec::new(),
-                                    },
-                                )),
-                            ),
+                            Err(error) => ctx.event_sender.send_response(ModeResponse::Status(
+                                Response::Refresh(StatusInfo {
+                                    header: error,
+                                    entries: Vec::new(),
+                                }),
+                            )),
                         }
                     });
                 } else if key.is_cancel() {
@@ -238,8 +210,7 @@ impl Mode {
                     self.output.set(info.header);
                 }
 
-                self.entries =
-                    info.entries.into_iter().map(Into::into).collect();
+                self.entries = info.entries.into_iter().map(Into::into).collect();
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Commit => self.state = State::Idle,
@@ -268,20 +239,19 @@ impl Mode {
             State::CommitMessageInput => "commit message",
             State::Waiting(WaitOperation::Commit) => "commit",
             State::Waiting(WaitOperation::Discard) => "discard",
-            State::Waiting(WaitOperation::ResolveTakingLocal) => {
-                "resolve taking local"
-            }
-            State::Waiting(WaitOperation::ResolveTakingOther) => {
-                "resolve taking other"
-            }
+            State::Waiting(WaitOperation::ResolveTakingLocal) => "resolve taking local",
+            State::Waiting(WaitOperation::ResolveTakingOther) => "resolve taking other",
             State::ViewDiff => "diff",
         };
         let (left_help, right_help) = match self.state {
             State::Idle | State::Waiting(_) => (
                 "[c]commit [R]revert [d]diff [L]take local [O]take other",
-                "[arrows]move [space]toggle [a]toggle all"
+                "[arrows]move [space]toggle [a]toggle all",
             ),
-            State::CommitMessageInput => ("", "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all"),
+            State::CommitMessageInput => (
+                "",
+                "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all",
+            ),
             State::ViewDiff => ("", "[arrows]move"),
         };
         (name, left_help, right_help)
@@ -305,23 +275,14 @@ impl Mode {
                     drawer.str(output);
                     drawer.next_line();
                     drawer.next_line();
-                    drawer.select_menu(
-                        &self.select,
-                        2,
-                        false,
-                        self.entries.iter(),
-                    );
+                    drawer.select_menu(&self.select, 2, false, self.entries.iter());
 
                     if self.entries.is_empty() {
                         let empty_message = match self.state {
                             State::Idle => "nothing to commit!",
                             _ => "working...",
                         };
-                        drawer.fmt(format_args!(
-                            "{}{}",
-                            Color::DarkYellow,
-                            empty_message
-                        ));
+                        drawer.fmt(format_args!("{}{}", Color::DarkYellow, empty_message));
                     }
                 }
             }
@@ -343,14 +304,13 @@ where
     thread::spawn(move || {
         use std::ops::Deref;
 
-        let mut info =
-            match f(ctx.backend.deref()).and_then(|_| ctx.backend.status()) {
-                Ok(info) => info,
-                Err(error) => StatusInfo {
-                    header: error,
-                    entries: Vec::new(),
-                },
-            };
+        let mut info = match f(ctx.backend.deref()).and_then(|_| ctx.backend.status()) {
+            Ok(info) => info,
+            Err(error) => StatusInfo {
+                header: error,
+                entries: Vec::new(),
+            },
+        };
         info.entries
             .sort_unstable_by(|a, b| a.status.cmp(&b.status));
 

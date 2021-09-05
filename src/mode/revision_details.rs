@@ -2,10 +2,7 @@ use std::thread;
 
 use crate::{
     backend::{RevisionEntry, RevisionInfo, SelectableRevisionEntry},
-    mode::{
-        ModeContext, ModeResponse, ModeStatus, Output, SelectMenu,
-        SelectMenuAction,
-    },
+    mode::{ModeContext, ModeResponse, ModeStatus, Output, SelectMenu, SelectMenuAction},
     platform::Key,
     ui::{Drawer, RESERVED_LINES_COUNT},
 };
@@ -72,35 +69,25 @@ impl Mode {
                 .sort_unstable_by(|a, b| a.status.cmp(&b.status));
 
             ctx.event_sender
-                .send_response(ModeResponse::RevisionDetails(Response::Info(
-                    info,
-                )));
+                .send_response(ModeResponse::RevisionDetails(Response::Info(info)));
         });
     }
 
-    pub fn on_key(
-        &mut self,
-        ctx: &ModeContext,
-        revision: &str,
-        key: Key,
-    ) -> ModeStatus {
-        let available_height =
-            (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+    pub fn on_key(&mut self, ctx: &ModeContext, revision: &str, key: Key) -> ModeStatus {
+        let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
         match self.state {
             State::Idle => {
-                match self.select.on_key(
-                    self.entries.len(),
-                    available_height,
-                    key,
-                ) {
+                match self
+                    .select
+                    .on_key(self.entries.len(), available_height, key)
+                {
                     SelectMenuAction::None => (),
                     SelectMenuAction::Toggle(i) => {
                         self.entries[i].selected = !self.entries[i].selected
                     }
                     SelectMenuAction::ToggleAll => {
-                        let all_selected =
-                            self.entries.iter().all(|e| e.selected);
+                        let all_selected = self.entries.iter().all(|e| e.selected);
                         for entry in &mut self.entries {
                             entry.selected = !all_selected;
                         }
@@ -121,18 +108,14 @@ impl Mode {
                             let ctx = ctx.clone();
                             let revision = revision.to_string();
                             thread::spawn(move || {
-                                let output = match ctx
-                                    .backend
-                                    .diff(Some(&revision), &entries)
-                                {
+                                let output = match ctx.backend.diff(Some(&revision), &entries) {
                                     Ok(output) => output,
                                     Err(error) => error,
                                 };
-                                ctx.event_sender.send_response(
-                                    ModeResponse::RevisionDetails(
-                                        Response::Diff(output),
-                                    ),
-                                );
+                                ctx.event_sender
+                                    .send_response(ModeResponse::RevisionDetails(Response::Diff(
+                                        output,
+                                    )));
                             });
                         }
                     }
@@ -158,8 +141,7 @@ impl Mode {
                     self.output.set(info.message);
                 }
 
-                self.entries =
-                    info.entries.into_iter().map(Into::into).collect();
+                self.entries = info.entries.into_iter().map(Into::into).collect();
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Diff(output) => {
@@ -190,8 +172,7 @@ impl Mode {
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
-        let show_full_output =
-            !matches!(self.state, State::Idle) || self.show_full_message;
+        let show_full_output = !matches!(self.state, State::Idle) || self.show_full_message;
         let line_count = if show_full_output {
             drawer.output(&self.output)
         } else {

@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::backend::{
-    Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
-    RevisionEntry, RevisionInfo, StatusInfo, TagEntry,
+    Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process, RevisionEntry,
+    RevisionInfo, StatusInfo, TagEntry,
 };
 
 pub struct Git;
@@ -21,8 +21,7 @@ impl Git {
 
 impl Backend for Git {
     fn status(&self) -> BackendResult<StatusInfo> {
-        let output =
-            Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
+        let output = Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
         let mut splits = output.split('\0').map(str::trim);
 
         let header = splits.next().unwrap_or("").into();
@@ -40,11 +39,7 @@ impl Backend for Git {
         Ok(StatusInfo { header, entries })
     }
 
-    fn commit(
-        &self,
-        message: &str,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn commit(&self, message: &str, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
             Process::spawn("git", &["add", "--all"])?.wait()?;
         } else {
@@ -96,10 +91,7 @@ impl Backend for Git {
             args.push("checkout");
             args.push("--");
             for entry in entries {
-                if !matches!(
-                    entry.status,
-                    FileStatus::Untracked | FileStatus::Added,
-                ) {
+                if !matches!(entry.status, FileStatus::Untracked | FileStatus::Added,) {
                     args.push(&entry.name);
                 }
             }
@@ -109,11 +101,7 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn diff(
-        &self,
-        revision: Option<&str>,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<String> {
+    fn diff(&self, revision: Option<&str>, entries: &[RevisionEntry]) -> BackendResult<String> {
         match revision {
             Some(revision) => {
                 let parent = format!("{}^@", revision);
@@ -148,10 +136,7 @@ impl Backend for Git {
         }
     }
 
-    fn resolve_taking_ours(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn resolve_taking_ours(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
             Process::spawn("git", &["checkout", ".", "--ours"])?.wait()?;
         } else {
@@ -180,10 +165,7 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn resolve_taking_theirs(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn resolve_taking_theirs(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
             Process::spawn("git", &["checkout", ".", "--theirs"])?.wait()?;
         } else {
@@ -283,8 +265,7 @@ impl Backend for Git {
     }
 
     fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo> {
-        let message =
-            Process::spawn("git", &["show", "-s", "--format=%B", revision])?;
+        let message = Process::spawn("git", &["show", "-s", "--format=%B", revision])?;
         let changes = Process::spawn(
             "git",
             &[
@@ -345,33 +326,23 @@ impl Backend for Git {
         let remote = Process::spawn("git", &["remote"])?.wait()?;
         Process::spawn("git", &["branch", name])?.wait()?;
         Process::spawn("git", &["checkout", name])?.wait()?;
-        Process::spawn(
-            "git",
-            &["push", "--set-upstream", remote.trim(), name],
-        )?
-        .wait()?;
+        Process::spawn("git", &["push", "--set-upstream", remote.trim(), name])?.wait()?;
         Ok(())
     }
 
     fn delete_branch(&self, name: &str) -> BackendResult<()> {
         let remote = Process::spawn("git", &["remote"])?.wait()?;
         Process::spawn("git", &["branch", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
-            .wait()?;
+        Process::spawn("git", &["push", "--delete", remote.trim(), name])?.wait()?;
         Ok(())
     }
 
     fn tags(&self) -> BackendResult<Vec<TagEntry>> {
-        let entries = Process::spawn(
-            "git",
-            &["tag", "--list", "--format=%(refname:short)"],
-        )?
-        .wait()?
-        .lines()
-        .map(|l| TagEntry {
-            name: l.trim().into(),
-        })
-        .collect();
+        let entries = Process::spawn("git", &["tag", "--list", "--format=%(refname:short)"])?
+            .wait()?
+            .lines()
+            .map(|l| TagEntry { name: l.into() })
+            .collect();
         Ok(entries)
     }
 
@@ -385,8 +356,7 @@ impl Backend for Git {
     fn delete_tag(&self, name: &str) -> BackendResult<()> {
         let remote = Process::spawn("git", &["remote"])?.wait()?;
         Process::spawn("git", &["tag", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?
-            .wait()?;
+        Process::spawn("git", &["push", "--delete", remote.trim(), name])?.wait()?;
         Ok(())
     }
 }

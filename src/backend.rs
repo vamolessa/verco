@@ -100,13 +100,7 @@ impl SelectEntryDraw for SelectableRevisionEntry {
         const NAME_TOO_LONG_PREFIX: &str = "...";
 
         let name_available_width = (drawer.viewport_size.0 as usize)
-            .saturating_sub(
-                2 + 1
-                    + FileStatus::max_len()
-                    + 1
-                    + 1
-                    + NAME_TOO_LONG_PREFIX.len(),
-            );
+            .saturating_sub(2 + 1 + FileStatus::max_len() + 1 + 1 + NAME_TOO_LONG_PREFIX.len());
 
         let (name_prefix, trimmed_name) =
             match self.name.char_indices().nth_back(name_available_width) {
@@ -130,25 +124,11 @@ impl SelectEntryDraw for SelectableRevisionEntry {
 
 pub trait Backend: 'static + Send + Sync {
     fn status(&self) -> BackendResult<StatusInfo>;
-    fn commit(
-        &self,
-        message: &str,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()>;
+    fn commit(&self, message: &str, entries: &[RevisionEntry]) -> BackendResult<()>;
     fn discard(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
-    fn diff(
-        &self,
-        revision: Option<&str>,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<String>;
-    fn resolve_taking_ours(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()>;
-    fn resolve_taking_theirs(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()>;
+    fn diff(&self, revision: Option<&str>, entries: &[RevisionEntry]) -> BackendResult<String>;
+    fn resolve_taking_ours(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
+    fn resolve_taking_theirs(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
 
     fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>>;
     fn checkout(&self, revision: &str) -> BackendResult<()>;
@@ -189,9 +169,7 @@ impl Process {
     pub fn wait(self) -> BackendResult<String> {
         let output = match self.0.wait_with_output() {
             Ok(output) => output,
-            Err(error) => {
-                return Err(format!("could not wait for process: {}", error))
-            }
+            Err(error) => return Err(format!("could not wait for process: {}", error)),
         };
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -208,8 +186,7 @@ impl Process {
     }
 }
 
-pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)>
-{
+pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)> {
     if let Some((root, git)) = git::Git::try_new() {
         Some((root, Arc::new(git)))
     } else if let Some((root, hg)) = hg::Hg::try_new() {

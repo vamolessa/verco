@@ -4,21 +4,18 @@ use std::{
 };
 
 use crate::backend::{
-    Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process,
-    RevisionEntry, RevisionInfo, StatusInfo, TagEntry,
+    Backend, BackendResult, BranchEntry, FileStatus, LogEntry, Process, RevisionEntry,
+    RevisionInfo, StatusInfo, TagEntry,
 };
 
 pub struct Plastic;
 
 impl Plastic {
     pub fn try_new() -> Option<(PathBuf, Self)> {
-        let output = Process::spawn(
-            "cm",
-            &["getworkspacefrompath", "--format={wkpath}", "."],
-        )
-        .ok()?
-        .wait()
-        .ok()?;
+        let output = Process::spawn("cm", &["getworkspacefrompath", "--format={wkpath}", "."])
+            .ok()?
+            .wait()
+            .ok()?;
 
         let root = Path::new(output.trim()).into();
         Some((root, Self))
@@ -58,11 +55,7 @@ impl Backend for Plastic {
         Ok(StatusInfo { header, entries })
     }
 
-    fn commit(
-        &self,
-        message: &str,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn commit(&self, message: &str, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
             let untracked = Process::spawn(
                 "cm",
@@ -156,11 +149,7 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    fn diff(
-        &self,
-        revision: Option<&str>,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<String> {
+    fn diff(&self, revision: Option<&str>, entries: &[RevisionEntry]) -> BackendResult<String> {
         let entry = match entries {
             [] => None,
             [entry] => Some(entry),
@@ -170,26 +159,21 @@ impl Backend for Plastic {
         match revision {
             Some(revision) => match entry {
                 None => {
-                    let head =
-                        Process::spawn("cm", &["status", "--head"])?.wait()?;
+                    let head = Process::spawn("cm", &["status", "--head"])?.wait()?;
                     let suffix = match head.find('@') {
                         Some(i) => &head[i..],
                         None => return Err("could not parse head".into()),
                     };
-                    let changeset_arg =
-                        format!("--showchangeset=cs:{}{}", revision, suffix);
+                    let changeset_arg = format!("--showchangeset=cs:{}{}", revision, suffix);
                     Process::spawn("plastic", &[&changeset_arg])?.wait()?;
                 }
                 Some(entry) => {
-                    Process::spawn("cm", &["diff", revision, &entry.name])?
-                        .wait()?;
+                    Process::spawn("cm", &["diff", revision, &entry.name])?.wait()?;
                 }
             },
             None => match entry {
                 None => {
-                    return Err(
-                        "diff is not implemented for pending changes".into()
-                    );
+                    return Err("diff is not implemented for pending changes".into());
                 }
                 Some(entry) => {
                     Process::spawn("cm", &["diff", &entry.name])?.wait()?;
@@ -201,10 +185,7 @@ impl Backend for Plastic {
     }
 
     // TODO
-    fn resolve_taking_ours(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn resolve_taking_ours(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
             Process::spawn(
                 "cm",
@@ -238,16 +219,9 @@ impl Backend for Plastic {
     }
 
     // TODO
-    fn resolve_taking_theirs(
-        &self,
-        entries: &[RevisionEntry],
-    ) -> BackendResult<()> {
+    fn resolve_taking_theirs(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn(
-                "cm",
-                &["merge", "--merge", "--keepsource" /*revision*/],
-            )?
-            .wait()?;
+            Process::spawn("cm", &["merge", "--merge", "--keepsource" /*revision*/])?.wait()?;
         } else {
             if !entries
                 .iter()
@@ -295,8 +269,7 @@ impl Backend for Plastic {
         )?;
 
         let current_changeset = current_changeset.wait()?;
-        let current_changeset =
-            current_changeset.split('\x1f').nth(1).unwrap_or("");
+        let current_changeset = current_changeset.split('\x1f').nth(1).unwrap_or("");
         let output = output.wait()?;
 
         let mut entries = Vec::new();
@@ -344,7 +317,7 @@ impl Backend for Plastic {
     }
 
     fn fetch(&self) -> BackendResult<()> {
-        Ok(())
+        self.pull()
     }
 
     fn pull(&self) -> BackendResult<()> {
@@ -393,10 +366,7 @@ impl Backend for Plastic {
 
     fn branches(&self) -> BackendResult<Vec<BranchEntry>> {
         let current_branch = Process::spawn("cm", &["status", "--header"])?;
-        let entries = Process::spawn(
-            "cm",
-            &["find", "branch", "--nototal", "--format={name}"],
-        )?;
+        let entries = Process::spawn("cm", &["find", "branch", "--nototal", "--format={name}"])?;
 
         let current_branch = current_branch.wait()?;
         let current_branch = current_branch.split('@').next().unwrap_or("");
@@ -425,14 +395,11 @@ impl Backend for Plastic {
     }
 
     fn tags(&self) -> BackendResult<Vec<TagEntry>> {
-        let entries = Process::spawn(
-            "cm",
-            &["find", "label", "--nototal", "--format={name}"],
-        )?
-        .wait()?
-        .lines()
-        .map(|l| TagEntry { name: l.into() })
-        .collect();
+        let entries = Process::spawn("cm", &["find", "label", "--nototal", "--format={name}"])?
+            .wait()?
+            .lines()
+            .map(|l| TagEntry { name: l.into() })
+            .collect();
         Ok(entries)
     }
 
