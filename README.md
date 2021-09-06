@@ -38,6 +38,14 @@ sudo dnf copr enable atim/verco -y
 sudo dnf install verco
 ```
 
+#### Arch Linux ([AUR](https://aur.archlinux.org/packages/verco/))
+
+`verco` can be installed from the available [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=b&K=verco&outdated=&SB=n&SO=a&PP=50&do_Search=Go) using an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers). For example:
+
+```
+paru -S verco
+```
+
 ## Usage
 
 In a terminal in a repository folder, type in the `verco` command.
