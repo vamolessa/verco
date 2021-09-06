@@ -286,8 +286,8 @@ impl Backend for Git {
         let mut entries = Vec::new();
         loop {
             let status = match splits.next() {
-                Some(status) => parse_file_status(status),
-                None => break,
+                Some(status) if !status.is_empty() => parse_file_status(status),
+                _ => break,
             };
             let name = match splits.next() {
                 Some(name) => name.into(),
