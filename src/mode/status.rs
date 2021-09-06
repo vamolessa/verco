@@ -266,7 +266,7 @@ impl Mode {
                     let output = self.output.text();
                     let output = match output
                         .char_indices()
-                        .nth(drawer.viewport_size.0.saturating_sub(1) as _)
+                        .nth((drawer.viewport_size.0 as usize).saturating_sub(RESERVED_LINES_COUNT))
                     {
                         Some((i, c)) => &output[..i + c.len_utf8()],
                         None => output,
@@ -318,3 +318,4 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+
