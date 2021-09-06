@@ -194,8 +194,8 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn log(&self, skip: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
-        let skip = skip.to_string();
+    fn log(&self, skip: usize, len: usize) -> BackendResult<(usize, Vec<LogEntry>)> {
+        let skip_text = skip.to_string();
         let len = len.to_string();
         let template = "--format=format:%x00%h%x00%as%x00%aN%x00%D%x00%s";
         let output = Process::spawn(
@@ -207,7 +207,7 @@ impl Backend for Git {
                 "--oneline",
                 "--graph",
                 "--skip",
-                &skip,
+                &skip_text,
                 "--max-count",
                 &len,
                 template,
@@ -236,7 +236,7 @@ impl Backend for Git {
             });
         }
 
-        Ok(entries)
+        Ok((skip, entries))
     }
 
     fn checkout(&self, revision: &str) -> BackendResult<()> {
@@ -373,3 +373,4 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => panic!("unknown file status '{}'", s),
     }
 }
+

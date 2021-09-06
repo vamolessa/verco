@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub enum Response {
-    Refresh(BackendResult<Vec<LogEntry>>),
+    Refresh(BackendResult<(usize, Vec<LogEntry>)>),
 }
 
 enum WaitOperation {
@@ -74,16 +74,10 @@ impl SelectEntryDraw for LogEntry {
             (line_count, &self.message[..])
         } else {
             let available_width = (drawer.viewport_size.0 as usize).saturating_sub(total_chars);
-            let message = match self
-                .message
-                .lines()
-                .next()
-                .unwrap_or("")
-                .char_indices()
-                .nth(available_width)
-            {
-                Some((i, _)) => &self.message[..i],
-                None => &self.message,
+            let message = self.message.lines().next().unwrap_or("");
+            let message = match message.char_indices().nth(available_width) {
+                Some((i, _)) => &message[..i],
+                None => &message,
             };
             (0, message)
         };
@@ -150,8 +144,20 @@ impl Mode {
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
         let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+
         self.select
             .on_key(self.entries.len(), available_height, key);
+
+        if matches!(self.state, State::Idle) && self.select.cursor() + 1 == self.entries.len() {
+            self.state = State::Waiting(WaitOperation::Refresh);
+            let start = self.entries.len();
+            let ctx = ctx.clone();
+            thread::spawn(move || {
+                let result = ctx.backend.log(start, available_height);
+                ctx.event_sender
+                    .send_response(ModeResponse::Log(Response::Refresh(result)));
+            });
+        }
 
         if let Key::Char('d') = key {
             let index = self.select.cursor();
@@ -203,7 +209,6 @@ impl Mode {
     pub fn on_response(&mut self, response: Response) {
         match response {
             Response::Refresh(result) => {
-                self.entries = Vec::new();
                 self.output.set(String::new());
 
                 if let State::Waiting(_) = self.state {
@@ -211,8 +216,14 @@ impl Mode {
                 }
                 if let State::Idle = self.state {
                     match result {
-                        Ok(entries) => self.entries = entries,
-                        Err(error) => self.output.set(error),
+                        Ok((start_index, entries)) => {
+                            self.entries.truncate(start_index);
+                            self.entries.extend(entries);
+                        }
+                        Err(error) => {
+                            self.entries.clear();
+                            self.output.set(error);
+                        }
                     }
                 }
 
@@ -270,3 +281,4 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
+

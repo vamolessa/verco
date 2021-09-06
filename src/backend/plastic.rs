@@ -248,7 +248,7 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    fn log(&self, skip: usize, len: usize) -> BackendResult<Vec<LogEntry>> {
+    fn log(&self, _: usize, _: usize) -> BackendResult<(usize, Vec<LogEntry>)> {
         let current_changeset = Process::spawn(
             "cm",
             &[
@@ -273,7 +273,9 @@ impl Backend for Plastic {
         let output = output.wait()?;
 
         let mut entries = Vec::new();
-        for record in output.split('\x1e').rev().skip(skip + 1).take(len) {
+        let mut splits = output.split('\x1e').rev();
+        splits.next();
+        for record in splits {
             let mut splits = record.splitn(5, '\x1f');
 
             let hash = splits.next().unwrap_or("").trim().into();
@@ -295,7 +297,7 @@ impl Backend for Plastic {
             });
         }
 
-        Ok(entries)
+        Ok((0, entries))
     }
 
     fn checkout(&self, revision: &str) -> BackendResult<()> {
@@ -423,3 +425,4 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => panic!("unknown file status '{}'", s),
     }
 }
+

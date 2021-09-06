@@ -130,7 +130,7 @@ pub trait Backend: 'static + Send + Sync {
     fn resolve_taking_ours(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
     fn resolve_taking_theirs(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
 
-    fn log(&self, start: usize, len: usize) -> BackendResult<Vec<LogEntry>>;
+    fn log(&self, start: usize, len: usize) -> BackendResult<(usize, Vec<LogEntry>)>;
     fn checkout(&self, revision: &str) -> BackendResult<()>;
     fn merge(&self, revision: &str) -> BackendResult<()>;
     fn fetch(&self) -> BackendResult<()>;
@@ -197,3 +197,4 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)> 
         None
     }
 }
+
