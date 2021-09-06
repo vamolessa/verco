@@ -425,4 +425,3 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => panic!("unknown file status '{}'", s),
     }
 }
-

@@ -197,4 +197,3 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)> 
         None
     }
 }
-

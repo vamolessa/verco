@@ -281,4 +281,3 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
-
