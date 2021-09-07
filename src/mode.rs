@@ -203,3 +203,35 @@ impl SelectMenu {
         }
     }
 }
+
+pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
+    let mut pattern_chars = pattern.chars();
+    let mut pattern_char = match pattern_chars.next() {
+        Some(c) => c,
+        None => return true,
+    };
+
+    let mut previous_matched_index = 0;
+    let mut was_alphanumeric = false;
+
+    for (i, text_char) in text.char_indices() {
+        if text_char.eq_ignore_ascii_case(&pattern_char) {
+            let is_alphanumeric = text_char.is_ascii_alphanumeric();
+            let matched = !is_alphanumeric
+                || !was_alphanumeric
+                || previous_matched_index + 1 == i;
+            was_alphanumeric = is_alphanumeric;
+
+            if matched {
+                previous_matched_index = i;
+                pattern_char = match pattern_chars.next() {
+                    Some(c) => c,
+                    None => return true,
+                };
+            }
+        }
+    }
+
+    false
+}
+

@@ -29,10 +29,7 @@ impl Backend for Git {
             .filter(|e| e.len() >= 2)
             .map(|e| {
                 let (status, filename) = e.split_at(2);
-                RevisionEntry {
-                    name: filename.trim().into(),
-                    status: parse_file_status(status.trim()),
-                }
+                RevisionEntry::new(filename.trim().into(), parse_file_status(status.trim()))
             })
             .collect();
 
@@ -227,6 +224,7 @@ impl Backend for Git {
             let message = splits.next().unwrap_or("").into();
 
             entries.push(LogEntry {
+                hidden: false,
                 graph,
                 hash,
                 date,
@@ -294,7 +292,7 @@ impl Backend for Git {
                 None => break,
             };
 
-            entries.push(RevisionEntry { name, status });
+            entries.push(RevisionEntry::new(name, status));
         }
 
         Ok(RevisionInfo { message, entries })

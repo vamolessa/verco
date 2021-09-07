@@ -1,13 +1,13 @@
 use std::thread;
 
 use crate::{
-    backend::{Backend, BackendResult, RevisionEntry, SelectableRevisionEntry, StatusInfo},
+    backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
         ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine, SelectMenu,
         SelectMenuAction,
     },
     platform::Key,
-    ui::{Color, Drawer, RESERVED_LINES_COUNT},
+    ui::{Color, Drawer, SelectEntryDraw, RESERVED_LINES_COUNT},
 };
 
 pub enum Response {
@@ -36,10 +36,37 @@ impl Default for State {
     }
 }
 
+impl SelectEntryDraw for RevisionEntry {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
+        const NAME_TOO_LONG_PREFIX: &str = "...";
+
+        let name_available_width = (drawer.viewport_size.0 as usize)
+            .saturating_sub(2 + 1 + FileStatus::max_len() + 1 + 1 + NAME_TOO_LONG_PREFIX.len());
+
+        let (name_prefix, trimmed_name) =
+            match self.name.char_indices().nth_back(name_available_width) {
+                Some((i, _)) => (NAME_TOO_LONG_PREFIX, &self.name[i..]),
+                None => ("", &self.name[..]),
+            };
+
+        let selected_text = if self.selected { '+' } else { ' ' };
+        drawer.fmt(format_args!(
+            "{} [{:>width$}] {}{}",
+            selected_text,
+            self.status.as_str(),
+            name_prefix,
+            trimmed_name,
+            width = FileStatus::max_len(),
+        ));
+
+        1
+    }
+}
+
 #[derive(Default)]
 pub struct Mode {
     state: State,
-    entries: Vec<SelectableRevisionEntry>,
+    entries: Vec<RevisionEntry>,
     output: Output,
     select: SelectMenu,
     readline: ReadLine,
@@ -49,11 +76,8 @@ impl Mode {
         let entries: Vec<_> = self
             .entries
             .iter()
-            .filter(|e| e.selected)
-            .map(|e| RevisionEntry {
-                name: e.name.clone(),
-                status: e.status.clone(),
-            })
+            .filter(|&e| e.selected)
+            .cloned()
             .collect();
         entries
     }
@@ -210,7 +234,7 @@ impl Mode {
                     self.output.set(info.header);
                 }
 
-                self.entries = info.entries.into_iter().map(Into::into).collect();
+                self.entries = info.entries;
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Commit => self.state = State::Idle,

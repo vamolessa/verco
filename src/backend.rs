@@ -4,8 +4,6 @@ use std::{
     sync::Arc,
 };
 
-use crate::ui::{Drawer, SelectEntryDraw};
-
 pub mod git;
 pub mod hg;
 pub mod plastic;
@@ -58,11 +56,24 @@ pub struct RevisionInfo {
 
 #[derive(Clone)]
 pub struct RevisionEntry {
+    pub selected: bool,
+    pub hidden: bool,
     pub name: String,
     pub status: FileStatus,
 }
+impl RevisionEntry {
+    pub fn new(name: String, status: FileStatus) -> Self {
+        Self {
+            selected: false,
+            hidden: false,
+            name,
+            status,
+        }
+    }
+}
 
 pub struct LogEntry {
+    pub hidden: bool,
     pub graph: String,
     pub hash: String,
     pub date: String,
@@ -78,48 +89,6 @@ pub struct BranchEntry {
 
 pub struct TagEntry {
     pub name: String,
-}
-
-#[derive(Clone)]
-pub struct SelectableRevisionEntry {
-    pub selected: bool,
-    pub name: String,
-    pub status: FileStatus,
-}
-impl From<RevisionEntry> for SelectableRevisionEntry {
-    fn from(other: RevisionEntry) -> Self {
-        Self {
-            selected: false,
-            name: other.name,
-            status: other.status,
-        }
-    }
-}
-impl SelectEntryDraw for SelectableRevisionEntry {
-    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
-        const NAME_TOO_LONG_PREFIX: &str = "...";
-
-        let name_available_width = (drawer.viewport_size.0 as usize)
-            .saturating_sub(2 + 1 + FileStatus::max_len() + 1 + 1 + NAME_TOO_LONG_PREFIX.len());
-
-        let (name_prefix, trimmed_name) =
-            match self.name.char_indices().nth_back(name_available_width) {
-                Some((i, _)) => (NAME_TOO_LONG_PREFIX, &self.name[i..]),
-                None => ("", &self.name[..]),
-            };
-
-        let selected_text = if self.selected { '+' } else { ' ' };
-        drawer.fmt(format_args!(
-            "{} [{:>width$}] {}{}",
-            selected_text,
-            self.status.as_str(),
-            name_prefix,
-            trimmed_name,
-            width = FileStatus::max_len(),
-        ));
-
-        1
-    }
 }
 
 pub trait Backend: 'static + Send + Sync {

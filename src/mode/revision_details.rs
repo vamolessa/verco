@@ -1,7 +1,7 @@
 use std::thread;
 
 use crate::{
-    backend::{RevisionEntry, RevisionInfo, SelectableRevisionEntry},
+    backend::{RevisionEntry, RevisionInfo},
     mode::{ModeContext, ModeResponse, ModeStatus, Output, SelectMenu, SelectMenuAction},
     platform::Key,
     ui::{Drawer, RESERVED_LINES_COUNT},
@@ -26,23 +26,18 @@ impl Default for State {
 #[derive(Default)]
 pub struct Mode {
     state: State,
-    entries: Vec<SelectableRevisionEntry>,
+    entries: Vec<RevisionEntry>,
     output: Output,
     select: SelectMenu,
     show_full_message: bool,
 }
 impl Mode {
     fn get_selected_entries(&self) -> Vec<RevisionEntry> {
-        let entries: Vec<_> = self
-            .entries
+        self.entries
             .iter()
-            .filter(|e| e.selected)
-            .map(|e| RevisionEntry {
-                name: e.name.clone(),
-                status: e.status.clone(),
-            })
-            .collect();
-        entries
+            .filter(|&e| e.selected)
+            .cloned()
+            .collect()
     }
 
     pub fn on_enter(&mut self, ctx: &ModeContext, revision: &str) {
@@ -141,7 +136,7 @@ impl Mode {
                     self.output.set(info.message);
                 }
 
-                self.entries = info.entries.into_iter().map(Into::into).collect();
+                self.entries = info.entries;
                 self.select.saturate_cursor(self.entries.len());
             }
             Response::Diff(output) => {

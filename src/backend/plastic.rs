@@ -49,7 +49,7 @@ impl Backend for Plastic {
             splits.next();
             let _mergeinfo = splits.next().unwrap_or("").trim();
 
-            entries.push(RevisionEntry { name, status });
+            entries.push(RevisionEntry::new(name, status));
         }
 
         Ok(StatusInfo { header, entries })
@@ -288,6 +288,7 @@ impl Backend for Plastic {
             let message = splits.next().unwrap_or("").into();
 
             entries.push(LogEntry {
+                hidden: false,
                 graph,
                 hash,
                 date,
@@ -360,7 +361,7 @@ impl Backend for Plastic {
                 None => break,
             };
 
-            entries.push(RevisionEntry { name, status });
+            entries.push(RevisionEntry::new(name, status));
         }
 
         Ok(RevisionInfo { message, entries })
