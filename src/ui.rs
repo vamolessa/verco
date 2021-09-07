@@ -265,10 +265,24 @@ impl Drawer {
             return 0;
         }
 
-        self.buf.push(b'/');
+        const PREFIX: &str = "filter:";
+        set_background_color(&mut self.buf, Color::DarkRed);
+        set_foreground_color(&mut self.buf, Color::White);
+        self.buf.extend_from_slice(PREFIX.as_bytes());
+
+        let available_width = (self.viewport_size.0 as usize).saturating_sub(PREFIX.len() + 2);
+        let (trimmed, text) = match text.char_indices().rev().nth(available_width) {
+            Some((i, _)) => (true, &text[i..]),
+            None => (false, text),
+        };
         self.buf.extend_from_slice(text.as_bytes());
+
         if filter.has_focus() {
-            self.buf.push(b'_');
+            set_background_color(&mut self.buf, Color::White);
+            self.buf.push(b' ');
+            if !trimmed {
+                set_background_color(&mut self.buf, Color::DarkRed);
+            }
         }
 
         self.next_line();
