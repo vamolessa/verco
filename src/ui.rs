@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::mode::{Output, ReadLine, SelectMenu};
+use crate::mode::{Filter, Output, ReadLine, SelectMenu};
 
 pub const HEADER_LINE_COUNT: usize = 2;
 pub const RESERVED_LINES_COUNT: usize = HEADER_LINE_COUNT + 1;
@@ -259,10 +259,26 @@ impl Drawer {
         }
     }
 
+    pub fn filter(&mut self, filter: &Filter) -> usize {
+        let text = filter.as_str();
+        if !filter.is_filtering() {
+            return 0;
+        }
+
+        self.buf.push(b'/');
+        self.buf.extend_from_slice(text.as_bytes());
+        if filter.has_focus() {
+            self.buf.push(b'_');
+        }
+
+        self.next_line();
+        1
+    }
+
     pub fn select_menu<'entries, I, E>(
         &mut self,
         select: &SelectMenu,
-        header_height: u16,
+        header_height: usize,
         show_full_hovered_entry: bool,
         entries: I,
     ) where
@@ -275,7 +291,8 @@ impl Drawer {
         set_foreground_color(&mut self.buf, Color::White);
 
         let mut line_count = 0;
-        let max_line_count = self.viewport_size.1.saturating_sub(2 + header_height) as usize;
+        let max_line_count =
+            (self.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT + header_height);
 
         for (i, entry) in entries.enumerate().skip(select.scroll()) {
             let hovered = i == cursor_index;
@@ -298,3 +315,4 @@ impl Drawer {
         }
     }
 }
+

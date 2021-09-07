@@ -224,7 +224,7 @@ impl Backend for Git {
             let message = splits.next().unwrap_or("").into();
 
             entries.push(LogEntry {
-                hidden: false,
+                visible: true,
                 graph,
                 hash,
                 date,

@@ -2,7 +2,7 @@ use std::thread;
 
 use crate::{
     backend::{Backend, BackendResult, LogEntry},
-    mode::{ModeContext, ModeKind, ModeResponse, ModeStatus, Output, SelectMenu},
+    mode::{Filter, ModeContext, ModeKind, ModeResponse, ModeStatus, Output, SelectMenu},
     platform::Key,
     ui::{Color, Drawer, SelectEntryDraw, RESERVED_LINES_COUNT},
 };
@@ -124,6 +124,7 @@ impl SelectEntryDraw for LogEntry {
 #[derive(Default)]
 pub struct Mode {
     state: State,
+    filter: Filter,
     entries: Vec<LogEntry>,
     output: Output,
     select: SelectMenu,
@@ -135,6 +136,7 @@ impl Mode {
             return;
         }
         self.state = State::Waiting(WaitOperation::Refresh);
+        self.filter.clear();
 
         self.output.set(String::new());
         self.show_full_hovered_message = false;
@@ -143,67 +145,87 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
+        let pending_input = self.filter.is_filtering();
         let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
-        self.select
-            .on_key(self.entries.len(), available_height, key);
+        if self.filter.has_focus() {
+            self.filter.on_key(key);
+            let filter = self.filter.as_str();
 
-        if matches!(self.state, State::Idle) && self.select.cursor() + 1 == self.entries.len() {
-            self.state = State::Waiting(WaitOperation::Refresh);
-            let start = self.entries.len();
-            let ctx = ctx.clone();
-            thread::spawn(move || {
-                let result = ctx.backend.log(start, available_height);
-                ctx.event_sender
-                    .send_response(ModeResponse::Log(Response::Refresh(result)));
-            });
-        }
+            let mut cursor = self.select.cursor();
+            for (i, entry) in self.entries.iter_mut().enumerate() {
+                let was_visible = entry.visible;
+                entry.visible = entry.fuzzy_matches(filter);
 
-        if let Key::Char('d') = key {
-            let index = self.select.cursor();
-            if let Some(entry) = self.entries.get(index) {
-                ctx.event_sender
-                    .send_mode_change(ModeKind::RevisionDetails(entry.hash.clone()));
-            }
-        } else if let Key::Tab = key {
-            self.show_full_hovered_message = !self.show_full_hovered_message;
-        } else if let State::Idle = self.state {
-            match key {
-                Key::Char('g') => {
-                    let index = self.select.cursor();
-                    if let Some(entry) = self.entries.get(index) {
-                        self.state = State::Waiting(WaitOperation::Checkout);
-                        let revision = entry.hash.clone();
-                        request(ctx, move |b| b.checkout(&revision));
+                if entry.visible != was_visible && i < cursor {
+                    if entry.visible {
+                        cursor += 1
+                    } else {
+                        cursor -= 1
                     }
                 }
-                Key::Char('m') => {
-                    let index = self.select.cursor();
-                    if let Some(entry) = self.entries.get(index) {
-                        self.state = State::Waiting(WaitOperation::Merge);
-                        let revision = entry.hash.clone();
-                        request(ctx, move |b| b.merge(&revision));
+            }
+        } else {
+            self.select
+                .on_key(self.entries.len(), available_height, key);
+
+            if matches!(self.state, State::Idle) && self.select.cursor() + 1 == self.entries.len() {
+                self.state = State::Waiting(WaitOperation::Refresh);
+                let start = self.entries.len();
+                let ctx = ctx.clone();
+                thread::spawn(move || {
+                    let result = ctx.backend.log(start, available_height);
+                    ctx.event_sender
+                        .send_response(ModeResponse::Log(Response::Refresh(result)));
+                });
+            }
+
+            if let Key::Char('d') = key {
+                let index = self.select.cursor();
+                if let Some(entry) = self.entries.get(index) {
+                    ctx.event_sender
+                        .send_mode_change(ModeKind::RevisionDetails(entry.hash.clone()));
+                }
+            } else if let Key::Tab = key {
+                self.show_full_hovered_message = !self.show_full_hovered_message;
+            } else if let Key::Ctrl('f') = key {
+                self.filter.enter();
+            } else if let State::Idle = self.state {
+                match key {
+                    Key::Char('g') => {
+                        let index = self.select.cursor();
+                        if let Some(entry) = self.entries.get(index) {
+                            self.state = State::Waiting(WaitOperation::Checkout);
+                            let revision = entry.hash.clone();
+                            request(ctx, move |b| b.checkout(&revision));
+                        }
                     }
+                    Key::Char('m') => {
+                        let index = self.select.cursor();
+                        if let Some(entry) = self.entries.get(index) {
+                            self.state = State::Waiting(WaitOperation::Merge);
+                            let revision = entry.hash.clone();
+                            request(ctx, move |b| b.merge(&revision));
+                        }
+                    }
+                    Key::Char('f') => {
+                        self.state = State::Waiting(WaitOperation::Fetch);
+                        request(ctx, Backend::fetch);
+                    }
+                    Key::Char('p') => {
+                        self.state = State::Waiting(WaitOperation::Pull);
+                        request(ctx, Backend::pull);
+                    }
+                    Key::Char('P') => {
+                        self.state = State::Waiting(WaitOperation::Push);
+                        request(ctx, Backend::push);
+                    }
+                    _ => (),
                 }
-                Key::Char('f') => {
-                    self.state = State::Waiting(WaitOperation::Fetch);
-                    request(ctx, Backend::fetch);
-                }
-                Key::Char('p') => {
-                    self.state = State::Waiting(WaitOperation::Pull);
-                    request(ctx, Backend::pull);
-                }
-                Key::Char('P') => {
-                    self.state = State::Waiting(WaitOperation::Push);
-                    request(ctx, Backend::push);
-                }
-                _ => (),
             }
         }
 
-        ModeStatus {
-            pending_input: false,
-        }
+        ModeStatus { pending_input }
     }
 
     pub fn on_response(&mut self, response: Response) {
@@ -248,18 +270,20 @@ impl Mode {
             State::Waiting(WaitOperation::Pull) => "pull",
             State::Waiting(WaitOperation::Push) => "push",
         };
+
         let left_help = "[g]checkout [d]details [f]fetch [p]pull [P]push";
-        let right_help = "[arrows]move";
+        let right_help = "[arrows]move [ctrl+f]filter";
         (name, left_help, right_help)
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
+        let filter_line_count = drawer.filter(&self.filter);
         if self.output.text().is_empty() {
             drawer.select_menu(
                 &self.select,
-                0,
+                filter_line_count,
                 self.show_full_hovered_message,
-                self.entries.iter(),
+                self.entries.iter().filter(|e| e.visible),
             );
         } else {
             drawer.output(&self.output);
@@ -281,3 +305,4 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
+

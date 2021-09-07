@@ -4,6 +4,8 @@ use std::{
     sync::Arc,
 };
 
+use crate::mode::fuzzy_matches;
+
 pub mod git;
 pub mod hg;
 pub mod plastic;
@@ -57,7 +59,7 @@ pub struct RevisionInfo {
 #[derive(Clone)]
 pub struct RevisionEntry {
     pub selected: bool,
-    pub hidden: bool,
+    pub visible: bool,
     pub name: String,
     pub status: FileStatus,
 }
@@ -65,21 +67,34 @@ impl RevisionEntry {
     pub fn new(name: String, status: FileStatus) -> Self {
         Self {
             selected: false,
-            hidden: false,
+            visible: true,
             name,
             status,
         }
     }
+
+    pub fn fuzzy_matches(&self, pattern: &str) -> bool {
+        fuzzy_matches(&self.name, pattern)
+    }
 }
 
 pub struct LogEntry {
-    pub hidden: bool,
+    pub visible: bool,
     pub graph: String,
     pub hash: String,
     pub date: String,
     pub author: String,
     pub refs: String,
     pub message: String,
+}
+impl LogEntry {
+    pub fn fuzzy_matches(&self, pattern: &str) -> bool {
+        fuzzy_matches(&self.message, pattern)
+            || fuzzy_matches(&self.refs, pattern)
+            || fuzzy_matches(&self.author, pattern)
+            || fuzzy_matches(&self.date, pattern)
+            || fuzzy_matches(&self.hash, pattern)
+    }
 }
 
 pub struct BranchEntry {
@@ -166,3 +181,4 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)> 
         None
     }
 }
+

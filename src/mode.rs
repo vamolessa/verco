@@ -204,6 +204,46 @@ impl SelectMenu {
     }
 }
 
+#[derive(Default)]
+pub struct Filter {
+    has_focus: bool,
+    readline: ReadLine,
+}
+impl Filter {
+    pub fn clear(&mut self) {
+        self.has_focus = false;
+        self.readline.clear();
+    }
+
+    pub fn enter(&mut self) {
+        self.has_focus = true;
+        self.readline.clear();
+    }
+
+    pub fn on_key(&mut self, key: Key) {
+        if key.is_submit() {
+            self.has_focus = false;
+        } else if key.is_cancel() {
+            self.has_focus = false;
+            self.readline.clear();
+        } else {
+            self.readline.on_key(key);
+        }
+    }
+
+    pub fn is_filtering(&self) -> bool {
+        self.has_focus || !self.readline.input().is_empty()
+    }
+
+    pub fn has_focus(&self) -> bool {
+        self.has_focus
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.readline.input()
+    }
+}
+
 pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
     let mut pattern_chars = pattern.chars();
     let mut pattern_char = match pattern_chars.next() {
@@ -217,9 +257,7 @@ pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
     for (i, text_char) in text.char_indices() {
         if text_char.eq_ignore_ascii_case(&pattern_char) {
             let is_alphanumeric = text_char.is_ascii_alphanumeric();
-            let matched = !is_alphanumeric
-                || !was_alphanumeric
-                || previous_matched_index + 1 == i;
+            let matched = !is_alphanumeric || !was_alphanumeric || previous_matched_index + 1 == i;
             was_alphanumeric = is_alphanumeric;
 
             if matched {
