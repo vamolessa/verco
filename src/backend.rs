@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::mode::fuzzy_matches;
+use crate::mode::{fuzzy_matches, FilterEntry};
 
 pub mod git;
 pub mod hg;
@@ -72,9 +72,11 @@ impl RevisionEntry {
             status,
         }
     }
-
-    pub fn fuzzy_matches(&self, pattern: &str) -> bool {
-        fuzzy_matches(&self.name, pattern)
+}
+impl FilterEntry for RevisionEntry {
+    fn fuzzy_match(&mut self, pattern: &str) -> bool {
+        self.visible = fuzzy_matches(&self.name, pattern);
+        self.visible
     }
 }
 
@@ -87,13 +89,14 @@ pub struct LogEntry {
     pub refs: String,
     pub message: String,
 }
-impl LogEntry {
-    pub fn fuzzy_matches(&self, pattern: &str) -> bool {
-        fuzzy_matches(&self.message, pattern)
+impl FilterEntry for LogEntry {
+    fn fuzzy_match(&mut self, pattern: &str) -> bool {
+        self.visible = fuzzy_matches(&self.message, pattern)
             || fuzzy_matches(&self.refs, pattern)
             || fuzzy_matches(&self.author, pattern)
             || fuzzy_matches(&self.date, pattern)
-            || fuzzy_matches(&self.hash, pattern)
+            || fuzzy_matches(&self.hash, pattern);
+        self.visible
     }
 }
 

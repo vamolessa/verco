@@ -3,7 +3,7 @@ use std::thread;
 use crate::{
     backend::{Backend, BackendResult, FileStatus, RevisionEntry, StatusInfo},
     mode::{
-        ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine, SelectMenu,
+        Filter, ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine, SelectMenu,
         SelectMenuAction,
     },
     platform::Key,
@@ -69,6 +69,7 @@ pub struct Mode {
     entries: Vec<RevisionEntry>,
     output: Output,
     select: SelectMenu,
+    filter: Filter,
     readline: ReadLine,
 }
 impl Mode {
@@ -103,6 +104,7 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
+        self.filter.clear();
         self.readline.clear();
 
         request(ctx, |_| Ok(()));

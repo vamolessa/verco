@@ -148,8 +148,8 @@ pub struct SelectMenu {
     scroll: usize,
 }
 impl SelectMenu {
-    pub fn cursor(&self) -> usize {
-        self.cursor
+    pub fn entry_index(&self, indices: &[usize]) -> usize {
+        indices[self.cursor]
     }
 
     pub fn scroll(&self) -> usize {
@@ -204,10 +204,15 @@ impl SelectMenu {
     }
 }
 
+pub trait FilterEntry {
+    fn fuzzy_match(&mut self, pattern: &str) -> bool;
+}
+
 #[derive(Default)]
 pub struct Filter {
     has_focus: bool,
     readline: ReadLine,
+    visible_indices: Vec<usize>,
 }
 impl Filter {
     pub fn clear(&mut self) {
@@ -229,6 +234,24 @@ impl Filter {
         } else {
             self.readline.on_key(key);
         }
+    }
+
+    pub fn filter<'entries, I, E>(&mut self, entries: I)
+    where
+        I: 'entries + Iterator<Item = &'entries mut E>,
+        E: 'entries + FilterEntry,
+    {
+        self.visible_indices.clear();
+        for (i, entry) in entries.enumerate() {
+            let is_visible = entry.fuzzy_match(self.as_str());
+            if is_visible {
+                self.visible_indices.push(i);
+            }
+        }
+    }
+
+    pub fn visible_indices(&self) -> &[usize] {
+        &self.visible_indices
     }
 
     pub fn is_filtering(&self) -> bool {
