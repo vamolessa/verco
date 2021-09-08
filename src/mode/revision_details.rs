@@ -181,7 +181,7 @@ impl Mode {
             State::Idle | State::Waiting => (
                 "revision details",
                 "[d]diff",
-                "[arrows]move [space]toggle [a]toggle all",
+                "[arrows]move [space]toggle [a]toggle all [ctrl+f]filter",
             ),
             State::ViewDiff => ("diff", "", "[arrows]move"),
         }

@@ -181,7 +181,7 @@ impl Mode {
             State::NewNameInput => "new tag name",
         };
         let (left_help, right_help) = match self.state {
-            State::Idle | State::Waiting(_) => ("[g]checkout [n]new [D]delete", "[arrows]move"),
+            State::Idle | State::Waiting(_) => ("[g]checkout [n]new [D]delete", "[arrows]move [ctrl+f]filter"),
             State::NewNameInput => (
                 "",
                 "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all",

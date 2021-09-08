@@ -302,7 +302,7 @@ impl Mode {
         let (left_help, right_help) = match self.state {
             State::Idle | State::Waiting(_) => (
                 "[c]commit [R]revert [d]diff [L]take local [O]take other",
-                "[arrows]move [space]toggle [a]toggle all",
+                "[arrows]move [space]toggle [a]toggle all [ctrl+f]filter",
             ),
             State::CommitMessageInput => (
                 "",

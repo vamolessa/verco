@@ -226,7 +226,7 @@ impl Mode {
         };
         let (left_help, right_help) = match self.state {
             State::Idle | State::Waiting(_) => {
-                ("[g]checkout [n]new [D]delete [m]merge", "[arrows]move")
+                ("[g]checkout [n]new [D]delete [m]merge", "[arrows]move [ctrl+f]filter")
             }
             State::NewNameInput => (
                 "",
