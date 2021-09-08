@@ -219,7 +219,6 @@ impl Backend for Hg {
             let message = splits.next().unwrap_or("").into();
 
             entries.push(LogEntry {
-                visible: true,
                 graph,
                 hash,
                 date,

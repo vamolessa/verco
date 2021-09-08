@@ -144,24 +144,12 @@ pub enum SelectMenuAction {
 
 #[derive(Default)]
 pub struct SelectMenu {
-    cursor: usize,
-    scroll: usize,
+    pub cursor: usize,
+    pub scroll: usize,
 }
 impl SelectMenu {
-    pub fn entry_index(&self, indices: &[usize]) -> usize {
-        indices[self.cursor]
-    }
-
-    pub fn scroll(&self) -> usize {
-        self.scroll
-    }
-
     pub fn saturate_cursor(&mut self, entries_len: usize) {
         self.cursor = entries_len.saturating_sub(1).min(self.cursor);
-    }
-
-    pub fn set_cursor(&mut self, cursor: usize) {
-        self.cursor = cursor;
     }
 
     pub fn on_remove_entry(&mut self, index: usize) {
@@ -205,7 +193,7 @@ impl SelectMenu {
 }
 
 pub trait FilterEntry {
-    fn fuzzy_match(&mut self, pattern: &str) -> bool;
+    fn fuzzy_matches(&self, pattern: &str) -> bool;
 }
 
 #[derive(Default)]
@@ -238,13 +226,12 @@ impl Filter {
 
     pub fn filter<'entries, I, E>(&mut self, entries: I)
     where
-        I: 'entries + Iterator<Item = &'entries mut E>,
+        I: 'entries + Iterator<Item = &'entries E>,
         E: 'entries + FilterEntry,
     {
         self.visible_indices.clear();
         for (i, entry) in entries.enumerate() {
-            let is_visible = entry.fuzzy_match(self.as_str());
-            if is_visible {
+            if entry.fuzzy_matches(self.as_str()) {
                 self.visible_indices.push(i);
             }
         }
@@ -295,4 +282,3 @@ pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
 
     false
 }
-

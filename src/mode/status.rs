@@ -88,12 +88,16 @@ impl Mode {
         for i in (0..self.entries.len()).rev() {
             if self.entries[i].selected {
                 self.entries.remove(i);
+                let i = match self.filter.visible_indices().binary_search(&i) {
+                    Ok(i) => i,
+                    Err(i) => i,
+                };
                 self.select.on_remove_entry(i);
             }
         }
         if self.entries.len() == previous_len {
             self.entries.clear();
-            self.select.set_cursor(0);
+            self.select.cursor = 0;
         }
     }
 
@@ -111,116 +115,127 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, key: Key) -> ModeStatus {
-        let pending_input = matches!(self.state, State::CommitMessageInput);
+        let pending_input =
+            matches!(self.state, State::CommitMessageInput) || self.filter.has_focus();
         let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
-        match self.state {
-            State::Idle | State::Waiting(_) => {
-                if self.output.line_count() > 1 {
-                    self.output.on_key(available_height, key);
-                } else {
-                    match self
-                        .select
-                        .on_key(self.entries.len(), available_height, key)
-                    {
-                        SelectMenuAction::None => (),
-                        SelectMenuAction::Toggle(i) => {
-                            self.entries[i].selected = !self.entries[i].selected
-                        }
-                        SelectMenuAction::ToggleAll => {
-                            let all_selected = self.entries.iter().all(|e| e.selected);
-                            for entry in &mut self.entries {
-                                entry.selected = !all_selected;
+        if self.filter.has_focus() {
+            self.filter.on_key(key);
+            self.filter.filter(self.entries.iter());
+            self.select
+                .saturate_cursor(self.filter.visible_indices().len());
+        } else {
+            match self.state {
+                State::Idle | State::Waiting(_) => {
+                    if self.output.line_count() > 1 {
+                        self.output.on_key(available_height, key);
+                    } else {
+                        match self.select.on_key(
+                            self.filter.visible_indices().len(),
+                            available_height,
+                            key,
+                        ) {
+                            SelectMenuAction::None => (),
+                            SelectMenuAction::Toggle(i) => {
+                                self.entries[i].selected = !self.entries[i].selected
+                            }
+                            SelectMenuAction::ToggleAll => {
+                                let all_selected = self.entries.iter().all(|e| e.selected);
+                                for entry in &mut self.entries {
+                                    entry.selected = !all_selected;
+                                }
                             }
                         }
                     }
-                }
 
-                match key {
-                    Key::Char('c') => {
-                        if !self.entries.is_empty() {
-                            self.state = State::CommitMessageInput;
-                            self.output.set(String::new());
-                            self.readline.clear();
-                        }
-                    }
-                    Key::Char('R') => {
-                        if matches!(self.state, State::Idle) && !self.entries.is_empty() {
-                            self.state = State::Waiting(WaitOperation::Discard);
-                            let entries = self.get_selected_entries();
-                            self.remove_selected_entries();
-
-                            request(ctx, move |b| b.discard(&entries));
-                        }
-                    }
-                    Key::Char('O') => {
-                        if matches!(self.state, State::Idle) && !self.entries.is_empty() {
-                            self.state = State::Waiting(WaitOperation::ResolveTakingLocal);
-                            let entries = self.get_selected_entries();
-
-                            request(ctx, move |b| b.resolve_taking_ours(&entries));
-                        }
-                    }
-                    Key::Char('T') => {
-                        if matches!(self.state, State::Idle) && !self.entries.is_empty() {
-                            self.state = State::Waiting(WaitOperation::ResolveTakingOther);
-                            let entries = self.get_selected_entries();
-
-                            request(ctx, move |b| b.resolve_taking_theirs(&entries));
-                        }
-                    }
-                    Key::Char('d') => {
-                        if !self.entries.is_empty() {
-                            self.state = State::ViewDiff;
-                            self.output.set(String::new());
-
-                            let entries = self.get_selected_entries();
-
-                            let ctx = ctx.clone();
-                            thread::spawn(move || {
-                                let output = match ctx.backend.diff(None, &entries) {
-                                    Ok(output) => output,
-                                    Err(error) => error,
-                                };
-                                ctx.event_sender
-                                    .send_response(ModeResponse::Status(Response::Diff(output)));
-                            });
-                        }
-                    }
-                    _ => (),
-                }
-            }
-            State::CommitMessageInput => {
-                self.readline.on_key(key);
-                if key.is_submit() {
-                    self.state = State::Waiting(WaitOperation::Commit);
-
-                    let message = self.readline.input().to_string();
-                    let entries = self.get_selected_entries();
-                    self.remove_selected_entries();
-
-                    let ctx = ctx.clone();
-                    thread::spawn(move || {
-                        ctx.event_sender.send_mode_change(ModeKind::Log);
-                        match ctx.backend.commit(&message, &entries) {
-                            Ok(()) => {
-                                ctx.event_sender
-                                    .send_response(ModeResponse::Status(Response::Commit));
-                                ctx.event_sender.send_mode_refresh(ModeKind::Log);
+                    match key {
+                        Key::Ctrl('f') => self.filter.enter(),
+                        Key::Char('c') => {
+                            if !self.entries.is_empty() {
+                                self.state = State::CommitMessageInput;
+                                self.output.set(String::new());
+                                self.readline.clear();
                             }
-                            Err(error) => ctx.event_sender.send_response(ModeResponse::Status(
-                                Response::Refresh(StatusInfo {
-                                    header: error,
-                                    entries: Vec::new(),
-                                }),
-                            )),
                         }
-                    });
-                } else if key.is_cancel() {
-                    self.on_enter(ctx);
+                        Key::Char('R') => {
+                            if matches!(self.state, State::Idle) && !self.entries.is_empty() {
+                                self.state = State::Waiting(WaitOperation::Discard);
+                                let entries = self.get_selected_entries();
+                                self.remove_selected_entries();
+
+                                request(ctx, move |b| b.discard(&entries));
+                            }
+                        }
+                        Key::Char('O') => {
+                            if matches!(self.state, State::Idle) && !self.entries.is_empty() {
+                                self.state = State::Waiting(WaitOperation::ResolveTakingLocal);
+                                let entries = self.get_selected_entries();
+
+                                request(ctx, move |b| b.resolve_taking_ours(&entries));
+                            }
+                        }
+                        Key::Char('T') => {
+                            if matches!(self.state, State::Idle) && !self.entries.is_empty() {
+                                self.state = State::Waiting(WaitOperation::ResolveTakingOther);
+                                let entries = self.get_selected_entries();
+
+                                request(ctx, move |b| b.resolve_taking_theirs(&entries));
+                            }
+                        }
+                        Key::Char('d') => {
+                            if !self.entries.is_empty() {
+                                self.state = State::ViewDiff;
+                                self.output.set(String::new());
+
+                                let entries = self.get_selected_entries();
+
+                                let ctx = ctx.clone();
+                                thread::spawn(move || {
+                                    let output = match ctx.backend.diff(None, &entries) {
+                                        Ok(output) => output,
+                                        Err(error) => error,
+                                    };
+                                    ctx.event_sender.send_response(ModeResponse::Status(
+                                        Response::Diff(output),
+                                    ));
+                                });
+                            }
+                        }
+                        _ => (),
+                    }
                 }
+                State::CommitMessageInput => {
+                    self.readline.on_key(key);
+                    if key.is_submit() {
+                        self.state = State::Waiting(WaitOperation::Commit);
+
+                        let message = self.readline.input().to_string();
+                        let entries = self.get_selected_entries();
+                        self.remove_selected_entries();
+
+                        let ctx = ctx.clone();
+                        thread::spawn(move || {
+                            ctx.event_sender.send_mode_change(ModeKind::Log);
+                            match ctx.backend.commit(&message, &entries) {
+                                Ok(()) => {
+                                    ctx.event_sender
+                                        .send_response(ModeResponse::Status(Response::Commit));
+                                    ctx.event_sender.send_mode_refresh(ModeKind::Log);
+                                }
+                                Err(error) => ctx.event_sender.send_response(ModeResponse::Status(
+                                    Response::Refresh(StatusInfo {
+                                        header: error,
+                                        entries: Vec::new(),
+                                    }),
+                                )),
+                            }
+                        });
+                    } else if key.is_cancel() {
+                        self.on_enter(ctx);
+                    }
+                }
+                _ => self.output.on_key(available_height, key),
             }
-            _ => self.output.on_key(available_height, key),
         }
 
         ModeStatus { pending_input }
@@ -237,7 +252,8 @@ impl Mode {
                 }
 
                 self.entries = info.entries;
-                self.select.saturate_cursor(self.entries.len());
+                self.select
+                    .saturate_cursor(self.filter.visible_indices().len());
             }
             Response::Commit => self.state = State::Idle,
             Response::Diff(mut output) => {
@@ -301,7 +317,15 @@ impl Mode {
                     drawer.str(output);
                     drawer.next_line();
                     drawer.next_line();
-                    drawer.select_menu(&self.select, 2, false, self.entries.iter());
+                    drawer.select_menu(
+                        &self.select,
+                        2,
+                        false,
+                        self.filter
+                            .visible_indices()
+                            .iter()
+                            .map(|&i| &self.entries[i]),
+                    );
 
                     if self.entries.is_empty() {
                         let empty_message = match self.state {
@@ -344,4 +368,3 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
-

@@ -299,7 +299,7 @@ impl Drawer {
         I: 'entries + Iterator<Item = &'entries E>,
         E: 'entries + SelectEntryDraw,
     {
-        let cursor_index = select.cursor();
+        let cursor_index = select.cursor;
 
         set_background_color(&mut self.buf, Color::Black);
         set_foreground_color(&mut self.buf, Color::White);
@@ -308,7 +308,7 @@ impl Drawer {
         let max_line_count =
             (self.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT + header_height);
 
-        for (i, entry) in entries.enumerate().skip(select.scroll()) {
+        for (i, entry) in entries.enumerate().skip(select.scroll) {
             let hovered = i == cursor_index;
             if hovered {
                 set_background_color(&mut self.buf, Color::DarkMagenta);
@@ -329,4 +329,3 @@ impl Drawer {
         }
     }
 }
-

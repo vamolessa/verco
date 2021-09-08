@@ -288,7 +288,6 @@ impl Backend for Plastic {
             let message = splits.next().unwrap_or("").into();
 
             entries.push(LogEntry {
-                visible: true,
                 graph,
                 hash,
                 date,

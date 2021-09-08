@@ -2,7 +2,7 @@ use std::thread;
 
 use crate::{
     backend::{RevisionEntry, RevisionInfo},
-    mode::{ModeContext, ModeResponse, ModeStatus, Output, SelectMenu, SelectMenuAction},
+    mode::{Filter, ModeContext, ModeResponse, ModeStatus, Output, SelectMenu, SelectMenuAction},
     platform::Key,
     ui::{Drawer, RESERVED_LINES_COUNT},
 };
@@ -29,6 +29,7 @@ pub struct Mode {
     entries: Vec<RevisionEntry>,
     output: Output,
     select: SelectMenu,
+    filter: Filter,
     show_full_message: bool,
 }
 impl Mode {
@@ -47,6 +48,7 @@ impl Mode {
         self.state = State::Waiting;
 
         self.output.set(String::new());
+        self.filter.clear();
         self.select.saturate_cursor(0);
         self.show_full_message = false;
 
@@ -71,54 +73,62 @@ impl Mode {
     pub fn on_key(&mut self, ctx: &ModeContext, revision: &str, key: Key) -> ModeStatus {
         let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
-        match self.state {
-            State::Idle => {
-                match self
-                    .select
-                    .on_key(self.entries.len(), available_height, key)
-                {
-                    SelectMenuAction::None => (),
-                    SelectMenuAction::Toggle(i) => {
-                        self.entries[i].selected = !self.entries[i].selected
-                    }
-                    SelectMenuAction::ToggleAll => {
-                        let all_selected = self.entries.iter().all(|e| e.selected);
-                        for entry in &mut self.entries {
-                            entry.selected = !all_selected;
+        if self.filter.has_focus() {
+            self.filter.on_key(key);
+            self.filter.filter(self.entries.iter());
+            self.select
+                .saturate_cursor(self.filter.visible_indices().len());
+        } else {
+            match self.state {
+                State::Idle => {
+                    match self.select.on_key(
+                        self.filter.visible_indices().len(),
+                        available_height,
+                        key,
+                    ) {
+                        SelectMenuAction::None => (),
+                        SelectMenuAction::Toggle(i) => {
+                            self.entries[i].selected = !self.entries[i].selected
+                        }
+                        SelectMenuAction::ToggleAll => {
+                            let all_selected = self.entries.iter().all(|e| e.selected);
+                            for entry in &mut self.entries {
+                                entry.selected = !all_selected;
+                            }
                         }
                     }
-                }
 
-                match key {
-                    Key::Tab => {
-                        self.show_full_message = !self.show_full_message;
-                    }
-                    Key::Char('d') => {
-                        if !self.entries.is_empty() {
-                            self.state = State::ViewDiff;
-                            self.output.set(String::new());
-
-                            let entries = self.get_selected_entries();
-
-                            let ctx = ctx.clone();
-                            let revision = revision.to_string();
-                            thread::spawn(move || {
-                                let output = match ctx.backend.diff(Some(&revision), &entries) {
-                                    Ok(output) => output,
-                                    Err(error) => error,
-                                };
-                                ctx.event_sender
-                                    .send_response(ModeResponse::RevisionDetails(Response::Diff(
-                                        output,
-                                    )));
-                            });
+                    match key {
+                        Key::Tab => {
+                            self.show_full_message = !self.show_full_message;
                         }
+                        Key::Char('d') => {
+                            if !self.entries.is_empty() {
+                                self.state = State::ViewDiff;
+                                self.output.set(String::new());
+
+                                let entries = self.get_selected_entries();
+
+                                let ctx = ctx.clone();
+                                let revision = revision.to_string();
+                                thread::spawn(move || {
+                                    let output = match ctx.backend.diff(Some(&revision), &entries) {
+                                        Ok(output) => output,
+                                        Err(error) => error,
+                                    };
+                                    ctx.event_sender
+                                        .send_response(ModeResponse::RevisionDetails(
+                                            Response::Diff(output),
+                                        ));
+                                });
+                            }
+                        }
+                        _ => (),
                     }
-                    _ => (),
                 }
+                State::ViewDiff => self.output.on_key(available_height, key),
+                _ => (),
             }
-            State::ViewDiff => self.output.on_key(available_height, key),
-            _ => (),
         }
 
         ModeStatus {
@@ -137,7 +147,8 @@ impl Mode {
                 }
 
                 self.entries = info.entries;
-                self.select.saturate_cursor(self.entries.len());
+                self.select
+                    .saturate_cursor(self.filter.visible_indices().len());
             }
             Response::Diff(output) => {
                 if let State::ViewDiff = self.state {
@@ -190,9 +201,11 @@ impl Mode {
                 &self.select,
                 (line_count + 1).min(u16::MAX as _) as _,
                 false,
-                self.entries.iter(),
+                self.filter
+                    .visible_indices()
+                    .iter()
+                    .map(|&i| &self.entries[i]),
             );
         }
     }
 }
-

@@ -59,7 +59,6 @@ pub struct RevisionInfo {
 #[derive(Clone)]
 pub struct RevisionEntry {
     pub selected: bool,
-    pub visible: bool,
     pub name: String,
     pub status: FileStatus,
 }
@@ -67,21 +66,18 @@ impl RevisionEntry {
     pub fn new(name: String, status: FileStatus) -> Self {
         Self {
             selected: false,
-            visible: true,
             name,
             status,
         }
     }
 }
 impl FilterEntry for RevisionEntry {
-    fn fuzzy_match(&mut self, pattern: &str) -> bool {
-        self.visible = fuzzy_matches(&self.name, pattern);
-        self.visible
+    fn fuzzy_matches(&self, pattern: &str) -> bool {
+        fuzzy_matches(&self.name, pattern)
     }
 }
 
 pub struct LogEntry {
-    pub visible: bool,
     pub graph: String,
     pub hash: String,
     pub date: String,
@@ -90,13 +86,12 @@ pub struct LogEntry {
     pub message: String,
 }
 impl FilterEntry for LogEntry {
-    fn fuzzy_match(&mut self, pattern: &str) -> bool {
-        self.visible = fuzzy_matches(&self.message, pattern)
+    fn fuzzy_matches(&self, pattern: &str) -> bool {
+        fuzzy_matches(&self.message, pattern)
             || fuzzy_matches(&self.refs, pattern)
             || fuzzy_matches(&self.author, pattern)
             || fuzzy_matches(&self.date, pattern)
-            || fuzzy_matches(&self.hash, pattern);
-        self.visible
+            || fuzzy_matches(&self.hash, pattern)
     }
 }
 
@@ -104,9 +99,19 @@ pub struct BranchEntry {
     pub name: String,
     pub checked_out: bool,
 }
+impl FilterEntry for BranchEntry {
+    fn fuzzy_matches(&self, pattern: &str) -> bool {
+        fuzzy_matches(&self.name, pattern)
+    }
+}
 
 pub struct TagEntry {
     pub name: String,
+}
+impl FilterEntry for TagEntry {
+    fn fuzzy_matches(&self, pattern: &str) -> bool {
+        fuzzy_matches(&self.name, pattern)
+    }
 }
 
 pub trait Backend: 'static + Send + Sync {
@@ -184,4 +189,3 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)> 
         None
     }
 }
-

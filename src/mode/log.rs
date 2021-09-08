@@ -125,10 +125,10 @@ impl SelectEntryDraw for LogEntry {
 #[derive(Default)]
 pub struct Mode {
     state: State,
-    filter: Filter,
     entries: Vec<LogEntry>,
     output: Output,
     select: SelectMenu,
+    filter: Filter,
     show_full_hovered_message: bool,
 }
 impl Mode {
@@ -152,14 +152,14 @@ impl Mode {
         if self.filter.has_focus() {
             self.filter.on_key(key);
 
-            self.filter.filter(self.entries.iter_mut());
+            self.filter.filter(self.entries.iter());
             self.select
                 .saturate_cursor(self.filter.visible_indices().len());
         } else {
             self.select
                 .on_key(self.filter.visible_indices().len(), available_height, key);
 
-            let current_entry_index = self.select.entry_index(self.filter.visible_indices());
+            let current_entry_index = self.filter.visible_indices()[self.select.cursor];
             if matches!(self.state, State::Idle) && current_entry_index + 1 == self.entries.len() {
                 self.state = State::Waiting(WaitOperation::Refresh);
                 let start = self.entries.len();
@@ -237,7 +237,7 @@ impl Mode {
                     }
                 }
 
-                self.filter.filter(self.entries.iter_mut());
+                self.filter.filter(self.entries.iter());
                 self.select
                     .saturate_cursor(self.filter.visible_indices().len());
             }
@@ -273,7 +273,10 @@ impl Mode {
                 &self.select,
                 filter_line_count,
                 self.show_full_hovered_message,
-                self.entries.iter().filter(|e| e.visible),
+                self.filter
+                    .visible_indices()
+                    .iter()
+                    .map(|&i| &self.entries[i]),
             );
         } else {
             drawer.output(&self.output);
@@ -295,4 +298,3 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
-

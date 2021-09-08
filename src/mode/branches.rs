@@ -2,7 +2,7 @@ use std::thread;
 
 use crate::{
     backend::{Backend, BackendResult, BranchEntry},
-    mode::{ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine, SelectMenu},
+    mode::{Filter, ModeContext, ModeKind, ModeResponse, ModeStatus, Output, ReadLine, SelectMenu},
     platform::Key,
     ui::{Drawer, SelectEntryDraw, RESERVED_LINES_COUNT},
 };
@@ -49,6 +49,7 @@ pub struct Mode {
     entries: Vec<BranchEntry>,
     output: Output,
     select: SelectMenu,
+    filter: Filter,
     readline: ReadLine,
 }
 impl Mode {
@@ -59,6 +60,7 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
+        self.filter.clear();
         self.readline.clear();
 
         request(ctx, |_| Ok(()));
@@ -68,85 +70,94 @@ impl Mode {
         let pending_input = matches!(self.state, State::NewNameInput);
         let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
-        match self.state {
-            State::Idle | State::Waiting(_) => {
-                if self.output.text().is_empty() {
-                    self.select
-                        .on_key(self.entries.len(), available_height, key);
-                } else {
-                    self.output.on_key(available_height, key);
-                }
+        if self.filter.has_focus() {
+            self.filter.on_key(key);
+            self.filter.filter(self.entries.iter());
+            self.select
+                .saturate_cursor(self.filter.visible_indices().len());
+        } else {
+            match self.state {
+                State::Idle | State::Waiting(_) => {
+                    if self.output.text().is_empty() {
+                        self.select.on_key(
+                            self.filter.visible_indices().len(),
+                            available_height,
+                            key,
+                        );
+                    } else {
+                        self.output.on_key(available_height, key);
+                    }
 
-                match key {
-                    Key::Char('g') => {
-                        let index = self.select.cursor();
-                        if let Some(entry) = self.entries.get(index) {
-                            let name = entry.name.clone();
-                            let ctx = ctx.clone();
-                            thread::spawn(move || {
-                                ctx.event_sender.send_mode_change(ModeKind::Log);
-                                match ctx.backend.checkout(&name) {
-                                    Ok(()) => {
-                                        ctx.event_sender.send_response(ModeResponse::Branches(
-                                            Response::Checkout,
-                                        ));
-                                        ctx.event_sender.send_mode_refresh(ModeKind::Log);
+                    let current_entry_index = self.filter.visible_indices()[self.select.cursor];
+                    match key {
+                        Key::Char('g') => {
+                            if let Some(entry) = self.entries.get(current_entry_index) {
+                                let name = entry.name.clone();
+                                let ctx = ctx.clone();
+                                thread::spawn(move || {
+                                    ctx.event_sender.send_mode_change(ModeKind::Log);
+                                    match ctx.backend.checkout(&name) {
+                                        Ok(()) => {
+                                            ctx.event_sender.send_response(ModeResponse::Branches(
+                                                Response::Checkout,
+                                            ));
+                                            ctx.event_sender.send_mode_refresh(ModeKind::Log);
+                                        }
+                                        Err(error) => ctx.event_sender.send_response(
+                                            ModeResponse::Branches(Response::Refresh(Err(error))),
+                                        ),
                                     }
-                                    Err(error) => ctx.event_sender.send_response(
-                                        ModeResponse::Branches(Response::Refresh(Err(error))),
-                                    ),
-                                }
-                            });
+                                });
+                            }
                         }
-                    }
-                    Key::Char('n') => {
-                        self.state = State::NewNameInput;
-                        self.output.set(String::new());
-                        self.readline.clear();
-                    }
-                    Key::Char('D') => {
-                        let index = self.select.cursor();
-                        if let Some(entry) = self.entries.get(index) {
-                            self.state = State::Waiting(WaitOperation::Delete);
-
-                            let name = entry.name.clone();
-                            self.entries.remove(index);
-                            self.select.on_remove_entry(index);
-                            request(ctx, move |b| b.delete_branch(&name));
+                        Key::Char('n') => {
+                            self.state = State::NewNameInput;
+                            self.output.set(String::new());
+                            self.readline.clear();
                         }
-                    }
-                    Key::Char('m') => {
-                        let index = self.select.cursor();
-                        if let Some(entry) = self.entries.get(index) {
-                            self.state = State::Waiting(WaitOperation::Merge);
+                        Key::Char('D') => {
+                            if let Some(entry) = self.entries.get(current_entry_index) {
+                                self.state = State::Waiting(WaitOperation::Delete);
 
-                            let name = entry.name.clone();
-                            let ctx = ctx.clone();
-                            thread::spawn(move || {
-                                ctx.event_sender.send_mode_change(ModeKind::Log);
-                                match ctx.backend.merge(&name) {
-                                    Ok(()) => {
-                                        ctx.event_sender
-                                            .send_response(ModeResponse::Branches(Response::Merge));
-                                        ctx.event_sender.send_mode_refresh(ModeKind::Log);
+                                let name = entry.name.clone();
+                                self.entries.remove(current_entry_index);
+                                self.select.on_remove_entry(self.select.cursor);
+                                request(ctx, move |b| b.delete_branch(&name));
+                            }
+                        }
+                        Key::Char('m') => {
+                            if let Some(entry) = self.entries.get(current_entry_index) {
+                                self.state = State::Waiting(WaitOperation::Merge);
+
+                                let name = entry.name.clone();
+                                let ctx = ctx.clone();
+                                thread::spawn(move || {
+                                    ctx.event_sender.send_mode_change(ModeKind::Log);
+                                    match ctx.backend.merge(&name) {
+                                        Ok(()) => {
+                                            ctx.event_sender.send_response(ModeResponse::Branches(
+                                                Response::Merge,
+                                            ));
+                                            ctx.event_sender.send_mode_refresh(ModeKind::Log);
+                                        }
+                                        Err(error) => ctx.event_sender.send_response(
+                                            ModeResponse::Branches(Response::Refresh(Err(error))),
+                                        ),
                                     }
-                                    Err(error) => ctx.event_sender.send_response(
-                                        ModeResponse::Branches(Response::Refresh(Err(error))),
-                                    ),
-                                }
-                            });
+                                });
+                            }
                         }
+                        _ => (),
                     }
-                    _ => (),
                 }
-            }
-            State::NewNameInput => {
-                self.readline.on_key(key);
-                if key.is_submit() {
-                    self.state = State::Waiting(WaitOperation::New);
+                State::NewNameInput => {
+                    self.readline.on_key(key);
+                    if key.is_submit() {
+                        self.state = State::Waiting(WaitOperation::New);
 
-                    let name = self.readline.input().to_string();
-                    request(ctx, move |b| b.new_branch(&name));
+                        let name = self.readline.input().to_string();
+                        request(ctx, move |b| b.new_branch(&name));
+                    }
                 }
             }
         }
@@ -170,10 +181,14 @@ impl Mode {
                     }
                 }
 
+                self.filter.filter(self.entries.iter());
+                self.select
+                    .saturate_cursor(self.filter.visible_indices().len());
+
                 if let Some(i) = self.entries.iter().position(|e| e.checked_out) {
-                    self.select.set_cursor(i);
-                } else {
-                    self.select.saturate_cursor(self.entries.len());
+                    if let Ok(i) = self.filter.visible_indices().binary_search(&i) {
+                        self.select.cursor = i;
+                    }
                 }
             }
             Response::Checkout | Response::Merge => self.state = State::Idle,
@@ -211,7 +226,15 @@ impl Mode {
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
-                    drawer.select_menu(&self.select, 0, false, self.entries.iter());
+                    drawer.select_menu(
+                        &self.select,
+                        0,
+                        false,
+                        self.filter
+                            .visible_indices()
+                            .iter()
+                            .map(|&i| &self.entries[i]),
+                    );
                 } else {
                     drawer.output(&self.output);
                 }
@@ -238,4 +261,3 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
-
