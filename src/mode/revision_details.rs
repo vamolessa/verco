@@ -88,8 +88,9 @@ impl Mode {
                     ) {
                         SelectMenuAction::None => (),
                         SelectMenuAction::Toggle(i) => {
-                            let i = self.filter.visible_indices()[i];
-                            self.entries[i].selected = !self.entries[i].selected
+                            if let Some(i) = self.filter.get_visible_index(i) {
+                                self.entries[i].selected = !self.entries[i].selected
+                            }
                         }
                         SelectMenuAction::ToggleAll => {
                             let all_selected = self
@@ -222,3 +223,4 @@ impl Mode {
         }
     }
 }
+

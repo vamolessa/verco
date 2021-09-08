@@ -159,8 +159,12 @@ impl Mode {
             self.select
                 .on_key(self.filter.visible_indices().len(), available_height, key);
 
-            let current_entry_index = self.filter.visible_indices()[self.select.cursor];
-            if matches!(self.state, State::Idle) && current_entry_index + 1 == self.entries.len() {
+            let current_entry_index = self.filter.get_visible_index(self.select.cursor);
+            if matches!(self.state, State::Idle)
+                && current_entry_index
+                    .map(|i| i + 1 == self.entries.len())
+                    .unwrap_or(false)
+            {
                 self.state = State::Waiting(WaitOperation::Refresh);
                 let start = self.entries.len();
                 let ctx = ctx.clone();
@@ -172,7 +176,8 @@ impl Mode {
             }
 
             if let Key::Char('d') = key {
-                if let Some(entry) = self.entries.get(current_entry_index) {
+                if let Some(current_entry_index) = current_entry_index {
+                    let entry = &self.entries[current_entry_index];
                     ctx.event_sender
                         .send_mode_change(ModeKind::RevisionDetails(entry.hash.clone()));
                 }
@@ -183,14 +188,16 @@ impl Mode {
             } else if let State::Idle = self.state {
                 match key {
                     Key::Char('g') => {
-                        if let Some(entry) = self.entries.get(current_entry_index) {
+                        if let Some(current_entry_index) = current_entry_index {
+                            let entry = &self.entries[current_entry_index];
                             self.state = State::Waiting(WaitOperation::Checkout);
                             let revision = entry.hash.clone();
                             request(ctx, move |b| b.checkout(&revision));
                         }
                     }
                     Key::Char('m') => {
-                        if let Some(entry) = self.entries.get(current_entry_index) {
+                        if let Some(current_entry_index) = current_entry_index {
+                            let entry = &self.entries[current_entry_index];
                             self.state = State::Waiting(WaitOperation::Merge);
                             let revision = entry.hash.clone();
                             request(ctx, move |b| b.merge(&revision));
@@ -298,3 +305,4 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
+

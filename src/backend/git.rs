@@ -68,7 +68,11 @@ impl Backend for Git {
                     args.push(&entry.name);
                 }
             }
-            let clean = Process::spawn("git", &args)?;
+            let clean = if args.len() > 3 {
+                Some(Process::spawn("git", &args)?)
+            } else {
+                None
+            };
 
             args.clear();
             args.push("rm");
@@ -79,10 +83,18 @@ impl Backend for Git {
                     args.push(&entry.name);
                 }
             }
-            let rm = Process::spawn("git", &args)?;
+            let rm = if args.len() > 3 {
+                Some(Process::spawn("git", &args)?)
+            } else {
+                None
+            };
 
-            clean.wait()?;
-            rm.wait()?;
+            if let Some(clean) = clean {
+                clean.wait()?;
+            }
+            if let Some(rm) = rm {
+                rm.wait()?;
+            }
 
             args.clear();
             args.push("checkout");
@@ -92,7 +104,9 @@ impl Backend for Git {
                     args.push(&entry.name);
                 }
             }
-            Process::spawn("git", &args)?.wait()?;
+            if args.len() > 2 {
+                Process::spawn("git", &args)?.wait()?;
+            }
         }
 
         Ok(())
@@ -370,3 +384,4 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => panic!("unknown file status '{}'", s),
     }
 }
+

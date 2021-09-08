@@ -81,11 +81,12 @@ impl Mode {
                         self.output.on_key(available_height, key);
                     }
 
-                    let current_entry_index = self.filter.visible_indices()[self.select.cursor];
+                    let current_entry_index = self.filter.get_visible_index(self.select.cursor);
                     match key {
                         Key::Ctrl('f') => self.filter.enter(),
                         Key::Char('g') => {
-                            if let Some(entry) = self.entries.get(current_entry_index) {
+                            if let Some(current_entry_index) = current_entry_index {
+                                let entry = &self.entries[current_entry_index];
                                 let name = entry.name.clone();
                                 let ctx = ctx.clone();
                                 thread::spawn(move || {
@@ -111,7 +112,8 @@ impl Mode {
                             self.readline.clear();
                         }
                         Key::Char('D') => {
-                            if let Some(entry) = self.entries.get(current_entry_index) {
+                            if let Some(current_entry_index) = current_entry_index {
+                                let entry = &self.entries[current_entry_index];
                                 self.state = State::Waiting(WaitOperation::Delete);
 
                                 let name = entry.name.clone();

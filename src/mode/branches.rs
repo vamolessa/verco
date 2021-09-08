@@ -88,11 +88,12 @@ impl Mode {
                         self.output.on_key(available_height, key);
                     }
 
-                    let current_entry_index = self.filter.visible_indices()[self.select.cursor];
+                    let current_entry_index = self.filter.get_visible_index(self.select.cursor);
                     match key {
                         Key::Ctrl('f') => self.filter.enter(),
                         Key::Char('g') => {
-                            if let Some(entry) = self.entries.get(current_entry_index) {
+                            if let Some(current_entry_index) = current_entry_index {
+                                let entry = &self.entries[current_entry_index];
                                 let name = entry.name.clone();
                                 let ctx = ctx.clone();
                                 thread::spawn(move || {
@@ -118,18 +119,28 @@ impl Mode {
                             self.readline.clear();
                         }
                         Key::Char('D') => {
-                            if let Some(entry) = self.entries.get(current_entry_index) {
+                            if let Some(current_entry_index) = current_entry_index {
+                                let entry = &self.entries[current_entry_index];
                                 self.state = State::Waiting(WaitOperation::Delete);
 
                                 let name = entry.name.clone();
                                 self.entries.remove(current_entry_index);
                                 self.filter.on_remove_entry(current_entry_index);
                                 self.select.on_remove_entry(self.select.cursor);
+
+                                eprintln!(
+                                    "delete branch {} {} {}",
+                                    self.entries.len(),
+                                    self.filter.visible_indices().len(),
+                                    self.select.cursor
+                                );
+
                                 request(ctx, move |b| b.delete_branch(&name));
                             }
                         }
                         Key::Char('m') => {
-                            if let Some(entry) = self.entries.get(current_entry_index) {
+                            if let Some(current_entry_index) = current_entry_index {
+                                let entry = &self.entries[current_entry_index];
                                 self.state = State::Waiting(WaitOperation::Merge);
 
                                 let name = entry.name.clone();
@@ -265,3 +276,4 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
+

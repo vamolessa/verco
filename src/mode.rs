@@ -250,6 +250,10 @@ impl Filter {
         }
     }
 
+    pub fn get_visible_index(&self, index: usize) -> Option<usize> {
+        self.visible_indices.get(index).cloned()
+    }
+
     pub fn visible_indices(&self) -> &[usize] {
         &self.visible_indices
     }

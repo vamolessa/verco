@@ -141,8 +141,9 @@ impl Mode {
                         ) {
                             SelectMenuAction::None => (),
                             SelectMenuAction::Toggle(i) => {
-                                let i = self.filter.visible_indices()[i];
-                                self.entries[i].selected = !self.entries[i].selected
+                                if let Some(i) = self.filter.get_visible_index(i) {
+                                    self.entries[i].selected = !self.entries[i].selected
+                                }
                             }
                             SelectMenuAction::ToggleAll => {
                                 let all_selected = self
@@ -223,12 +224,6 @@ impl Mode {
                         let message = self.readline.input().to_string();
                         let entries = self.get_selected_entries();
                         self.remove_selected_entries();
-
-                        eprintln!(
-                            "COMMITOU!! {} {}",
-                            self.entries.len(),
-                            self.filter.visible_indices().len()
-                        );
 
                         let ctx = ctx.clone();
                         thread::spawn(move || {
