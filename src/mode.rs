@@ -206,6 +206,7 @@ impl Filter {
     pub fn clear(&mut self) {
         self.has_focus = false;
         self.readline.clear();
+        self.visible_indices.clear();
     }
 
     pub fn enter(&mut self) {
@@ -233,6 +234,18 @@ impl Filter {
         for (i, entry) in entries.enumerate() {
             if entry.fuzzy_matches(self.as_str()) {
                 self.visible_indices.push(i);
+            }
+        }
+    }
+
+    pub fn on_remove_entry(&mut self, entry_index: usize) {
+        for i in (0..self.visible_indices.len()).rev() {
+            if entry_index < i {
+                self.visible_indices[i] -= 1;
+            } else if entry_index == i {
+                self.visible_indices.remove(i);
+            } else {
+                break;
             }
         }
     }
@@ -282,3 +295,4 @@ pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
 
     false
 }
+

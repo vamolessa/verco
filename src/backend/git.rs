@@ -29,7 +29,7 @@ impl Backend for Git {
             .filter(|e| e.len() >= 2)
             .map(|e| {
                 let (status, filename) = e.split_at(2);
-                RevisionEntry::new(filename.trim().into(), parse_file_status(status.trim()))
+                RevisionEntry::new(filename.trim().into(), parse_file_status(status))
             })
             .collect();
 
@@ -283,7 +283,7 @@ impl Backend for Git {
         let mut entries = Vec::new();
         loop {
             let status = match splits.next() {
-                Some(status) if !status.is_empty() => parse_file_status(status),
+                Some(status) => parse_file_status(status),
                 _ => break,
             };
             let name = match splits.next() {
@@ -359,14 +359,14 @@ impl Backend for Git {
 }
 
 fn parse_file_status(s: &str) -> FileStatus {
-    match s {
-        "M" => FileStatus::Modified,
-        "A" => FileStatus::Added,
-        "D" => FileStatus::Deleted,
-        "R" => FileStatus::Renamed,
-        "??" => FileStatus::Untracked,
-        "C" => FileStatus::Copied,
-        "U" => FileStatus::Unmerged,
+    match s.chars().next() {
+        Some('M') => FileStatus::Modified,
+        Some('A') => FileStatus::Added,
+        Some('D') => FileStatus::Deleted,
+        Some('R') => FileStatus::Renamed,
+        Some('?') => FileStatus::Untracked,
+        Some('C') => FileStatus::Copied,
+        Some('U') => FileStatus::Unmerged,
         _ => panic!("unknown file status '{}'", s),
     }
 }

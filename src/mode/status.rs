@@ -85,9 +85,11 @@ impl Mode {
 
     fn remove_selected_entries(&mut self) {
         let previous_len = self.entries.len();
+
         for i in (0..self.entries.len()).rev() {
             if self.entries[i].selected {
                 self.entries.remove(i);
+                self.filter.on_remove_entry(i);
                 let i = match self.filter.visible_indices().binary_search(&i) {
                     Ok(i) => i,
                     Err(i) => i,
@@ -95,9 +97,11 @@ impl Mode {
                 self.select.on_remove_entry(i);
             }
         }
+
         if self.entries.len() == previous_len {
             self.entries.clear();
             self.select.cursor = 0;
+            self.filter.clear();
         }
     }
 
@@ -219,6 +223,12 @@ impl Mode {
                         let message = self.readline.input().to_string();
                         let entries = self.get_selected_entries();
                         self.remove_selected_entries();
+
+                        eprintln!(
+                            "COMMITOU!! {} {}",
+                            self.entries.len(),
+                            self.filter.visible_indices().len()
+                        );
 
                         let ctx = ctx.clone();
                         thread::spawn(move || {

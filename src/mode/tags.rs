@@ -116,6 +116,7 @@ impl Mode {
 
                                 let name = entry.name.clone();
                                 self.entries.remove(current_entry_index);
+                                self.filter.on_remove_entry(current_entry_index);
                                 self.select.on_remove_entry(self.select.cursor);
                                 request(ctx, move |b| b.delete_tag(&name));
                             }
