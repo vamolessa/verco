@@ -221,7 +221,7 @@ impl Filter {
     }
 
     pub fn on_key(&mut self, key: Key) {
-        if key.is_submit() {
+        if key.is_submit() || key == Key::Ctrl('f') {
             self.has_focus = false;
         } else if key.is_cancel() {
             self.has_focus = false;
