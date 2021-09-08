@@ -71,6 +71,7 @@ impl Mode {
     }
 
     pub fn on_key(&mut self, ctx: &ModeContext, revision: &str, key: Key) -> ModeStatus {
+        let pending_input = self.filter.has_focus();
         let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
 
         if self.filter.has_focus() {
@@ -139,9 +140,7 @@ impl Mode {
             }
         }
 
-        ModeStatus {
-            pending_input: false,
-        }
+        ModeStatus { pending_input }
     }
 
     pub fn on_response(&mut self, response: Response) {
