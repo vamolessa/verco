@@ -90,6 +90,7 @@ impl Mode {
 
                     let current_entry_index = self.filter.visible_indices()[self.select.cursor];
                     match key {
+                        Key::Ctrl('f') => self.filter.enter(),
                         Key::Char('g') => {
                             if let Some(entry) = self.entries.get(current_entry_index) {
                                 let name = entry.name.clone();
@@ -113,6 +114,7 @@ impl Mode {
                         Key::Char('n') => {
                             self.state = State::NewNameInput;
                             self.output.set(String::new());
+                            self.filter.clear();
                             self.readline.clear();
                         }
                         Key::Char('D') => {
@@ -223,12 +225,13 @@ impl Mode {
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
+        let filter_line_count = drawer.filter(&self.filter);
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
                     drawer.select_menu(
                         &self.select,
-                        0,
+                        filter_line_count,
                         false,
                         self.filter
                             .visible_indices()
@@ -261,3 +264,4 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
+

@@ -137,12 +137,17 @@ impl Mode {
                         ) {
                             SelectMenuAction::None => (),
                             SelectMenuAction::Toggle(i) => {
+                                let i = self.filter.visible_indices()[i];
                                 self.entries[i].selected = !self.entries[i].selected
                             }
                             SelectMenuAction::ToggleAll => {
-                                let all_selected = self.entries.iter().all(|e| e.selected);
-                                for entry in &mut self.entries {
-                                    entry.selected = !all_selected;
+                                let all_selected = self
+                                    .filter
+                                    .visible_indices()
+                                    .iter()
+                                    .all(|&i| self.entries[i].selected);
+                                for &i in self.filter.visible_indices() {
+                                    self.entries[i].selected = !all_selected;
                                 }
                             }
                         }
@@ -154,6 +159,7 @@ impl Mode {
                             if !self.entries.is_empty() {
                                 self.state = State::CommitMessageInput;
                                 self.output.set(String::new());
+                                self.filter.clear();
                                 self.readline.clear();
                             }
                         }
@@ -186,6 +192,7 @@ impl Mode {
                             if !self.entries.is_empty() {
                                 self.state = State::ViewDiff;
                                 self.output.set(String::new());
+                                self.filter.clear();
 
                                 let entries = self.get_selected_entries();
 
@@ -252,6 +259,8 @@ impl Mode {
                 }
 
                 self.entries = info.entries;
+
+                self.filter.filter(self.entries.iter());
                 self.select
                     .saturate_cursor(self.filter.visible_indices().len());
             }
@@ -300,6 +309,7 @@ impl Mode {
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
+        let filter_line_count = drawer.filter(&self.filter);
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.line_count() > 1 {
@@ -319,7 +329,7 @@ impl Mode {
                     drawer.next_line();
                     drawer.select_menu(
                         &self.select,
-                        2,
+                        2 + filter_line_count,
                         false,
                         self.filter
                             .visible_indices()
@@ -368,3 +378,4 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+

@@ -286,6 +286,9 @@ impl Drawer {
         }
 
         self.next_line();
+        set_background_color(&mut self.buf, Color::Black);
+        set_foreground_color(&mut self.buf, Color::White);
+
         1
     }
 

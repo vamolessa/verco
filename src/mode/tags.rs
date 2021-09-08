@@ -83,6 +83,7 @@ impl Mode {
 
                     let current_entry_index = self.filter.visible_indices()[self.select.cursor];
                     match key {
+                        Key::Ctrl('f') => self.filter.enter(),
                         Key::Char('g') => {
                             if let Some(entry) = self.entries.get(current_entry_index) {
                                 let name = entry.name.clone();
@@ -106,6 +107,7 @@ impl Mode {
                         Key::Char('n') => {
                             self.state = State::NewNameInput;
                             self.output.set(String::new());
+                            self.filter.clear();
                             self.readline.clear();
                         }
                         Key::Char('D') => {
@@ -125,6 +127,7 @@ impl Mode {
                     self.readline.on_key(key);
                     if key.is_submit() {
                         self.state = State::Waiting(WaitOperation::New);
+                        self.filter.clear();
 
                         let name = self.readline.input().to_string();
                         request(ctx, move |b| b.new_tag(&name));
@@ -185,10 +188,11 @@ impl Mode {
     }
 
     pub fn draw(&self, drawer: &mut Drawer) {
+        let filter_line_count = drawer.filter(&self.filter);
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
-                    drawer.select_menu(&self.select, 0, false, self.entries.iter());
+                    drawer.select_menu(&self.select, filter_line_count, false, self.entries.iter());
                 } else {
                     drawer.output(&self.output);
                 }
@@ -215,3 +219,4 @@ where
             .send_response(ModeResponse::Tags(Response::Refresh(result)));
     });
 }
+
