@@ -45,6 +45,10 @@ impl Backend for Plastic {
             let mut splits = line.split('\x1f');
             let status = splits.next().unwrap_or("");
             let status = parse_file_status(status);
+            if let FileStatus::Renamed = status {
+                splits.next();
+                splits.next();
+            }
             let name = splits.next().unwrap_or("").into();
             splits.next();
             let _mergeinfo = splits.next().unwrap_or("").trim();
@@ -424,6 +428,7 @@ fn parse_file_status(s: &str) -> FileStatus {
         "CO" => FileStatus::Added,
         "LD" => FileStatus::Deleted,
         "PR" => FileStatus::Untracked,
+        "LM" => FileStatus::Renamed,
         _ => panic!("unknown file status '{}'", s),
     }
 }
