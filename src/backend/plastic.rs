@@ -56,6 +56,8 @@ impl Backend for Plastic {
     }
 
     fn commit(&self, message: &str, entries: &[RevisionEntry]) -> BackendResult<()> {
+        let message_arg = format!("-c={}", message);
+
         if entries.is_empty() {
             let untracked = Process::spawn(
                 "cm",
@@ -81,7 +83,7 @@ impl Backend for Plastic {
                 Process::spawn("cm", &args)?.wait()?;
             }
 
-            Process::spawn("cm", &["checkin", "--all"])?.wait()?;
+            Process::spawn("cm", &["checkin", "--all", &message_arg])?.wait()?;
         } else {
             let mut args = Vec::new();
             args.push("add");
@@ -99,8 +101,8 @@ impl Backend for Plastic {
             for entry in entries {
                 args.push(&entry.name);
             }
+            args.push(&message_arg);
             Process::spawn("cm", &args)?.wait()?;
-            Process::spawn("cm", &["commit", "-m", message])?.wait()?;
         }
 
         Ok(())
@@ -425,3 +427,4 @@ fn parse_file_status(s: &str) -> FileStatus {
         _ => panic!("unknown file status '{}'", s),
     }
 }
+
