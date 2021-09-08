@@ -137,9 +137,9 @@ impl Mode {
             return;
         }
         self.state = State::Waiting(WaitOperation::Refresh);
-        self.filter.clear();
 
         self.output.set(String::new());
+        self.filter.clear();
         self.show_full_hovered_message = false;
 
         request(ctx, |_| Ok(()));
