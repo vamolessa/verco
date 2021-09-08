@@ -299,4 +299,3 @@ pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
 
     false
 }
-

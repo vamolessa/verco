@@ -112,7 +112,9 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
-        self.filter.clear();
+        self.filter.filter(self.entries.iter());
+        self.select
+            .saturate_cursor(self.filter.visible_indices().len());
         self.readline.clear();
 
         request(ctx, |_| Ok(()));
@@ -383,4 +385,3 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
-

@@ -49,7 +49,7 @@ impl Mode {
 
         self.output.set(String::new());
         self.filter.clear();
-        self.select.saturate_cursor(0);
+        self.select.cursor = 0;
         self.show_full_message = false;
 
         let ctx = ctx.clone();
@@ -181,7 +181,7 @@ impl Mode {
             State::Idle | State::Waiting => (
                 "revision details",
                 "[d]diff",
-                "[arrows]move [space]toggle [a]toggle all [ctrl+f]filter",
+                "[tab]full message [arrows]move [space]toggle [a]toggle all [ctrl+f]filter",
             ),
             State::ViewDiff => ("diff", "", "[arrows]move"),
         }
@@ -223,4 +223,3 @@ impl Mode {
         }
     }
 }
-

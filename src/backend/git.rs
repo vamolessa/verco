@@ -292,12 +292,12 @@ impl Backend for Git {
         let message = message.wait()?.trim().into();
 
         let changes = changes.wait()?;
-        let mut splits = changes.split('\0').map(str::trim);
+        let mut splits = changes.split('\0');
 
         let mut entries = Vec::new();
         loop {
             let status = match splits.next() {
-                Some(status) => parse_file_status(status),
+                Some(status) if !status.is_empty() => parse_file_status(status),
                 _ => break,
             };
             let name = match splits.next() {
@@ -381,7 +381,7 @@ fn parse_file_status(s: &str) -> FileStatus {
         Some('?') => FileStatus::Untracked,
         Some('C') => FileStatus::Copied,
         Some('U') => FileStatus::Unmerged,
+        Some(' ') => FileStatus::Clean,
         _ => panic!("unknown file status '{}'", s),
     }
 }
-

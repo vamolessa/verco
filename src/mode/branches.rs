@@ -60,7 +60,9 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
-        self.filter.clear();
+        self.filter.filter(self.entries.iter());
+        self.select
+            .saturate_cursor(self.filter.visible_indices().len());
         self.readline.clear();
 
         request(ctx, |_| Ok(()));
@@ -225,9 +227,10 @@ impl Mode {
             State::NewNameInput => "new branch name",
         };
         let (left_help, right_help) = match self.state {
-            State::Idle | State::Waiting(_) => {
-                ("[g]checkout [n]new [D]delete [m]merge", "[arrows]move [ctrl+f]filter")
-            }
+            State::Idle | State::Waiting(_) => (
+                "[g]checkout [n]new [D]delete [m]merge",
+                "[arrows]move [ctrl+f]filter",
+            ),
             State::NewNameInput => (
                 "",
                 "[enter]submit [esc]cancel [ctrl+w]delete word [ctrl+u]delete all",
@@ -276,4 +279,3 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
-

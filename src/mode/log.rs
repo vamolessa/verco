@@ -139,7 +139,9 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
-        self.filter.clear();
+        self.filter.filter(self.entries.iter());
+        self.select
+            .saturate_cursor(self.filter.visible_indices().len());
         self.show_full_hovered_message = false;
 
         request(ctx, |_| Ok(()));
@@ -269,7 +271,7 @@ impl Mode {
         };
 
         let left_help = "[g]checkout [d]details [f]fetch [p]pull [P]push";
-        let right_help = "[arrows]move [ctrl+f]filter";
+        let right_help = "[tab]full message [arrows]move [ctrl+f]filter";
         (name, left_help, right_help)
     }
 
@@ -305,4 +307,3 @@ where
             .send_response(ModeResponse::Log(Response::Refresh(result)));
     });
 }
-
