@@ -256,7 +256,7 @@ impl Backend for Git {
     }
 
     fn merge(&self, revision: &str) -> BackendResult<()> {
-        Process::spawn("git", &["merge", revision])?.wait()?;
+        Process::spawn("git", &["merge", "--no-ff", revision])?.wait()?;
         Ok(())
     }
 
@@ -266,7 +266,7 @@ impl Backend for Git {
     }
 
     fn pull(&self) -> BackendResult<()> {
-        Process::spawn("git", &["pull", "--all"])?.wait()?;
+        Process::spawn("git", &["pull", "--no-ff", "--all"])?.wait()?;
         Ok(())
     }
 
