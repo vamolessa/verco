@@ -132,10 +132,11 @@ impl Mode {
                     self.readline.on_key(key);
                     if key.is_submit() {
                         self.state = State::Waiting(WaitOperation::New);
-                        self.filter.clear();
 
                         let name = self.readline.input().to_string();
                         request(ctx, move |b| b.new_tag(&name));
+                    } else if key.is_cancel() {
+                        self.on_enter(ctx);
                     }
                 }
             }
@@ -200,7 +201,15 @@ impl Mode {
         match self.state {
             State::Idle | State::Waiting(_) => {
                 if self.output.text.is_empty() {
-                    drawer.select_menu(&self.select, filter_line_count, false, self.entries.iter());
+                    drawer.select_menu(
+                        &self.select,
+                        filter_line_count,
+                        false,
+                        self.filter
+                            .visible_indices()
+                            .iter()
+                            .map(|&i| &self.entries[i]),
+                    );
                 } else {
                     drawer.output(&self.output);
                 }

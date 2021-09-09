@@ -130,13 +130,6 @@ impl Mode {
                                 self.filter.on_remove_entry(current_entry_index);
                                 self.select.on_remove_entry(self.select.cursor);
 
-                                eprintln!(
-                                    "delete branch {} {} {}",
-                                    self.entries.len(),
-                                    self.filter.visible_indices().len(),
-                                    self.select.cursor
-                                );
-
                                 request(ctx, move |b| b.delete_branch(&name));
                             }
                         }
@@ -173,6 +166,8 @@ impl Mode {
 
                         let name = self.readline.input().to_string();
                         request(ctx, move |b| b.new_branch(&name));
+                    } else if key.is_cancel() {
+                        self.on_enter(ctx);
                     }
                 }
             }
