@@ -41,7 +41,7 @@ impl SelectEntryDraw for RevisionEntry {
         const NAME_TOO_LONG_PREFIX: &str = "...";
 
         let name_available_width = (drawer.viewport_size.0 as usize)
-            .saturating_sub(2 + 1 + FileStatus::max_len() + 1 + 1 + NAME_TOO_LONG_PREFIX.len());
+            .saturating_sub(2 + 1 + FileStatus::max_len() + 1 + 1 + NAME_TOO_LONG_PREFIX.len() + 1);
 
         let (name_prefix, trimmed_name) =
             match self.name.char_indices().nth_back(name_available_width) {
@@ -357,7 +357,7 @@ impl Mode {
                 drawer.readline(&self.readline, "type in the commit message...")
             }
             State::ViewDiff => {
-                drawer.output(&self.output);
+                drawer.diff(&self.output);
             }
         }
     }
@@ -385,3 +385,4 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+

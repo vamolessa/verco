@@ -205,6 +205,54 @@ impl Drawer {
         move_cursor_to_next_line(&mut self.buf);
     }
 
+    pub fn diff(&mut self, output: &Output) -> usize {
+        let tab_bytes = [b' '; 4];
+        let mut utf8_buf = [0; 4];
+
+        set_background_color(&mut self.buf, Color::Black);
+
+        let mut line_count = 0;
+        for line in output.lines_from_scroll() {
+            let mut x = 0;
+
+            match line.chars().next() {
+                Some('+') => set_foreground_color(&mut self.buf, Color::DarkGreen),
+                Some('-') => set_foreground_color(&mut self.buf, Color::DarkRed),
+                _ => set_foreground_color(&mut self.buf, Color::White),
+            }
+
+            for c in line.chars() {
+                match c {
+                    '\t' => {
+                        self.buf.extend_from_slice(&tab_bytes);
+                        x += tab_bytes.len();
+                    }
+                    _ => {
+                        let bytes = c.encode_utf8(&mut utf8_buf).as_bytes();
+                        self.buf.extend_from_slice(bytes);
+                        x += 1;
+                    }
+                }
+
+                if x >= self.viewport_size.0 as _ {
+                    x -= self.viewport_size.0 as usize;
+                    line_count += 1;
+                }
+            }
+
+            self.next_line();
+
+            line_count += 1;
+            if line_count + 1 >= self.viewport_size.1 as _ {
+                break;
+            }
+        }
+
+        set_foreground_color(&mut self.buf, Color::White);
+
+        line_count
+    }
+
     pub fn output(&mut self, output: &Output) -> usize {
         let tab_bytes = [b' '; 4];
         let mut utf8_buf = [0; 4];
@@ -271,7 +319,7 @@ impl Drawer {
         self.buf.extend_from_slice(PREFIX.as_bytes());
 
         let available_width = (self.viewport_size.0 as usize).saturating_sub(PREFIX.len() + 2);
-        let (trimmed, text) = match text.char_indices().rev().nth(available_width) {
+        let (trimmed, text) = match text.char_indices().nth_back(available_width) {
             Some((i, _)) => (true, &text[i..]),
             None => (false, text),
         };
@@ -332,3 +380,4 @@ impl Drawer {
         }
     }
 }
+

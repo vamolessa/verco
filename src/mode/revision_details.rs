@@ -159,8 +159,11 @@ impl Mode {
                 self.select
                     .saturate_cursor(self.filter.visible_indices().len());
             }
-            Response::Diff(output) => {
+            Response::Diff(mut output) => {
                 if let State::ViewDiff = self.state {
+                    if output.is_empty() {
+                        output.push('\n');
+                    }
                     self.output.set(output);
                 }
             }
@@ -189,8 +192,9 @@ impl Mode {
     pub fn draw(&self, drawer: &mut Drawer) {
         let filter_line_count = drawer.filter(&self.filter);
 
-        let show_full_output = !matches!(self.state, State::Idle) || self.show_full_message;
-        let line_count = if show_full_output {
+        let line_count = if let State::ViewDiff = self.state {
+            drawer.diff(&self.output)
+        } else if self.show_full_message {
             drawer.output(&self.output)
         } else {
             let output = self.output.text().lines().next().unwrap_or("");
@@ -222,3 +226,4 @@ impl Mode {
         }
     }
 }
+
