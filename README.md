@@ -37,6 +37,7 @@ A simple Git/Mercurial/PlasticSCM tui client based on keyboard shortcuts
 - custom keybindings (we implement redundant keybindings, though)
 - configuration file/environment var (cli options is fine)
 - clone, repo init and complex actions (should be left for their respective cli)
+- rebase support
 
 ## Platforms
 
