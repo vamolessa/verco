@@ -8,6 +8,36 @@ A simple Git/Mercurial/PlasticSCM tui client based on keyboard shortcuts
 
 ![verco workflow](page/screenshots/workflow.gif)
 
+## Features
+
+- One interface for many version control backends
+- Support for Git, Mercurial (Hg) and Plastic SCM
+- Supported actions:
+  - status
+  - revision history
+  - revision details
+  - discard changes
+  - checkout revision
+  - checkin changes
+  - branch and tag management (list/create/delete)
+  - merge
+  - push/pull/fetch
+- Everything accessible through at most two keys
+
+### Goals
+
+- implement everyday version control actions (opinionated)
+- cross-platform (Windows, Linux, BSD, Mac)
+- responsive ui even when it's executing some heavy operation
+- zero dependencies (besides platform libs)
+
+### Non Goals
+
+- cover all api surface of a given version control
+- custom keybindings (we implement redundant keybindings, though)
+- configuration file/environment var (cli options is fine)
+- clone, repo init and complex actions (should be left for their respective cli)
+
 ## Platforms
 
 This project uses Cargo and pure Rust stable and works on latest versions of Windows, Mac, Linux and BSD.
