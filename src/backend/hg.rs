@@ -212,7 +212,7 @@ impl Backend for Hg {
             if line == "~" {
                 continue;
             }
-        
+
             let mut splits = line.splitn(6, '\x1f');
 
             let graph = splits.next().unwrap_or("").into();
