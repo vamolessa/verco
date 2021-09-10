@@ -266,7 +266,7 @@ impl Backend for Git {
     }
 
     fn pull(&self) -> BackendResult<()> {
-        Process::spawn("git", &["pull", "--no-ff", "--all"])?.wait()?;
+        Process::spawn("git", &["pull", "--all"])?.wait()?;
         Ok(())
     }
 
