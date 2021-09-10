@@ -190,8 +190,8 @@ impl Backend for Hg {
     }
 
     fn log(&self, skip: usize, len: usize) -> BackendResult<(usize, Vec<LogEntry>)> {
-        let limit = (skip + len).to_string();
         let template = "\x1f{node|short}\x1f{date|shortdate}\x1f{author|person}\x1f{ifeq(phase,'secret','(secret) ','')}{ifeq(phase,'draft','(draft) ','')}{if(topics,'[{topics}] ')}{tags % '{tag} '}{branch}\x1f{desc}";
+        let revset = format!("limit(tip:0,{},{})", len, skip);
         let output = Process::spawn(
             "hg",
             &[
@@ -201,14 +201,18 @@ impl Backend for Hg {
                 "--graph",
                 "--template",
                 template,
-                "--limit",
-                &limit,
+                "--rev",
+                &revset,
             ],
         )?
         .wait()?;
 
         let mut entries = Vec::new();
         for line in output.lines() {
+            if line == "~" {
+                continue;
+            }
+        
             let mut splits = line.splitn(6, '\x1f');
 
             let graph = splits.next().unwrap_or("").into();
@@ -228,7 +232,7 @@ impl Backend for Hg {
             });
         }
 
-        Ok((0, entries))
+        Ok((skip, entries))
     }
 
     fn checkout(&self, revision: &str) -> BackendResult<()> {
