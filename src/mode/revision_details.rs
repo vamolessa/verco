@@ -82,9 +82,15 @@ impl Mode {
         } else {
             match self.state {
                 State::Idle => {
+                    let line_count = if self.show_full_message {
+                        self.output.line_count()
+                    } else {
+                        1
+                    };
+
                     match self.select.on_key(
                         self.filter.visible_indices().len(),
-                        available_height,
+                        available_height.saturating_sub(line_count + 1),
                         key,
                     ) {
                         SelectMenuAction::None => (),
@@ -226,3 +232,4 @@ impl Mode {
         }
     }
 }
+

@@ -138,7 +138,7 @@ impl Mode {
                     } else {
                         match self.select.on_key(
                             self.filter.visible_indices().len(),
-                            available_height,
+                            available_height.saturating_sub(2),
                             key,
                         ) {
                             SelectMenuAction::None => (),
@@ -385,3 +385,4 @@ where
             .send_response(ModeResponse::Status(Response::Refresh(info)));
     });
 }
+
