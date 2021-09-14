@@ -21,7 +21,8 @@ impl Git {
 
 impl Backend for Git {
     fn status(&self) -> BackendResult<StatusInfo> {
-        let output = Process::spawn("git", &["status", "--branch", "--null"])?.wait()?;
+        let output =
+            Process::spawn("git", &["status", "--branch", "--no-rename", "--null"])?.wait()?;
         let mut splits = output.split('\0').map(str::trim);
 
         let header = splits.next().unwrap_or("").into();
@@ -149,7 +150,7 @@ impl Backend for Git {
 
     fn resolve_taking_ours(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["checkout", ".", "--ours"])?.wait()?;
+            Process::spawn("git", &["checkout", "--ours", "."])?.wait()?;
         } else {
             if !entries
                 .iter()
@@ -160,7 +161,6 @@ impl Backend for Git {
 
             let mut args = Vec::new();
             args.push("checkout");
-            args.push(".");
             args.push("--ours");
             args.push("--");
 
@@ -178,7 +178,7 @@ impl Backend for Git {
 
     fn resolve_taking_theirs(&self, entries: &[RevisionEntry]) -> BackendResult<()> {
         if entries.is_empty() {
-            Process::spawn("git", &["checkout", ".", "--theirs"])?.wait()?;
+            Process::spawn("git", &["checkout", "--theirs", "."])?.wait()?;
         } else {
             if !entries
                 .iter()
@@ -189,7 +189,6 @@ impl Backend for Git {
 
             let mut args = Vec::new();
             args.push("checkout");
-            args.push(".");
             args.push("--theirs");
             args.push("--");
 
@@ -382,6 +381,6 @@ fn parse_file_status(s: &str) -> FileStatus {
         Some('C') => FileStatus::Copied,
         Some('U') => FileStatus::Unmerged,
         Some(' ') => FileStatus::Clean,
-        _ => panic!("unknown file status '{}'", s),
+        _ => FileStatus::Unknown(s.into()),
     }
 }

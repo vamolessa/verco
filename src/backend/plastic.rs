@@ -429,6 +429,6 @@ fn parse_file_status(s: &str) -> FileStatus {
         "LD" => FileStatus::Deleted,
         "PR" => FileStatus::Untracked,
         "LM" => FileStatus::Renamed,
-        _ => panic!("unknown file status '{}'", s),
+        _ => FileStatus::Unknown(s.into()),
     }
 }

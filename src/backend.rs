@@ -24,6 +24,7 @@ pub enum FileStatus {
     Missing,
     Ignored,
     Clean,
+    Unknown(String),
 }
 impl FileStatus {
     pub const fn max_len() -> usize {
@@ -42,6 +43,13 @@ impl FileStatus {
             Self::Missing => "missing",
             Self::Ignored => "ignored",
             Self::Clean => "clean",
+            Self::Unknown(status) => {
+                if status.len() > Self::max_len() {
+                    &status[..Self::max_len()]
+                } else {
+                    status
+                }
+            }
         }
     }
 }
