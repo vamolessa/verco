@@ -275,7 +275,10 @@ impl Backend for Git {
     }
 
     fn revision_details(&self, revision: &str) -> BackendResult<RevisionInfo> {
-        let message = Process::spawn("git", &["show", "-s", "--format=%B", revision])?;
+        let message = Process::spawn(
+            "git",
+            &["show", "-s", "--format=%B", "--no-renames", revision],
+        )?;
         let changes = Process::spawn(
             "git",
             &[
