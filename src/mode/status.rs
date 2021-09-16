@@ -20,8 +20,8 @@ enum WaitOperation {
     Refresh,
     Commit,
     Discard,
-    ResolveTakingLocal,
-    ResolveTakingOther,
+    ResolveTakingOurs,
+    ResolveTakingTheirs,
 }
 
 enum State {
@@ -181,7 +181,7 @@ impl Mode {
                         }
                         Key::Char('O') => {
                             if matches!(self.state, State::Idle) && !self.entries.is_empty() {
-                                self.state = State::Waiting(WaitOperation::ResolveTakingLocal);
+                                self.state = State::Waiting(WaitOperation::ResolveTakingOurs);
                                 let entries = self.get_selected_entries();
 
                                 request(ctx, move |b| b.resolve_taking_ours(&entries));
@@ -189,7 +189,7 @@ impl Mode {
                         }
                         Key::Char('T') => {
                             if matches!(self.state, State::Idle) && !self.entries.is_empty() {
-                                self.state = State::Waiting(WaitOperation::ResolveTakingOther);
+                                self.state = State::Waiting(WaitOperation::ResolveTakingTheirs);
                                 let entries = self.get_selected_entries();
 
                                 request(ctx, move |b| b.resolve_taking_theirs(&entries));
@@ -297,13 +297,13 @@ impl Mode {
             State::CommitMessageInput => "commit message",
             State::Waiting(WaitOperation::Commit) => "commit",
             State::Waiting(WaitOperation::Discard) => "discard",
-            State::Waiting(WaitOperation::ResolveTakingLocal) => "resolve taking local",
-            State::Waiting(WaitOperation::ResolveTakingOther) => "resolve taking other",
+            State::Waiting(WaitOperation::ResolveTakingOurs) => "resolve taking ours",
+            State::Waiting(WaitOperation::ResolveTakingTheirs) => "resolve taking theirs",
             State::ViewDiff => "diff",
         };
         let (left_help, right_help) = match self.state {
             State::Idle | State::Waiting(_) => (
-                "[c]commit [R]revert [d]diff [L]take local [O]take other",
+                "[c]commit [R]revert [d]diff [O]take ours [T]take theirs",
                 "[arrows]move [space]toggle [a]toggle all [ctrl+f]filter",
             ),
             State::CommitMessageInput => (
