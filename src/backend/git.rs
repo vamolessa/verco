@@ -260,7 +260,7 @@ impl Backend for Git {
     }
 
     fn fetch(&self) -> BackendResult<()> {
-        Process::spawn("git", &["fetch", "--all"])?.wait()?;
+        Process::spawn("git", &["fetch", "--all", "--prune"])?.wait()?;
         Ok(())
     }
 
