@@ -189,7 +189,7 @@ impl Mode {
                 self.filter.enter();
             } else if let State::Idle = self.state {
                 match key {
-                    Key::Char('g') => {
+                    Key::Char('G') => {
                         if let Some(current_entry_index) = current_entry_index {
                             let entry = &self.entries[current_entry_index];
                             self.state = State::Waiting(WaitOperation::Checkout);
@@ -270,7 +270,7 @@ impl Mode {
             State::Waiting(WaitOperation::Push) => "push",
         };
 
-        let left_help = "[g]checkout [d]details [f]fetch [p]pull [P]push";
+        let left_help = "[G]checkout [d]details [f]fetch [p]pull [P]push";
         let right_help = "[tab]full message [arrows]move [ctrl+f]filter";
         (name, left_help, right_help)
     }
