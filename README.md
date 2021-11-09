@@ -82,8 +82,9 @@ paru -S verco
 In a terminal in a repository folder, type in the `verco` command.
 It will launch `verco`'s tui and you'll be able to interface with Git/Mercurial/PlasticSCM.
 
-## Donations
+## Development Support
 
 Please consider supporting `verco`'s development and I'll be eternally grateful :)
 
 <a href="https://liberapay.com/lessa/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a>
+<a href='https://ko-fi.com/K3K86X3RD' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://cdn.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
