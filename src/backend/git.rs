@@ -361,7 +361,11 @@ impl Backend for Git {
             let name = name.into();
             let checkout_name = checkout_name.into();
             let checked_out = splits.next().unwrap_or("") == "*";
-            Some(BranchEntry { name, checkout_name, checked_out })
+            Some(BranchEntry {
+                name,
+                checkout_name,
+                checked_out,
+            })
         })
         .collect();
         Ok(entries)

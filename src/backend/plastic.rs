@@ -396,7 +396,11 @@ impl Backend for Plastic {
                 let name = name.to_string();
                 let checkout_name = name.clone();
                 let checked_out = name == current_branch;
-                BranchEntry { name, checkout_name, checked_out }
+                BranchEntry {
+                    name,
+                    checkout_name,
+                    checked_out,
+                }
             })
             .collect();
 

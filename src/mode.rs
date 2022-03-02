@@ -243,7 +243,10 @@ impl Filter {
             }
         }
 
-        self.visible_indices.iter().position(|&i| i == entry_index).unwrap_or(0)
+        self.visible_indices
+            .iter()
+            .position(|&i| i == entry_index)
+            .unwrap_or(0)
     }
 
     pub fn on_remove_entry(&mut self, entry_index: usize) {
@@ -307,4 +310,3 @@ pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
 
     false
 }
-

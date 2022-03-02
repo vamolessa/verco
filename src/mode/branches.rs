@@ -189,7 +189,8 @@ impl Mode {
                 }
 
                 let cursor = self.filter.filter(self.entries.iter(), self.select.cursor);
-                let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+                let available_height =
+                    (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
                 self.select.fix_cursor_on_filter(cursor, available_height);
 
                 if let Some(i) = self.entries.iter().position(|e| e.checked_out) {

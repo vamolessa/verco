@@ -297,7 +297,11 @@ impl Backend for Hg {
                 let name = splits.next().unwrap_or("").to_string();
                 let checkout_name = name.clone();
                 let checked_out = splits.next().unwrap_or("") == "*";
-                BranchEntry { name, checkout_name, checked_out }
+                BranchEntry {
+                    name,
+                    checkout_name,
+                    checked_out,
+                }
             })
             .collect();
         Ok(entries)
