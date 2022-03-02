@@ -76,9 +76,8 @@ impl Mode {
 
         if self.filter.has_focus() {
             self.filter.on_key(key);
-            self.filter.filter(self.entries.iter());
-            self.select
-                .saturate_cursor(self.filter.visible_indices().len());
+            let cursor = self.filter.filter(self.entries.iter(), self.select.cursor);
+            self.select.fix_cursor_on_filter(cursor, available_height);
         } else {
             match self.state {
                 State::Idle => {
@@ -149,7 +148,7 @@ impl Mode {
         ModeStatus { pending_input }
     }
 
-    pub fn on_response(&mut self, response: Response) {
+    pub fn on_response(&mut self, ctx: &ModeContext, response: Response) {
         match response {
             Response::Info(info) => {
                 if let State::Waiting = self.state {
@@ -161,9 +160,9 @@ impl Mode {
 
                 self.entries = info.entries;
 
-                self.filter.filter(self.entries.iter());
-                self.select
-                    .saturate_cursor(self.filter.visible_indices().len());
+                let cursor = self.filter.filter(self.entries.iter(), self.select.cursor);
+                let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+                self.select.fix_cursor_on_filter(cursor, available_height);
             }
             Response::Diff(mut output) => {
                 if let State::ViewDiff = self.state {

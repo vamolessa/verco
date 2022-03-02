@@ -96,20 +96,20 @@ impl Application {
         true
     }
 
-    pub fn on_response(&mut self, response: ModeResponse) {
+    pub fn on_response(&mut self, ctx: &ModeContext, response: ModeResponse) {
         match response {
             ModeResponse::Status(response) => {
-                self.status_mode.on_response(response);
+                self.status_mode.on_response(ctx, response);
             }
-            ModeResponse::Log(response) => self.log_mode.on_response(response),
+            ModeResponse::Log(response) => self.log_mode.on_response(ctx, response),
             ModeResponse::RevisionDetails(response) => {
-                self.revision_details_mode.on_response(response);
+                self.revision_details_mode.on_response(ctx, response);
             }
             ModeResponse::Branches(response) => {
-                self.branches_mode.on_response(response);
+                self.branches_mode.on_response(ctx, response);
             }
             ModeResponse::Tags(response) => {
-                self.tags_mode.on_response(response);
+                self.tags_mode.on_response(ctx, response);
             }
         }
     }
@@ -221,7 +221,7 @@ pub fn run(platform_event_reader: PlatformEventReader, backend: Arc<dyn Backend>
             Ok(Event::Resize(width, height)) => {
                 ctx.viewport_size = (width, height);
             }
-            Ok(Event::Response(response)) => application.on_response(response),
+            Ok(Event::Response(response)) => application.on_response(&ctx, response),
             Ok(Event::ModeChange(mode)) => application.enter_mode(&ctx, mode),
             Ok(Event::ModeRefresh(mode)) => application.refresh_mode(&ctx, mode),
             Err(mpsc::RecvTimeoutError::Timeout) => draw_body = false,

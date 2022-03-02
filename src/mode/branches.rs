@@ -60,9 +60,9 @@ impl Mode {
         self.state = State::Waiting(WaitOperation::Refresh);
 
         self.output.set(String::new());
-        self.filter.filter(self.entries.iter());
-        self.select
-            .saturate_cursor(self.filter.visible_indices().len());
+        let cursor = self.filter.filter(self.entries.iter(), self.select.cursor);
+        let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+        self.select.fix_cursor_on_filter(cursor, available_height);
         self.readline.clear();
 
         request(ctx, |_| Ok(()));
@@ -74,9 +74,8 @@ impl Mode {
 
         if self.filter.has_focus() {
             self.filter.on_key(key);
-            self.filter.filter(self.entries.iter());
-            self.select
-                .saturate_cursor(self.filter.visible_indices().len());
+            let cursor = self.filter.filter(self.entries.iter(), self.select.cursor);
+            self.select.fix_cursor_on_filter(cursor, available_height);
         } else {
             match self.state {
                 State::Idle | State::Waiting(_) => {
@@ -173,7 +172,7 @@ impl Mode {
         ModeStatus { pending_input }
     }
 
-    pub fn on_response(&mut self, response: Response) {
+    pub fn on_response(&mut self, ctx: &ModeContext, response: Response) {
         match response {
             Response::Refresh(result) => {
                 self.entries = Vec::new();
@@ -189,9 +188,9 @@ impl Mode {
                     }
                 }
 
-                self.filter.filter(self.entries.iter());
-                self.select
-                    .saturate_cursor(self.filter.visible_indices().len());
+                let cursor = self.filter.filter(self.entries.iter(), self.select.cursor);
+                let available_height = (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
+                self.select.fix_cursor_on_filter(cursor, available_height);
 
                 if let Some(i) = self.entries.iter().position(|e| e.checked_out) {
                     if let Ok(i) = self.filter.visible_indices().binary_search(&i) {

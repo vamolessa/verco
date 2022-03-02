@@ -148,10 +148,6 @@ pub struct SelectMenu {
     pub scroll: usize,
 }
 impl SelectMenu {
-    pub fn saturate_cursor(&mut self, entries_len: usize) {
-        self.cursor = entries_len.saturating_sub(1).min(self.cursor);
-    }
-
     pub fn on_remove_entry(&mut self, index: usize) {
         if index <= self.cursor {
             self.cursor = self.cursor.saturating_sub(1);
@@ -176,18 +172,26 @@ impl SelectMenu {
             _ => self.cursor,
         };
 
-        self.saturate_cursor(entries_len);
-
-        if self.cursor < self.scroll {
-            self.scroll = self.cursor;
-        } else if self.cursor >= self.scroll + available_height {
-            self.scroll = self.cursor + 1 - available_height;
-        }
+        self.cursor = entries_len.saturating_sub(1).min(self.cursor);
+        self.scroll_to_cursor(available_height);
 
         match key {
             Key::Char(' ') if self.cursor < entries_len => SelectMenuAction::Toggle(self.cursor),
             Key::Char('a') => SelectMenuAction::ToggleAll,
             _ => SelectMenuAction::None,
+        }
+    }
+
+    pub fn fix_cursor_on_filter(&mut self, cursor: usize, available_height: usize) {
+        self.cursor = cursor;
+        self.scroll_to_cursor(available_height);
+    }
+
+    fn scroll_to_cursor(&mut self, available_height: usize) {
+        if self.cursor < self.scroll {
+            self.scroll = self.cursor;
+        } else if self.cursor >= self.scroll + available_height {
+            self.scroll = self.cursor + 1 - available_height;
         }
     }
 }
@@ -225,17 +229,21 @@ impl Filter {
         }
     }
 
-    pub fn filter<'entries, I, E>(&mut self, entries: I)
+    pub fn filter<'entries, I, E>(&mut self, entries: I, cursor: usize) -> usize
     where
         I: 'entries + Iterator<Item = &'entries E>,
         E: 'entries + FilterEntry,
     {
+        let entry_index = self.visible_indices.get(cursor).cloned().unwrap_or(0);
+
         self.visible_indices.clear();
         for (i, entry) in entries.enumerate() {
             if entry.fuzzy_matches(self.as_str()) {
                 self.visible_indices.push(i);
             }
         }
+
+        self.visible_indices.iter().position(|&i| i == entry_index).unwrap_or(0)
     }
 
     pub fn on_remove_entry(&mut self, entry_index: usize) {
@@ -299,3 +307,4 @@ pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
 
     false
 }
+
