@@ -249,13 +249,28 @@ impl Backend for Git {
         Ok((skip, entries))
     }
 
-    fn checkout(&self, revision: &str) -> BackendResult<()> {
+    fn checkout_revision(&self, revision: &str) -> BackendResult<()> {
         Process::spawn("git", &["checkout", revision])?.wait()?;
         Ok(())
     }
 
-    fn merge(&self, revision: &str) -> BackendResult<()> {
-        Process::spawn("git", &["merge", "--no-ff", revision])?.wait()?;
+    fn checkout_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        let branch_name = &branch.name;
+        let branch_name = match branch_name.strip_prefix("origin/") {
+            Some(stripped) => stripped,
+            None => &branch_name,
+        };
+        Process::spawn("git", &["checkout", branch_name])?.wait()?;
+        Ok(())
+    }
+
+    fn checkout_tag(&self, tag: &TagEntry) -> BackendResult<()> {
+        Process::spawn("git", &["checkout", &tag.name])?.wait()?;
+        Ok(())
+    }
+
+    fn merge_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        Process::spawn("git", &["merge", "--no-ff", &branch.name])?.wait()?;
         Ok(())
     }
 
@@ -320,16 +335,33 @@ impl Backend for Git {
                 "branch",
                 "--list",
                 "--all",
-                "--format=%(refname:short)%00%(HEAD)",
+                "--format=%(refname:short)%00%(upstream:short)%00%(HEAD)",
             ],
         )?
         .wait()?
         .lines()
-        .map(|l| {
-            let mut splits = l.splitn(2, '\0');
-            let name = splits.next().unwrap_or("").into();
+        .filter_map(|l| {
+            let mut splits = l.splitn(3, '\0');
+            let name = splits.next()?;
+            let upstream_name = splits.next()?;
+
+            let (name, checkout_name) = if upstream_name.is_empty() {
+                let checkout_name = match name.find('/') {
+                    Some(i) => &name[i + 1..],
+                    None => "",
+                };
+                if checkout_name == "HEAD" {
+                    return None;
+                }
+                (name, checkout_name)
+            } else {
+                (name, name)
+            };
+
+            let name = name.into();
+            let checkout_name = checkout_name.into();
             let checked_out = splits.next().unwrap_or("") == "*";
-            BranchEntry { name, checked_out }
+            Some(BranchEntry { name, checkout_name, checked_out })
         })
         .collect();
         Ok(entries)
@@ -343,10 +375,11 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn delete_branch(&self, name: &str) -> BackendResult<()> {
+    fn delete_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        let branch_name = &branch.name;
         let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["branch", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?.wait()?;
+        Process::spawn("git", &["branch", "--delete", branch_name])?.wait()?;
+        Process::spawn("git", &["push", "--delete", remote.trim(), branch_name])?.wait()?;
         Ok(())
     }
 
@@ -366,10 +399,11 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn delete_tag(&self, name: &str) -> BackendResult<()> {
+    fn delete_tag(&self, tag: &TagEntry) -> BackendResult<()> {
+        let tag_name = &tag.name;
         let remote = Process::spawn("git", &["remote"])?.wait()?;
-        Process::spawn("git", &["tag", "--delete", name])?.wait()?;
-        Process::spawn("git", &["push", "--delete", remote.trim(), name])?.wait()?;
+        Process::spawn("git", &["tag", "--delete", tag_name])?.wait()?;
+        Process::spawn("git", &["push", "--delete", remote.trim(), tag_name])?.wait()?;
         Ok(())
     }
 }

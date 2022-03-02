@@ -25,7 +25,7 @@ fn main() {
                     println!("\t-v --version\tprint version number and exit");
                 }
                 "-v" | "--version" => {
-                    print!("{}", env!("CARGO_PKG_VERSION"));
+                    println!("{}", env!("CARGO_PKG_VERSION"));
                 }
                 arg => eprintln!("invalid argument '{}'", arg),
             }

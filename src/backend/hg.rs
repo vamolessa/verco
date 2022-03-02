@@ -27,9 +27,9 @@ impl Backend for Hg {
         for line in output.lines() {
             let mut splits = line.splitn(2, ' ');
             let status = parse_file_status(splits.next().unwrap_or("").trim());
-            let name = splits.next().unwrap_or("").into();
+            let filename = splits.next().unwrap_or("").into();
 
-            entries.push(RevisionEntry::new(name, status));
+            entries.push(RevisionEntry::new(filename, status));
         }
 
         Ok(StatusInfo { header, entries })
@@ -235,13 +235,23 @@ impl Backend for Hg {
         Ok((skip, entries))
     }
 
-    fn checkout(&self, revision: &str) -> BackendResult<()> {
+    fn checkout_revision(&self, revision: &str) -> BackendResult<()> {
         Process::spawn("hg", &["update", revision])?.wait()?;
         Ok(())
     }
 
-    fn merge(&self, revision: &str) -> BackendResult<()> {
-        Process::spawn("hg", &["merge", revision])?.wait()?;
+    fn checkout_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        Process::spawn("hg", &["update", &branch.name])?.wait()?;
+        Ok(())
+    }
+
+    fn checkout_tag(&self, tag: &TagEntry) -> BackendResult<()> {
+        Process::spawn("hg", &["update", &tag.name])?.wait()?;
+        Ok(())
+    }
+
+    fn merge_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        Process::spawn("hg", &["merge", &branch.name])?.wait()?;
         Ok(())
     }
 
@@ -284,9 +294,10 @@ impl Backend for Hg {
             .lines()
             .map(|l| {
                 let mut splits = l.splitn(2, '\x1f');
-                let name = splits.next().unwrap_or("").into();
+                let name = splits.next().unwrap_or("").to_string();
+                let checkout_name = name.clone();
                 let checked_out = splits.next().unwrap_or("") == "*";
-                BranchEntry { name, checked_out }
+                BranchEntry { name, checkout_name, checked_out }
             })
             .collect();
         Ok(entries)
@@ -297,11 +308,11 @@ impl Backend for Hg {
         Ok(())
     }
 
-    fn delete_branch(&self, name: &str) -> BackendResult<()> {
+    fn delete_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
         let changeset = Process::spawn("hg", &["identify", "--num"])?.wait()?;
-        self.checkout(name)?;
+        self.checkout_branch(branch)?;
         Process::spawn("hg", &["commit", "-m", "close branch", "--close-branch"])?.wait()?;
-        self.checkout(&changeset)?;
+        self.checkout_revision(&changeset)?;
         Ok(())
     }
 
@@ -319,8 +330,8 @@ impl Backend for Hg {
         Ok(())
     }
 
-    fn delete_tag(&self, name: &str) -> BackendResult<()> {
-        Process::spawn("hg", &["tag", "--remove", name])?.wait()?;
+    fn delete_tag(&self, tag: &TagEntry) -> BackendResult<()> {
+        Process::spawn("hg", &["tag", "--remove", &tag.name])?.wait()?;
         Ok(())
     }
 }

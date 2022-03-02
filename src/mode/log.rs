@@ -14,7 +14,6 @@ pub enum Response {
 enum WaitOperation {
     Refresh,
     Checkout,
-    Merge,
     Fetch,
     Pull,
     Push,
@@ -194,15 +193,7 @@ impl Mode {
                             let entry = &self.entries[current_entry_index];
                             self.state = State::Waiting(WaitOperation::Checkout);
                             let revision = entry.hash.clone();
-                            request(ctx, move |b| b.checkout(&revision));
-                        }
-                    }
-                    Key::Char('m') => {
-                        if let Some(current_entry_index) = current_entry_index {
-                            let entry = &self.entries[current_entry_index];
-                            self.state = State::Waiting(WaitOperation::Merge);
-                            let revision = entry.hash.clone();
-                            request(ctx, move |b| b.merge(&revision));
+                            request(ctx, move |b| b.checkout_revision(&revision));
                         }
                     }
                     Key::Char('f') => {
@@ -264,7 +255,6 @@ impl Mode {
         let name = match self.state {
             State::Idle | State::Waiting(WaitOperation::Refresh) => "log",
             State::Waiting(WaitOperation::Checkout) => "checkout",
-            State::Waiting(WaitOperation::Merge) => "merge",
             State::Waiting(WaitOperation::Fetch) => "fetch",
             State::Waiting(WaitOperation::Pull) => "pull",
             State::Waiting(WaitOperation::Push) => "push",

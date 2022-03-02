@@ -306,13 +306,23 @@ impl Backend for Plastic {
         Ok((0, entries))
     }
 
-    fn checkout(&self, revision: &str) -> BackendResult<()> {
+    fn checkout_revision(&self, revision: &str) -> BackendResult<()> {
         Process::spawn("cm", &["switch", revision])?.wait()?;
         Ok(())
     }
 
-    fn merge(&self, revision: &str) -> BackendResult<()> {
-        let result = Process::spawn("cm", &["merge", "--merge", revision])
+    fn checkout_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        Process::spawn("cm", &["switch", &branch.name])?.wait()?;
+        Ok(())
+    }
+
+    fn checkout_tag(&self, tag: &TagEntry) -> BackendResult<()> {
+        Process::spawn("cm", &["switch", &tag.name])?.wait()?;
+        Ok(())
+    }
+
+    fn merge_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        let result = Process::spawn("cm", &["merge", "--merge", &branch.name])
             .and_then(Process::wait)
             .map(|_| ());
 
@@ -383,9 +393,10 @@ impl Backend for Plastic {
             .wait()?
             .lines()
             .map(|name| {
-                let name = name.into();
+                let name = name.to_string();
+                let checkout_name = name.clone();
                 let checked_out = name == current_branch;
-                BranchEntry { name, checked_out }
+                BranchEntry { name, checkout_name, checked_out }
             })
             .collect();
 
@@ -397,8 +408,8 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    fn delete_branch(&self, name: &str) -> BackendResult<()> {
-        Process::spawn("cm", &["branch", "delete", name])?.wait()?;
+    fn delete_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        Process::spawn("cm", &["branch", "delete", &branch.name])?.wait()?;
         Ok(())
     }
 
@@ -416,8 +427,8 @@ impl Backend for Plastic {
         Ok(())
     }
 
-    fn delete_tag(&self, name: &str) -> BackendResult<()> {
-        Process::spawn("cm", &["label", "delete", name])?.wait()?;
+    fn delete_tag(&self, tag: &TagEntry) -> BackendResult<()> {
+        Process::spawn("cm", &["label", "delete", &tag.name])?.wait()?;
         Ok(())
     }
 }

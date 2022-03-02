@@ -95,12 +95,11 @@ impl Mode {
                         Key::Ctrl('f') => self.filter.enter(),
                         Key::Char('g') => {
                             if let Some(current_entry_index) = current_entry_index {
-                                let entry = &self.entries[current_entry_index];
-                                let name = entry.name.clone();
+                                let entry = self.entries[current_entry_index].clone();
                                 let ctx = ctx.clone();
                                 thread::spawn(move || {
                                     ctx.event_sender.send_mode_change(ModeKind::Log);
-                                    match ctx.backend.checkout(&name) {
+                                    match ctx.backend.checkout_branch(&entry) {
                                         Ok(()) => {
                                             ctx.event_sender.send_response(ModeResponse::Branches(
                                                 Response::Checkout,
@@ -122,27 +121,25 @@ impl Mode {
                         }
                         Key::Char('D') => {
                             if let Some(current_entry_index) = current_entry_index {
-                                let entry = &self.entries[current_entry_index];
+                                let entry = self.entries[current_entry_index].clone();
                                 self.state = State::Waiting(WaitOperation::Delete);
 
-                                let name = entry.name.clone();
                                 self.entries.remove(current_entry_index);
                                 self.filter.on_remove_entry(current_entry_index);
                                 self.select.on_remove_entry(self.select.cursor);
 
-                                request(ctx, move |b| b.delete_branch(&name));
+                                request(ctx, move |b| b.delete_branch(&entry));
                             }
                         }
                         Key::Char('m') => {
                             if let Some(current_entry_index) = current_entry_index {
-                                let entry = &self.entries[current_entry_index];
+                                let entry = self.entries[current_entry_index].clone();
                                 self.state = State::Waiting(WaitOperation::Merge);
 
-                                let name = entry.name.clone();
                                 let ctx = ctx.clone();
                                 thread::spawn(move || {
                                     ctx.event_sender.send_mode_change(ModeKind::Log);
-                                    match ctx.backend.merge(&name) {
+                                    match ctx.backend.merge_branch(&entry) {
                                         Ok(()) => {
                                             ctx.event_sender.send_response(ModeResponse::Branches(
                                                 Response::Merge,

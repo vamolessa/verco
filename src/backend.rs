@@ -103,8 +103,10 @@ impl FilterEntry for LogEntry {
     }
 }
 
+#[derive(Clone)]
 pub struct BranchEntry {
     pub name: String,
+    pub checkout_name: String,
     pub checked_out: bool,
 }
 impl FilterEntry for BranchEntry {
@@ -113,6 +115,7 @@ impl FilterEntry for BranchEntry {
     }
 }
 
+#[derive(Clone)]
 pub struct TagEntry {
     pub name: String,
 }
@@ -131,8 +134,10 @@ pub trait Backend: 'static + Send + Sync {
     fn resolve_taking_theirs(&self, entries: &[RevisionEntry]) -> BackendResult<()>;
 
     fn log(&self, start: usize, len: usize) -> BackendResult<(usize, Vec<LogEntry>)>;
-    fn checkout(&self, revision: &str) -> BackendResult<()>;
-    fn merge(&self, revision: &str) -> BackendResult<()>;
+    fn checkout_revision(&self, revision: &str) -> BackendResult<()>;
+    fn checkout_branch(&self, branch: &BranchEntry) -> BackendResult<()>;
+    fn checkout_tag(&self, tag: &TagEntry) -> BackendResult<()>;
+    fn merge_branch(&self, branch: &BranchEntry) -> BackendResult<()>;
     fn fetch(&self) -> BackendResult<()>;
     fn pull(&self) -> BackendResult<()>;
     fn push(&self) -> BackendResult<()>;
@@ -141,11 +146,11 @@ pub trait Backend: 'static + Send + Sync {
 
     fn branches(&self) -> BackendResult<Vec<BranchEntry>>;
     fn new_branch(&self, name: &str) -> BackendResult<()>;
-    fn delete_branch(&self, name: &str) -> BackendResult<()>;
+    fn delete_branch(&self, name: &BranchEntry) -> BackendResult<()>;
 
     fn tags(&self) -> BackendResult<Vec<TagEntry>>;
     fn new_tag(&self, name: &str) -> BackendResult<()>;
-    fn delete_tag(&self, name: &str) -> BackendResult<()>;
+    fn delete_tag(&self, name: &TagEntry) -> BackendResult<()>;
 }
 
 pub struct Process(Child);
