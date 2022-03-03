@@ -53,7 +53,7 @@ impl Key {
     }
 
     pub fn is_cancel(&self) -> bool {
-        matches!(self, Self::Esc | Self::Ctrl('c') | Self::Char('q'))
+        matches!(self, Self::Esc | Self::Ctrl('c'))
     }
 }
 
