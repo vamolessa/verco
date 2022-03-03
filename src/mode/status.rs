@@ -247,7 +247,16 @@ impl Mode {
                         self.on_enter(ctx);
                     }
                 }
-                _ => self.output.on_key(available_height, key),
+                State::ViewDiff => {
+                    if key.is_cancel() {
+                        self.on_enter(ctx);
+                        return ModeStatus {
+                            pending_input: true,
+                        };
+                    }
+
+                    self.output.on_key(available_height, key);
+                }
             }
         }
 

@@ -81,7 +81,10 @@ impl Application {
 
         if !status.pending_input {
             if key.is_cancel() {
-                return false;
+                match self.current_mode {
+                    ModeKind::RevisionDetails(_) => self.enter_mode(ctx, ModeKind::Log),
+                    _ => return false,
+                }
             }
 
             match key {
