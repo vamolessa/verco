@@ -30,7 +30,7 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for TagEntry {
-    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool, _: bool) -> usize {
         drawer.str(&self.name);
         1
     }
@@ -203,6 +203,7 @@ impl Mode {
                         &self.select,
                         filter_line_count,
                         false,
+                        self.filter.is_filtering(),
                         self.filter
                             .visible_indices()
                             .iter()

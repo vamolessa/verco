@@ -233,6 +233,7 @@ impl Mode {
                 &self.select,
                 (line_count + 1).min(u16::MAX as _) as _,
                 false,
+                self.filter.is_filtering(),
                 self.filter
                     .visible_indices()
                     .iter()
@@ -241,4 +242,3 @@ impl Mode {
         }
     }
 }
-

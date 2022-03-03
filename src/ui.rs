@@ -77,7 +77,7 @@ impl fmt::Display for Color {
 }
 
 pub trait SelectEntryDraw {
-    fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool) -> usize;
+    fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool, has_filter: bool) -> usize;
 }
 
 pub struct Drawer {
@@ -345,6 +345,7 @@ impl Drawer {
         select: &SelectMenu,
         header_height: usize,
         show_full_hovered_entry: bool,
+        has_filter: bool,
         entries: I,
     ) where
         I: 'entries + Iterator<Item = &'entries E>,
@@ -365,7 +366,12 @@ impl Drawer {
                 set_background_color(&mut self.buf, Color::DarkMagenta);
             }
 
-            line_count += entry.draw(self, hovered, hovered && show_full_hovered_entry);
+            line_count += entry.draw(
+                self,
+                hovered,
+                hovered && show_full_hovered_entry,
+                has_filter,
+            );
 
             clear_until_new_line(&mut self.buf);
             move_cursor_to_next_line(&mut self.buf);

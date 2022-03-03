@@ -30,7 +30,7 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for LogEntry {
-    fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool) -> usize {
+    fn draw(&self, drawer: &mut Drawer, hovered: bool, full: bool, is_filtering: bool) -> usize {
         fn color(color: Color, hovered: bool) -> Color {
             if hovered {
                 Color::White
@@ -45,7 +45,9 @@ impl SelectEntryDraw for LogEntry {
             None => &self.author,
         };
 
-        let mut total_chars = self.graph.chars().count()
+        let graph = if is_filtering { "" } else { &self.graph };
+
+        let mut total_chars = graph.chars().count()
             + 1
             + self.hash.chars().count()
             + 1
@@ -90,7 +92,7 @@ impl SelectEntryDraw for LogEntry {
         drawer.fmt(format_args!(
             "{}{} {}{} {}{} {}{} {}{}{}{}{}",
             color(Color::White, hovered),
-            &self.graph,
+            &graph,
             color(Color::DarkYellow, hovered),
             &self.hash,
             color(Color::DarkBlue, hovered),
@@ -272,6 +274,7 @@ impl Mode {
                 &self.select,
                 filter_line_count,
                 self.show_full_hovered_message,
+                self.filter.is_filtering(),
                 self.filter
                     .visible_indices()
                     .iter()

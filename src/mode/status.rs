@@ -37,7 +37,7 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for RevisionEntry {
-    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool, _: bool) -> usize {
         const NAME_TOO_LONG_PREFIX: &str = "...";
 
         let name_available_width = (drawer.viewport_size.0 as usize)
@@ -347,6 +347,7 @@ impl Mode {
                         &self.select,
                         2 + filter_line_count,
                         false,
+                        self.filter.is_filtering(),
                         self.filter
                             .visible_indices()
                             .iter()

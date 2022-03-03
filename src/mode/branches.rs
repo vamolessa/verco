@@ -32,7 +32,7 @@ impl Default for State {
 }
 
 impl SelectEntryDraw for BranchEntry {
-    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool) -> usize {
+    fn draw(&self, drawer: &mut Drawer, _: bool, _: bool, _: bool) -> usize {
         let status = if self.checked_out {
             " (checked out)"
         } else {
@@ -240,6 +240,7 @@ impl Mode {
                         &self.select,
                         filter_line_count,
                         false,
+                        self.filter.is_filtering(),
                         self.filter
                             .visible_indices()
                             .iter()
