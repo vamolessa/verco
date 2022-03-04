@@ -338,6 +338,10 @@ impl Backend for Plastic {
         self.pull()
     }
 
+    fn fetch_branch(&self, _: &BranchEntry) -> BackendResult<()> {
+        Ok(())
+    }
+
     fn pull(&self) -> BackendResult<()> {
         Process::spawn("cm", &["update"])?.wait()?;
         Ok(())
@@ -399,6 +403,7 @@ impl Backend for Plastic {
                 BranchEntry {
                     name,
                     checkout_name,
+                    tracking_status: String::new(),
                     checked_out,
                 }
             })

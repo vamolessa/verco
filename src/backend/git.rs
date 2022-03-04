@@ -279,6 +279,10 @@ impl Backend for Git {
         Ok(())
     }
 
+    fn fetch_branch(&self, _branch: &BranchEntry) -> BackendResult<()> {
+        Ok(())
+    }
+
     fn pull(&self) -> BackendResult<()> {
         Process::spawn("git", &["pull", "--all"])?.wait()?;
         Ok(())
@@ -335,13 +339,13 @@ impl Backend for Git {
                 "branch",
                 "--list",
                 "--all",
-                "--format=%(refname:short)%00%(upstream:short)%00%(HEAD)",
+                "--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)%00%(HEAD)",
             ],
         )?
         .wait()?
         .lines()
         .filter_map(|l| {
-            let mut splits = l.splitn(3, '\0');
+            let mut splits = l.splitn(4, '\0');
             let name = splits.next()?;
             let upstream_name = splits.next()?;
 
@@ -360,10 +364,13 @@ impl Backend for Git {
 
             let name = name.into();
             let checkout_name = checkout_name.into();
+            let tracking_status = splits.next()?.into();
             let checked_out = splits.next().unwrap_or("") == "*";
+
             Some(BranchEntry {
                 name,
                 checkout_name,
+                tracking_status,
                 checked_out,
             })
         })
