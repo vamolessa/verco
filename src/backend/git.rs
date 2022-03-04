@@ -292,7 +292,7 @@ impl Backend for Git {
             None => return Ok(()),
         };
 
-        let tracking = format!("{}:{}", &branch.name, remote_branch_name);
+        let tracking = format!("{}:{}", remote_branch_name, &branch.name);
         Process::spawn("git", &["fetch", remote, &tracking])?.wait()?;
         Ok(())
     }
