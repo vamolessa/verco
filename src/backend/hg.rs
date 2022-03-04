@@ -299,11 +299,11 @@ impl Backend for Hg {
             .map(|l| {
                 let mut splits = l.splitn(2, '\x1f');
                 let name = splits.next().unwrap_or("").to_string();
-                let checkout_name = name.clone();
+                let upstream_name = name.clone();
                 let checked_out = splits.next().unwrap_or("") == "*";
                 BranchEntry {
                     name,
-                    checkout_name,
+                    upstream_name,
                     tracking_status: String::new(),
                     checked_out,
                 }

@@ -398,11 +398,11 @@ impl Backend for Plastic {
             .lines()
             .map(|name| {
                 let name = name.to_string();
-                let checkout_name = name.clone();
+                let upstream_name = name.clone();
                 let checked_out = name == current_branch;
                 BranchEntry {
                     name,
-                    checkout_name,
+                    upstream_name,
                     tracking_status: String::new(),
                     checked_out,
                 }

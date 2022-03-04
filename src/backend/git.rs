@@ -255,11 +255,15 @@ impl Backend for Git {
     }
 
     fn checkout_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
-        let branch_name = &branch.name;
-        let branch_name = match branch_name.strip_prefix("origin/") {
-            Some(stripped) => stripped,
-            None => &branch_name,
+        let branch_name = if branch.upstream_name.is_empty() {
+            match branch.name.find('/') {
+                Some(i) => &branch.name[i + 1..],
+                None => return Ok(()),
+            }
+        } else {
+            &branch.name
         };
+
         Process::spawn("git", &["checkout", branch_name])?.wait()?;
         Ok(())
     }
@@ -279,7 +283,17 @@ impl Backend for Git {
         Ok(())
     }
 
-    fn fetch_branch(&self, _branch: &BranchEntry) -> BackendResult<()> {
+    fn fetch_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        if branch.upstream_name.is_empty() {
+            return Ok(());
+        }
+        let (remote, remote_branch_name) = match branch.upstream_name.find('/') {
+            Some(i) => (&branch.upstream_name[..i], &branch.upstream_name[i + 1..]),
+            None => return Ok(()),
+        };
+
+        let tracking = format!("{}:{}", &branch.name, remote_branch_name);
+        Process::spawn("git", &["fetch", remote, &tracking])?.wait()?;
         Ok(())
     }
 
@@ -349,27 +363,24 @@ impl Backend for Git {
             let name = splits.next()?;
             let upstream_name = splits.next()?;
 
-            let (name, checkout_name) = if upstream_name.is_empty() {
-                let checkout_name = match name.find('/') {
+            if upstream_name.is_empty() {
+                let branch_name = match name.find('/') {
                     Some(i) => &name[i + 1..],
                     None => "",
                 };
-                if checkout_name == "HEAD" {
+                if branch_name == "HEAD" {
                     return None;
                 }
-                (name, checkout_name)
-            } else {
-                (name, name)
-            };
+            }
 
             let name = name.into();
-            let checkout_name = checkout_name.into();
+            let upstream_name = upstream_name.into();
             let tracking_status = splits.next()?.into();
             let checked_out = splits.next().unwrap_or("") == "*";
 
             Some(BranchEntry {
                 name,
-                checkout_name,
+                upstream_name,
                 tracking_status,
                 checked_out,
             })

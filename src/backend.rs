@@ -106,7 +106,7 @@ impl FilterEntry for LogEntry {
 #[derive(Clone)]
 pub struct BranchEntry {
     pub name: String,
-    pub checkout_name: String,
+    pub upstream_name: String,
     pub tracking_status: String,
     pub checked_out: bool,
 }
