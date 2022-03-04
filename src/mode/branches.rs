@@ -290,4 +290,3 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
-
