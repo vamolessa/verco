@@ -338,6 +338,10 @@ impl Backend for Plastic {
         self.pull()
     }
 
+    fn fetch_branch(&self, _: &BranchEntry) -> BackendResult<()> {
+        Ok(())
+    }
+
     fn pull(&self) -> BackendResult<()> {
         Process::spawn("cm", &["update"])?.wait()?;
         Ok(())
@@ -394,11 +398,12 @@ impl Backend for Plastic {
             .lines()
             .map(|name| {
                 let name = name.to_string();
-                let checkout_name = name.clone();
+                let upstream_name = name.clone();
                 let checked_out = name == current_branch;
                 BranchEntry {
                     name,
-                    checkout_name,
+                    upstream_name,
+                    tracking_status: String::new(),
                     checked_out,
                 }
             })

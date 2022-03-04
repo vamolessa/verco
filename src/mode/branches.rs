@@ -16,6 +16,7 @@ pub enum Response {
 enum WaitOperation {
     Refresh,
     New,
+    Fetch,
     Delete,
     Merge,
 }
@@ -34,11 +35,14 @@ impl Default for State {
 impl SelectEntryDraw for BranchEntry {
     fn draw(&self, drawer: &mut Drawer, _: bool, _: bool, _: bool) -> usize {
         let status = if self.checked_out {
-            " (checked out)"
+            "(checked out)"
         } else {
             ""
         };
-        drawer.fmt(format_args!("{}{}", self.name, status));
+        drawer.fmt(format_args!(
+            "{} {} {}",
+            &self.name, &self.tracking_status, status
+        ));
         1
     }
 }
@@ -117,6 +121,14 @@ impl Mode {
                             self.output.set(String::new());
                             self.filter.clear();
                             self.readline.clear();
+                        }
+                        Key::Char('f') => {
+                            if let Some(current_entry_index) = current_entry_index {
+                                let entry = self.entries[current_entry_index].clone();
+                                self.state = State::Waiting(WaitOperation::Fetch);
+
+                                request(ctx, move |b| b.fetch_branch(&entry));
+                            }
                         }
                         Key::Char('D') => {
                             if let Some(current_entry_index) = current_entry_index {
@@ -214,13 +226,14 @@ impl Mode {
         let name = match self.state {
             State::Idle | State::Waiting(WaitOperation::Refresh) => "branches",
             State::Waiting(WaitOperation::New) => "new branch",
+            State::Waiting(WaitOperation::Fetch) => "fetch branch",
             State::Waiting(WaitOperation::Delete) => "delete branch",
             State::Waiting(WaitOperation::Merge) => "merge branch",
             State::NewNameInput => "new branch name",
         };
         let (left_help, right_help) = match self.state {
             State::Idle | State::Waiting(_) => (
-                "[g]checkout [n]new [D]delete [m]merge",
+                "[g]checkout [n]new [f]fetch [D]delete [m]merge",
                 "[arrows]move [ctrl+f]filter",
             ),
             State::NewNameInput => (
@@ -272,3 +285,4 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
+

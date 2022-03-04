@@ -255,11 +255,15 @@ impl Backend for Git {
     }
 
     fn checkout_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
-        let branch_name = &branch.name;
-        let branch_name = match branch_name.strip_prefix("origin/") {
-            Some(stripped) => stripped,
-            None => &branch_name,
+        let branch_name = if branch.upstream_name.is_empty() {
+            match branch.name.find('/') {
+                Some(i) => &branch.name[i + 1..],
+                None => return Ok(()),
+            }
+        } else {
+            &branch.name
         };
+
         Process::spawn("git", &["checkout", branch_name])?.wait()?;
         Ok(())
     }
@@ -276,6 +280,20 @@ impl Backend for Git {
 
     fn fetch(&self) -> BackendResult<()> {
         Process::spawn("git", &["fetch", "--all", "--prune"])?.wait()?;
+        Ok(())
+    }
+
+    fn fetch_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        if branch.upstream_name.is_empty() {
+            return Ok(());
+        }
+        let (remote, remote_branch_name) = match branch.upstream_name.find('/') {
+            Some(i) => (&branch.upstream_name[..i], &branch.upstream_name[i + 1..]),
+            None => return Ok(()),
+        };
+
+        let tracking = format!("{}:{}", remote_branch_name, &branch.name);
+        Process::spawn("git", &["fetch", remote, &tracking])?.wait()?;
         Ok(())
     }
 
@@ -335,35 +353,35 @@ impl Backend for Git {
                 "branch",
                 "--list",
                 "--all",
-                "--format=%(refname:short)%00%(upstream:short)%00%(HEAD)",
+                "--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)%00%(HEAD)",
             ],
         )?
         .wait()?
         .lines()
         .filter_map(|l| {
-            let mut splits = l.splitn(3, '\0');
+            let mut splits = l.splitn(4, '\0');
             let name = splits.next()?;
             let upstream_name = splits.next()?;
 
-            let (name, checkout_name) = if upstream_name.is_empty() {
-                let checkout_name = match name.find('/') {
+            if upstream_name.is_empty() {
+                let branch_name = match name.find('/') {
                     Some(i) => &name[i + 1..],
                     None => "",
                 };
-                if checkout_name == "HEAD" {
+                if branch_name == "HEAD" {
                     return None;
                 }
-                (name, checkout_name)
-            } else {
-                (name, name)
-            };
+            }
 
             let name = name.into();
-            let checkout_name = checkout_name.into();
+            let upstream_name = upstream_name.into();
+            let tracking_status = splits.next()?.into();
             let checked_out = splits.next().unwrap_or("") == "*";
+
             Some(BranchEntry {
                 name,
-                checkout_name,
+                upstream_name,
+                tracking_status,
                 checked_out,
             })
         })

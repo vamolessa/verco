@@ -106,7 +106,8 @@ impl FilterEntry for LogEntry {
 #[derive(Clone)]
 pub struct BranchEntry {
     pub name: String,
-    pub checkout_name: String,
+    pub upstream_name: String,
+    pub tracking_status: String,
     pub checked_out: bool,
 }
 impl FilterEntry for BranchEntry {
@@ -139,6 +140,7 @@ pub trait Backend: 'static + Send + Sync {
     fn checkout_tag(&self, tag: &TagEntry) -> BackendResult<()>;
     fn merge_branch(&self, branch: &BranchEntry) -> BackendResult<()>;
     fn fetch(&self) -> BackendResult<()>;
+    fn fetch_branch(&self, branch: &BranchEntry) -> BackendResult<()>;
     fn pull(&self) -> BackendResult<()>;
     fn push(&self) -> BackendResult<()>;
 
@@ -146,11 +148,11 @@ pub trait Backend: 'static + Send + Sync {
 
     fn branches(&self) -> BackendResult<Vec<BranchEntry>>;
     fn new_branch(&self, name: &str) -> BackendResult<()>;
-    fn delete_branch(&self, name: &BranchEntry) -> BackendResult<()>;
+    fn delete_branch(&self, branch: &BranchEntry) -> BackendResult<()>;
 
     fn tags(&self) -> BackendResult<Vec<TagEntry>>;
     fn new_tag(&self, name: &str) -> BackendResult<()>;
-    fn delete_tag(&self, name: &TagEntry) -> BackendResult<()>;
+    fn delete_tag(&self, tag: &TagEntry) -> BackendResult<()>;
 }
 
 pub struct Process(Child);
