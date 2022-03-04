@@ -55,6 +55,7 @@ pub struct Mode {
     select: SelectMenu,
     filter: Filter,
     readline: ReadLine,
+    is_first_refresh: bool,
 }
 impl Mode {
     pub fn on_enter(&mut self, ctx: &ModeContext) {
@@ -69,6 +70,7 @@ impl Mode {
         self.select.fix_cursor_on_filter(cursor, available_height);
         self.readline.clear();
 
+        self.is_first_refresh = true;
         request(ctx, |_| Ok(()));
     }
 
@@ -205,11 +207,14 @@ impl Mode {
                     (ctx.viewport_size.1 as usize).saturating_sub(RESERVED_LINES_COUNT);
                 self.select.fix_cursor_on_filter(cursor, available_height);
 
-                if let Some(i) = self.entries.iter().position(|e| e.checked_out) {
-                    if let Ok(i) = self.filter.visible_indices().binary_search(&i) {
-                        self.select.cursor = i;
+                if self.is_first_refresh {
+                    if let Some(i) = self.entries.iter().position(|e| e.checked_out) {
+                        if let Ok(i) = self.filter.visible_indices().binary_search(&i) {
+                            self.select.cursor = i;
+                        }
                     }
                 }
+                self.is_first_refresh = false;
             }
             Response::Checkout | Response::Merge => self.state = State::Idle,
         }
@@ -285,3 +290,4 @@ where
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
+

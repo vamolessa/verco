@@ -154,7 +154,6 @@ impl Mode {
 
         if self.filter.has_focus() {
             self.filter.on_key(key);
-
             let cursor = self.filter.filter(self.entries.iter(), self.select.cursor);
             self.select.fix_cursor_on_filter(cursor, available_height);
         } else {
