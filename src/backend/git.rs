@@ -284,6 +284,10 @@ impl Backend for Git {
     }
 
     fn fetch_branch(&self, branch: &BranchEntry) -> BackendResult<()> {
+        if branch.checked_out {
+            return self.pull();
+        }
+
         if branch.upstream_name.is_empty() {
             return Ok(());
         }
