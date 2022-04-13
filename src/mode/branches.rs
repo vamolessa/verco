@@ -283,10 +283,16 @@ where
 
         let mut result = f(ctx.backend.deref()).and_then(|_| ctx.backend.branches());
         if let Ok(entries) = &mut result {
-            entries.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+            entries.sort_unstable_by(|a, b| {
+                a.upstream_name
+                    .is_empty()
+                    .cmp(&b.upstream_name.is_empty())
+                    .then_with(|| a.name.cmp(&b.name))
+            });
         }
 
         ctx.event_sender
             .send_response(ModeResponse::Branches(Response::Refresh(result)));
     });
 }
+
