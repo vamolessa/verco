@@ -80,7 +80,7 @@ impl Application {
         };
 
         if !status.pending_input {
-            if key.is_cancel() {
+            if key.is_cancel() || key == Key::Char('q') {
                 match self.current_mode {
                     ModeKind::RevisionDetails(_) => self.enter_mode(ctx, ModeKind::Log),
                     _ => return false,

@@ -10,7 +10,7 @@ checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
 
 [[package]]
 name = "verco"
-version = "6.10.0"
+version = "6.11.0"
 dependencies = [
  "libc",
  "winapi",

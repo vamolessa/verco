@@ -248,7 +248,7 @@ impl Mode {
                     }
                 }
                 State::ViewDiff => {
-                    if key.is_cancel() {
+                    if key.is_cancel() || key == Key::Char('q') {
                         self.on_enter(ctx);
                         return ModeStatus {
                             pending_input: true,
