@@ -197,7 +197,7 @@ impl SelectMenu {
 }
 
 pub trait FilterEntry {
-    fn fuzzy_matches(&self, pattern: &str) -> bool;
+    fn fuzzy_matches(&self, matcher: &mut FuzzyMatcher, pattern: &str) -> bool;
 }
 
 #[derive(Default)]
@@ -205,6 +205,7 @@ pub struct Filter {
     has_focus: bool,
     readline: ReadLine,
     visible_indices: Vec<usize>,
+    matcher: FuzzyMatcher,
 }
 impl Filter {
     pub fn clear(&mut self) {
@@ -238,7 +239,7 @@ impl Filter {
 
         self.visible_indices.clear();
         for (i, entry) in entries.enumerate() {
-            if entry.fuzzy_matches(self.as_str()) {
+            if entry.fuzzy_matches(&mut self.matcher, self.readline.input()) {
                 self.visible_indices.push(i);
             }
         }
@@ -282,31 +283,84 @@ impl Filter {
     }
 }
 
-pub fn fuzzy_matches(text: &str, pattern: &str) -> bool {
-    let mut pattern_chars = pattern.chars();
-    let mut pattern_char = match pattern_chars.next() {
-        Some(c) => c,
-        None => return true,
-    };
+const FIRST_CHAR_SCORE: u32 = 1;
+const WORD_BOUNDARY_MATCH_SCORE: u32 = 2;
+const CONSECUTIVE_MATCH_SCORE: u32 = 3;
 
-    let mut previous_matched_index = 0;
-    let mut was_alphanumeric = false;
+struct FuzzyMatch {
+    rest_index: u32,
+    score: u32,
+}
 
-    for (i, text_char) in text.char_indices() {
-        if text_char.eq_ignore_ascii_case(&pattern_char) {
-            let is_alphanumeric = text_char.is_ascii_alphanumeric();
-            let matched = !is_alphanumeric || !was_alphanumeric || previous_matched_index + 1 == i;
-            was_alphanumeric = is_alphanumeric;
+#[derive(Default)]
+pub struct FuzzyMatcher {
+    previous_matches: Vec<FuzzyMatch>,
+    next_matches: Vec<FuzzyMatch>,
+}
+impl FuzzyMatcher {
+    pub fn fuzzy_matches(&mut self, text: &str, pattern: &str) -> bool {
+        if pattern.is_empty() {
+            return true;
+        }
 
-            if matched {
-                previous_matched_index = i;
-                pattern_char = match pattern_chars.next() {
-                    Some(c) => c,
-                    None => return true,
-                };
+        self.previous_matches.clear();
+        self.previous_matches.push(FuzzyMatch {
+            rest_index: 0,
+            score: 0,
+        });
+
+        for pattern_char in pattern.chars() {
+            self.next_matches.clear();
+
+            for previous_match in &self.previous_matches {
+                let mut previous_text_char = '\0';
+                for (i, text_char) in text[previous_match.rest_index as usize..].char_indices() {
+                    if text_char.eq_ignore_ascii_case(&pattern_char) {
+                        let (matched, mut score) = if i == 0 && previous_match.rest_index != 0 {
+                            (true, CONSECUTIVE_MATCH_SCORE)
+                        } else if !text_char.is_ascii_alphanumeric() {
+                            (true, 0)
+                        } else {
+                            let is_word_boundary = (!previous_text_char.is_ascii_alphanumeric()
+                                && text_char.is_ascii_alphanumeric())
+                                || (previous_text_char.is_ascii_lowercase()
+                                    && text_char.is_ascii_uppercase());
+                            (is_word_boundary, WORD_BOUNDARY_MATCH_SCORE)
+                        };
+
+                        if matched {
+                            if i == 0 && previous_match.rest_index == 0 {
+                                score += FIRST_CHAR_SCORE;
+                            }
+
+                            let rest_index =
+                                previous_match.rest_index + (i + text_char.len_utf8()) as u32;
+                            let score = previous_match.score + score;
+                            self.next_matches.push(FuzzyMatch {
+                                rest_index,
+                                score,
+                            });
+                        }
+                    }
+
+                    previous_text_char = text_char;
+                }
+            }
+
+            if self.next_matches.is_empty() {
+                return false;
+            }
+            std::mem::swap(&mut self.previous_matches, &mut self.next_matches);
+        }
+
+        let mut best_score = 0;
+        for previous_match in &self.previous_matches {
+            if best_score < previous_match.score {
+                best_score = previous_match.score;
             }
         }
-    }
 
-    false
+        best_score > 0
+    }
 }
+

@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::mode::{fuzzy_matches, FilterEntry};
+use crate::mode::{FilterEntry, FuzzyMatcher};
 
 pub mod git;
 pub mod hg;
@@ -80,8 +80,8 @@ impl RevisionEntry {
     }
 }
 impl FilterEntry for RevisionEntry {
-    fn fuzzy_matches(&self, pattern: &str) -> bool {
-        fuzzy_matches(&self.name, pattern)
+    fn fuzzy_matches(&self, matcher: &mut FuzzyMatcher, pattern: &str) -> bool {
+        matcher.fuzzy_matches(&self.name, pattern)
     }
 }
 
@@ -94,12 +94,12 @@ pub struct LogEntry {
     pub message: String,
 }
 impl FilterEntry for LogEntry {
-    fn fuzzy_matches(&self, pattern: &str) -> bool {
-        fuzzy_matches(&self.message, pattern)
-            || fuzzy_matches(&self.refs, pattern)
-            || fuzzy_matches(&self.author, pattern)
-            || fuzzy_matches(&self.date, pattern)
-            || fuzzy_matches(&self.hash, pattern)
+    fn fuzzy_matches(&self, matcher: &mut FuzzyMatcher, pattern: &str) -> bool {
+        matcher.fuzzy_matches(&self.message, pattern)
+            || matcher.fuzzy_matches(&self.refs, pattern)
+            || matcher.fuzzy_matches(&self.author, pattern)
+            || matcher.fuzzy_matches(&self.date, pattern)
+            || matcher.fuzzy_matches(&self.hash, pattern)
     }
 }
 
@@ -111,8 +111,8 @@ pub struct BranchEntry {
     pub checked_out: bool,
 }
 impl FilterEntry for BranchEntry {
-    fn fuzzy_matches(&self, pattern: &str) -> bool {
-        fuzzy_matches(&self.name, pattern)
+    fn fuzzy_matches(&self, matcher: &mut FuzzyMatcher, pattern: &str) -> bool {
+        matcher.fuzzy_matches(&self.name, pattern)
     }
 }
 
@@ -121,8 +121,8 @@ pub struct TagEntry {
     pub name: String,
 }
 impl FilterEntry for TagEntry {
-    fn fuzzy_matches(&self, pattern: &str) -> bool {
-        fuzzy_matches(&self.name, pattern)
+    fn fuzzy_matches(&self, matcher: &mut FuzzyMatcher, pattern: &str) -> bool {
+        matcher.fuzzy_matches(&self.name, pattern)
     }
 }
 
@@ -204,3 +204,4 @@ pub fn backend_from_current_repository() -> Option<(PathBuf, Arc<dyn Backend>)> 
         None
     }
 }
+
