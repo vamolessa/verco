@@ -283,13 +283,8 @@ impl Filter {
     }
 }
 
-const FIRST_CHAR_SCORE: u32 = 1;
-const WORD_BOUNDARY_MATCH_SCORE: u32 = 2;
-const CONSECUTIVE_MATCH_SCORE: u32 = 3;
-
 struct FuzzyMatch {
     rest_index: u32,
-    score: u32,
 }
 
 #[derive(Default)]
@@ -304,10 +299,7 @@ impl FuzzyMatcher {
         }
 
         self.previous_matches.clear();
-        self.previous_matches.push(FuzzyMatch {
-            rest_index: 0,
-            score: 0,
-        });
+        self.previous_matches.push(FuzzyMatch { rest_index: 0 });
 
         for pattern_char in pattern.chars() {
             self.next_matches.clear();
@@ -316,30 +308,22 @@ impl FuzzyMatcher {
                 let mut previous_text_char = '\0';
                 for (i, text_char) in text[previous_match.rest_index as usize..].char_indices() {
                     if text_char.eq_ignore_ascii_case(&pattern_char) {
-                        let (matched, mut score) = if i == 0 && previous_match.rest_index != 0 {
-                            (true, CONSECUTIVE_MATCH_SCORE)
+                        let matched = if i == 0 && previous_match.rest_index != 0 {
+                            true
                         } else if !text_char.is_ascii_alphanumeric() {
-                            (true, 0)
+                            true
                         } else {
                             let is_word_boundary = (!previous_text_char.is_ascii_alphanumeric()
                                 && text_char.is_ascii_alphanumeric())
                                 || (previous_text_char.is_ascii_lowercase()
                                     && text_char.is_ascii_uppercase());
-                            (is_word_boundary, WORD_BOUNDARY_MATCH_SCORE)
+                            is_word_boundary
                         };
 
                         if matched {
-                            if i == 0 && previous_match.rest_index == 0 {
-                                score += FIRST_CHAR_SCORE;
-                            }
-
                             let rest_index =
                                 previous_match.rest_index + (i + text_char.len_utf8()) as u32;
-                            let score = previous_match.score + score;
-                            self.next_matches.push(FuzzyMatch {
-                                rest_index,
-                                score,
-                            });
+                            self.next_matches.push(FuzzyMatch { rest_index });
                         }
                     }
 
@@ -353,14 +337,7 @@ impl FuzzyMatcher {
             std::mem::swap(&mut self.previous_matches, &mut self.next_matches);
         }
 
-        let mut best_score = 0;
-        for previous_match in &self.previous_matches {
-            if best_score < previous_match.score {
-                best_score = previous_match.score;
-            }
-        }
-
-        best_score > 0
+        true
     }
 }
 
