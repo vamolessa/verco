@@ -340,4 +340,3 @@ impl FuzzyMatcher {
         true
     }
 }
-
